@@ -3,9 +3,9 @@
 此仓库用于维护 `riowang88/CCBaga` 的本地修改，源自 [liseami/CCBaga](https://github.com/liseami/CCBaga)。保留上游 Git 历史、MIT 许可和第三方声明。
 
 - 日常工作目录：`~/Documents/CCBaga`。
-- `origin`：`https://github.com/riowang88/CCBaga.git`（私有）；`upstream`：原作者仓库。日常修改推送 `origin/main`。
+- `origin`：`https://github.com/riowang88/CCBaga.git`（公开）；`upstream`：原作者仓库。日常修改推送 `origin/main`。
 - 导入基线：上游 `5659b3c9fb7cf836e71707a77c8be267de393747` 加本地已验证修复，对应已安装的 `0.2.49+local.identity.6`。
-- 源码版本字段沿用上游；上述本机版本通过构建时配置覆盖，不代表仓库已建立自动版本或发布流程。
+- 源码版本基数已调整为 `0.2.49`；发布工作流按该基数加运行号递增，确保新版本高于已安装版本。上述本机版本通过构建时配置覆盖。
 
 ## 当前状态
 
@@ -23,4 +23,12 @@
 
 身份保险库、浏览器资料、Cookie、密钥和个人配置属于应用运行数据，不放入源码仓库。`releases/`、身份归档和密钥沿用现有 Git 忽略规则。
 
-应用内更新地址及签名公钥仍指向上游；现有正式发布工作流仍只允许上游所有者发布。本仓库当前用于源码维护，README 原有下载链接仍是上游版本，不包含这里的本地修复。后续建立本仓库安装包或自动更新渠道时，需单独配置版本、签名和发布目标。
+应用内更新地址已配置为 `https://github.com/riowang88/CCBaga/releases/latest/download/latest.json`，使用本仓库独立公钥，仍强制校验签名与版本。macOS/Windows 更新下载地址和发布权限同步到本仓库，仅 `riowang88` 可触发及重跑发布；原有跨平台验收、公证和正式签名要求保留。Linux 仍通过安装包或包管理器更新。
+
+独立更新密钥位于本机仓库外的 `~/.config/ccbaga-release/`（目录 0700、加密私钥与密码文件 0600），已配置 GitHub Secrets `TAURI_SIGNING_PRIVATE_KEY` 和 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`。私钥不进入应用或 Git；维护者应妥善备份该目录。
+
+截至更新渠道迁移时，本仓库没有 Release。正式发布仍缺六项 Apple Secrets：`APPLE_CERTIFICATE`、`APPLE_CERTIFICATE_PASSWORD`、`APPLE_API_PRIVATE_KEY`、`APPLE_API_KEY`、`APPLE_API_ISSUER`、`CC_SIGN_IDENTITY`。取得有效凭据、完成发布验收后，才能生成可用的 `latest.json` 与签名更新包。没有 Release 时新地址返回错误，不能宣称“已是最新版本”。
+
+当前安装的 `0.2.49+local.identity.6` 内嵌的仍是上游地址及公钥。源码配置不会修改已安装应用；首次迁移需安装包含新地址和公钥的构建，之后才能使用本仓库的更新。此次未构建、安装或发布新应用。
+
+更新渠道验证：发布装配 3 项测试通过（含新地址接受、macOS/Windows 旧地址拒绝、未验收产物拒绝）；Tauri 官方更新器 2 项测试通过，使用新密钥签署的一次性测试载荷验证正常签名、字节篡改及版本冒用，不安装任何应用。发布所有者限制、版本基数与应用包标识另已核对。首次发布前仍需验证真实安装包、公证结果与线上下载。

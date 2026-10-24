@@ -16,7 +16,7 @@ result=subprocess.run(['bun','run','tauri','signer','sign','--app-version',versi
 if result.returncode:raise SystemExit('Windows updater signing failed')
 signature=Path(str(installer)+'.sig').read_text(encoding='utf-8').strip()
 manifest=installer.parent/'latest-windows.json'
-manifest.write_text(json.dumps({'version':version,'platforms':{'windows-x86_64':{'url':f'https://github.com/liseami/CCBaga/releases/download/v{version}/{installer.name}','signature':signature}}},indent=2)+'\n',encoding='utf-8')
+manifest.write_text(json.dumps({'version':version,'platforms':{'windows-x86_64':{'url':f'https://github.com/riowang88/CCBaga/releases/download/v{version}/{installer.name}','signature':signature}}},indent=2)+'\n',encoding='utf-8')
 clean={k:v for k,v in env.items() if not k.startswith('TAURI_SIGNING_PRIVATE_KEY')}
 clean.update(CC_UPDATE_MANIFEST=str(manifest),CC_UPDATE_ARCHIVE=str(installer))
 subprocess.run(['cargo','test','--locked','--manifest-path','src-tauri/Cargo.toml','--features','custom-protocol','published_archive_matches_embedded_key_and_signed_version','--','--ignored'],cwd=ROOT,env=clean,check=True)

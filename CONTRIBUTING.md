@@ -17,7 +17,7 @@ Follow the [development guide](README.md#development) or [Linux setup](docs/linu
 - Run the relevant [checks](README.md#checks); verify documentation links for documentation changes.
 - Preserve third-party notices. Original contributions use the [MIT License](LICENSE).
 
-Official versions are published exclusively by **liseami**. Contributor builds are for development and testing.
+Releases from this repository are published exclusively by **riowang88**. Upstream releases remain maintained by **liseami**. Contributor builds are for development and testing.
 
 ## Bug reports
 

@@ -62,3 +62,5 @@ test-browser-dns.ts: 仅虚构 DNS/回环响应，验证无外泄回环 Referer/
 test-browser-doh.ts：隔离内存配置覆盖 zh-Hans-SG、两模式、服务商、自定义地址、保存回读及运行中禁用，中英文范围/回退说明；不写用户网络设置。
 
 test-identity-regressions.ts 追加 browser-only 保存入口、命名提交、当前卡与空模板高亮回归；test-local-identity-sessions.mjs 同时执行无账号元数据与纯浏览器身份的真实 HttpOnly 会话往返，临时 HOME/XDG、合成 Cookie、本机 HTTP 样本，不读真实资料。
+
+本仓库更新产物：release-macos.py 从 tauri.conf.json 的更新地址派生下载仓库；sign-windows-update.py 与 assemble-release.py 固定 riowang88/CCBaga，装配回归覆盖新地址接受与旧地址拒绝。所有既有摘要、签名、公证和跨平台交付检查保留。

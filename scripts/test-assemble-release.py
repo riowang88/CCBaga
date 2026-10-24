@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # [INPUT]: 真实发布装配入口与临时平台产物/校验清单，无真实安装器或签名材料。
-# [OUTPUT]: 完整九文件交付和缺失平台摘要时拒绝未验收产物的离线回归。
+# [OUTPUT]: 本仓库九文件交付、旧更新源拒绝和缺失平台摘要时拒绝未验收产物的离线回归。
 # [POS]: 发布合并边界的标准库测试，不发布、不下载、不操作用户文件。
 # [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 import hashlib
@@ -38,7 +38,7 @@ class ReleaseAssemblyTests(unittest.TestCase):
             signature = 'disposable-signature-' + platform
             (self.out / (name + '.sig')).write_text(signature + '\n')
             (self.out / manifest).write_text(json.dumps({'version': self.version, 'platforms': {
-                platform: {'url': f'https://github.com/liseami/CCBaga/releases/download/v{self.version}/{name}',
+                platform: {'url': f'https://github.com/riowang88/CCBaga/releases/download/v{self.version}/{name}',
                            'signature': signature}}}))
         self.lists = {'SHA256SUMS': [self.dmg, self.archive, self.archive + '.sig', 'latest.json'],
                       'Linux-SHA256SUMS': self.linux,
@@ -63,6 +63,25 @@ class ReleaseAssemblyTests(unittest.TestCase):
         for line in (self.out / 'SHA256SUMS').read_text().splitlines():
             digest, filename = line.split('  ', 1)
             self.assertEqual(digest, hashlib.sha256((self.out / filename).read_bytes()).hexdigest())
+
+    def test_old_repository_update_url_is_rejected(self):
+        for filename, platform in [('latest.json', 'darwin-aarch64'),
+                                   ('latest-windows.json', 'windows-x86_64')]:
+            with self.subTest(platform=platform):
+                path = self.out / filename
+                original = path.read_bytes()
+                manifest = json.loads(original)
+                manifest['platforms'][platform]['url'] = manifest['platforms'][platform]['url'].replace(
+                    'github.com/riowang88/CCBaga/', 'github.com/liseami/CCBaga/')
+                path.write_text(json.dumps(manifest))
+                self.write_lists()
+                try:
+                    with self.assertRaisesRegex(SystemExit, 'Updater URL/signature mismatch'):
+                        assembly.main()
+                    self.assertFalse((self.root / 'release-files.txt').exists())
+                finally:
+                    path.write_bytes(original)
+                    self.write_lists()
 
     def test_omitted_artifact_cannot_be_rehashed_and_published(self):
         for manifest, artifact in [('SHA256SUMS', self.dmg), ('Windows-SHA256SUMS', self.windows),

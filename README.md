@@ -5,7 +5,7 @@
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 -->
 
-> **Local maintenance repository:** This private repository tracks the installed `0.2.49+local.identity.6` fixes. See [maintenance baseline](LOCAL-DEVELOPMENT.md). Download links and the in-app updater below still target upstream releases.
+> **Local maintenance repository:** This repository tracks the installed `0.2.49+local.identity.6` fixes. See [maintenance baseline](LOCAL-DEVELOPMENT.md). New builds use this repository’s update endpoint and signing key; the first release requires signing and notarization credentials. Existing installed builds retain their embedded upstream channel until replaced.
 
 <div align="center">
   <img src="docs/brand-logos.svg" width="320" height="149" alt="CCBaga-A and CCBaga-B logos, side by side" />
@@ -71,7 +71,7 @@ Windows x86_64 uses one NSIS setup installer containing both A and B. The instal
 
 ### macOS
 
-Download the official installer from [GitHub Releases](https://github.com/liseami/CCBaga/releases/latest). The distribution package is named `CCBaga-<version>-macos-arm64.dmg`. It contains both applications:
+Download the installer from this repository’s [GitHub Releases](https://github.com/riowang88/CCBaga/releases/latest). The distribution package is named `CCBaga-<version>-macos-arm64.dmg`. It contains both applications:
 
 | Application | Installed bundle | Role |
 | --- | --- | --- |

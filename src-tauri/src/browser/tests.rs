@@ -657,3 +657,73 @@ fn refreshed_context_recomputes_target_from_effective_machine_country() {
     context.update_machine(taiwan);
     assert!(context.region.is_none());
 }
+
+#[test]
+fn singapore_simplified_chinese_is_valid_and_matches_only_singapore_timezone() {
+    let mut m = machine(); m.timezones.push("Asia/Singapore".into());
+    let mut c = Config::default(); c.follow_machine=false; c.language="zh-Hans-SG".into(); c.timezone="Asia/Singapore".into();
+    assert!(c.validate(&m).is_ok());
+    assert_eq!(c.region(&m).map(|r|r.country),Some("SG"));
+    c.timezone="America/New_York".into();assert!(c.region(&m).is_none());
+    let args=config::arguments(&c,&m,Path::new("/fixture"),"http://127.0.0.1/","148");
+    assert!(args.contains(&"--lang=zh-Hans-SG".into()));
+    assert!(args.contains(&"--accept-lang=zh-Hans-SG,zh".into()));
+}
+fn doh_fixture(mode:&str, provider:&str, custom_url:&str) -> Config {
+    serde_json::from_value(serde_json::json!({"dns":{"mode":mode,"provider":provider,"custom_url":custom_url}})).unwrap()
+}
+#[test]
+fn doh_old_config_and_inherit_leave_existing_resolution_untouched() {
+    let c:Config=serde_json::from_value(serde_json::json!({"seed":42})).unwrap();
+    assert_eq!(serde_json::to_value(&c).unwrap()["dns"]["mode"],"inherit");
+    let root=sample();let original=br#"{"dns_over_https":{"mode":"automatic","templates":"https://existing.invalid/dns-query","other":7},"keep":true}"#;
+    fs::write(root.join("Local State"),original).unwrap();
+    profile::preferences(&root,&c,&machine()).unwrap();
+    assert_eq!(fs::read(root.join("Local State")).unwrap(),original);
+    assert!(!root.join("CCBaga-DNS.json").exists());fs::remove_dir_all(root).unwrap();
+}
+#[test]
+fn doh_secure_uses_local_state_and_restores_original_after_switching_back() {
+    let root=sample();
+    fs::write(root.join("Local State"),br#"{"dns_over_https":{"mode":"off","templates":"","other":7},"keep":{"value":true}}"#).unwrap();
+    let c=doh_fixture("secure","cloudflare","");
+    profile::preferences(&root,&c,&machine()).unwrap();
+    let read=||serde_json::from_slice::<serde_json::Value>(&fs::read(root.join("Local State")).unwrap()).unwrap();
+    assert_eq!(read()["dns_over_https"]["mode"],"secure");assert_eq!(read()["dns_over_https"]["templates"],"https://cloudflare-dns.com/dns-query");
+    profile::preferences(&root,&doh_fixture("secure","google",""),&machine()).unwrap();
+    assert_eq!(read()["dns_over_https"]["templates"],"https://dns.google/dns-query");
+    let mut v=read();v["unrelated_change"]=serde_json::json!(true);profile::write_json(&root.join("Local State"),&v).unwrap();
+    profile::preferences(&root,&Config::default(),&machine()).unwrap();
+    assert_eq!(read()["dns_over_https"],serde_json::json!({"mode":"off","templates":"","other":7}));
+    assert_eq!(read()["unrelated_change"],true);assert_eq!(read()["keep"]["value"],true);
+    assert!(!root.join("CCBaga-DNS.json").exists());fs::remove_dir_all(root).unwrap();
+}
+#[test]
+fn doh_restore_absent_preferences_and_isolate_other_profiles() {
+    let root=sample();let a=root.join("a");let b=root.join("b");fs::create_dir_all(&a).unwrap();fs::create_dir_all(&b).unwrap();
+    fs::write(b.join("Local State"),b"other profile").unwrap();
+    profile::preferences(&a,&doh_fixture("secure","quad9",""),&machine()).unwrap();
+    profile::preferences(&a,&Config::default(),&machine()).unwrap();
+    let v:serde_json::Value=serde_json::from_slice(&fs::read(a.join("Local State")).unwrap()).unwrap();
+    assert!(v.get("dns_over_https").is_none());
+    assert_eq!(fs::read(b.join("Local State")).unwrap(),b"other profile");fs::remove_dir_all(root).unwrap();
+}
+#[test]
+fn doh_custom_address_validation_preserves_valid_endpoints_and_inactive_values() {
+    for url in ["https://resolver.example/dns-query","https://resolver.example:8443/private-id/dns-query?key=value","https://[::1]:8443/dns-query","https://resolver.example/dns-query{?dns}","https://resolver.example/dns-query?key=value{&dns}"] {
+        assert!(doh_fixture("secure","custom",url).validate(&machine()).is_ok(),"{url}");
+    }
+    for url in ["","http://resolver.example/dns-query","file:///tmp/resolver","https://user:pass@resolver.example/dns-query","https://resolver.example/dns-query#fragment","https://resolver.example/\n--flag","https://resolver.example/{unknown}","https://one.example/dns-query https://two.example/dns-query"] {
+        assert!(doh_fixture("secure","custom",url).validate(&machine()).is_err(),"{url}");
+    }
+    assert!(doh_fixture("inherit","custom","").validate(&machine()).is_ok());
+    for value in [serde_json::json!({"dns":{"mode":"automatic"}}),serde_json::json!({"dns":{"provider":"unknown"}})] {assert!(serde_json::from_value::<Config>(value).is_err());}
+}
+#[test]
+fn doh_malformed_local_state_and_restore_marker_are_not_overwritten() {
+    let root=sample();let path=root.join("Local State");let c=doh_fixture("secure","cloudflare","");
+    fs::write(&path,b"broken json").unwrap();assert!(profile::preferences(&root,&c,&machine()).is_err());assert_eq!(fs::read(&path).unwrap(),b"broken json");
+    fs::write(&path,br#"{"dns_over_https":"bad"}"#).unwrap();assert!(profile::preferences(&root,&c,&machine()).is_err());
+    fs::write(&path,b"{}").unwrap();fs::write(root.join("CCBaga-DNS.json"),b"broken marker").unwrap();assert!(profile::preferences(&root,&Config::default(),&machine()).is_err());assert_eq!(fs::read(&path).unwrap(),b"{}");
+    fs::remove_dir_all(root).unwrap();
+}

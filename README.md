@@ -4,6 +4,9 @@
 [POS]: 项目公开入口，连接产品功能、使用说明与模块导航。
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 -->
+
+> **Local maintenance repository:** This private repository tracks the installed `0.2.49+local.identity.6` fixes. See [maintenance baseline](LOCAL-DEVELOPMENT.md). Download links and the in-app updater below still target upstream releases.
+
 <div align="center">
   <img src="docs/brand-logos.svg" width="320" height="149" alt="CCBaga-A and CCBaga-B logos, side by side" />
   <h1>CCBaga</h1>

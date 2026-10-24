@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 原生身份命令、保留策略、Motion 弹簧/浏览器媒体订阅、共享确认窗/进度、文件残留与 CLI 维护。
- * [OUTPUT]: 空/当前/暂存身份竖式立体工牌、原地备份与订阅/凭据徽章、顶部绿光、弹簧横滚/视差、有界进程提示与删除确认；卡片下统一显示身份/空身份/文件清理的真实阶段动画和结果。
+ * [OUTPUT]: 空/未保存/已有身份竖式立体工牌，未识别 CLI 但有浏览器资料时仍可命名保存，当前本地档案在原卡片高亮且保存确认明确更新原档案、原地备份与订阅/凭据徽章、顶部绿光、弹簧横滚/视差、明确标注 Claude 客户端进程与浏览器资料联动、删除确认；卡片下统一显示身份/空身份/文件清理的真实阶段动画和结果。
  * [POS]: 身份管理 GUI；只呈现脱敏元数据，身份正文留在原生保险库；可选浏览器绑定/旧资料采用确认与重开重试，关联浏览器资料删除单独选择。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -16,7 +16,7 @@ import {formatBytes} from './cleaner-model';
 import {IdentityTransfer} from './identity-transfer';
 import {ClaudeCliPanel} from './claude-cli-panel';
 import {ClaudeResiduePanel} from './claude-residue-panel';
-import {credentialStatus, defaultPolicy, policyRows, type Identity, type IdentityState} from './identity-model';
+import {credentialStatus, identityPolicyKey, readIdentityPolicy, policyRows, type Identity, type IdentityState} from './identity-model';
 type Target = Identity | 'empty' | 'recovery' | 'save';
 function authLabel(status:string|null|undefined) {
  if(status==='local_unexpired')return '本地未过期';
@@ -29,7 +29,7 @@ export function IdentityPanel({onBusy, initialEmpty=false}: {onBusy?: (busy:bool
  const {t, locale}=useI18n();
  const [state,setState]=useState<IdentityState|null>(null);
  const [now,setNow]=useState(Date.now);
- const [policy,setPolicy]=useState({...defaultPolicy});
+ const [policy,setPolicy]=useState(readIdentityPolicy);
  const [loading,setLoading]=useState(true), [busy,setBusy]=useState(false), [cliBusy,setCliBusy]=useState(false);
  const [residueBusy,setResidueBusy]=useState(false),[residueRevision,setResidueRevision]=useState(0);
  const [error,setError]=useState('');
@@ -46,10 +46,11 @@ export function IdentityPanel({onBusy, initialEmpty=false}: {onBusy?: (busy:bool
  const scrollSpring=useSpring(0,{stiffness:170,damping:25,mass:.8});
  const scrollTarget=useRef(0);
  const locked=busy||cliBusy||residueBusy||transferBusy||transfer!==null||!!review||!!rename||!!deletion||browserReview!==null;
- const active=state?.records.find(row=>row.id===state.active);
  const current=state?.current;
- const saved=state?.records.filter(row=>!current?.present||row.id!==state.active)??[];
- const currentName=current?.display_name||current?.email?.split('@')[0]||active?.name||t('当前身份');
+ const active=state?.records.find(row=>row.id===(state.workspace_id===undefined?state.active:state.workspace_id));
+ const browserOnly=!!state?.browser_profile_present&&!current?.present;
+ const currentName=active?.name||current?.display_name||current?.email?.split('@')[0]||t('当前身份');
+ const saved=state?.records??[];
  const blocked=locked||loading||!state||!!state?.recovery;
  const kept=policyRows.filter(([key])=>policy[key]).map(([,label])=>t(label));
  const removed=policyRows.filter(([key])=>!policy[key]).map(([,label])=>t(label));
@@ -89,7 +90,7 @@ export function IdentityPanel({onBusy, initialEmpty=false}: {onBusy?: (busy:bool
    const next=await invoke<IdentityState>('identities_read');
    setState(next);if(invalidateResidue)setResidueRevision(value=>value+1);setError('');
    if(review==='empty'){
-    const resolved=next.current.display_name||next.current.email?.split('@')[0]||next.records.find(row=>row.id===next.active)?.name||t('当前身份');
+    const resolved=next.records.find(row=>row.id===(next.workspace_id??next.active))?.name||next.current.display_name||next.current.email?.split('@')[0]||t('当前身份');
     setName(old=>old===t('当前身份')?resolved.slice(0,64):old);
    }
    return true;
@@ -114,7 +115,6 @@ export function IdentityPanel({onBusy, initialEmpty=false}: {onBusy?: (busy:bool
  function choose(target:Target) {
   setName(target==='recovery'?t('恢复前状态'):target==='save'?(active?.name||currentName).slice(0,64):currentName.slice(0,64));
   if(target==='recovery') {const previous=state?.records.find(row=>row.id===state.recovery);if(previous)setPolicy({...previous.policy});}
-  else if(target==='save'&&active)setPolicy({...active.policy});
   setReview(target);setError('');
  }
  async function stop() {
@@ -131,7 +131,7 @@ export function IdentityPanel({onBusy, initialEmpty=false}: {onBusy?: (busy:bool
     :await invoke<IdentityState>('identities_switch', {targetId:typeof target==='object'?target.id:'empty', currentName:name.trim(), policy, recover:target==='recovery', onProgress});
    setState(next);
    setResidueRevision(value=>value+1);
-   activity.finish(true,next.browser_warning||(target==='recovery'?'原身份已恢复。':target==='save'?'当前身份已加密备份，工作区保持不变。':'身份切换完成。'));
+   activity.finish(true,next.browser_warning||(target==='recovery'?'原身份已恢复。':target==='save'?(browserOnly?'当前身份已保存，浏览器资料仍保留在本机。':'当前身份已加密备份，工作区保持不变。'):'身份切换完成。'));
   } catch(e) {setError(String(e));activity.finish(false,String(e));await refreshAfterError();}
   finally {setBusy(false);}
  }
@@ -155,38 +155,43 @@ export function IdentityPanel({onBusy, initialEmpty=false}: {onBusy?: (busy:bool
   try {setState(await invoke<IdentityState>('identities_rename',{id:rename.id,value:renameValue}));setRename(null);setError('');}
   catch(e) {setError(String(e));} finally {setBusy(false);}
  }
- const options=<div className="identity-policy-grid">{policyRows.map(([key,label])=><div className="identity-policy-row" key={key}><Checkbox label={t(label)} checked={policy[key]} disabled={locked} onCheckedChange={checked=>setPolicy(old=>({...old,[key]:checked}))}/></div>)}</div>;
+ const options=<div className="identity-policy-grid">{policyRows.map(([key,label])=><div className="identity-policy-row" key={key}><Checkbox label={t(label)} checked={policy[key]} disabled={locked} onCheckedChange={checked=>{
+  const next={...policy,[key]:checked};setPolicy(next);
+  try {localStorage.setItem(identityPolicyKey,JSON.stringify(next));}
+  catch {setError('保留选项未能保存；重新打开页面后请再次核对。');}
+ }}/></div>)}</div>;
+ const currentCard=<IdentityCard className="identity-card current" key={active?.id??'unsaved-current'} label={active?`${active.name} · ${t('当前身份')}`:t('当前身份')}>
+     <div className="identity-card-head"><div className="identity-avatar" aria-hidden="true">{current?.display_name||current?.email?Array.from(currentName)[0]?.toUpperCase():<ShieldCheck size={20}/>}</div><span className="identity-live-badge">{loading?t('检查中'):state?.processes==null?t('Claude 进程状态未知'):state.running?t('Claude 客户端运行中'):t('Claude 客户端未运行')}</span>{active&&<Button className="identity-export" variant="ghost" size="small" disabled={blocked} aria-label={t('导出保存备份')} onClick={()=>setTransfer(active)}>{t('导出')}</Button>}</div>
+     <h3>{currentName}</h3>
+     <div className="identity-account">{current?.email?<span className="identity-email">{current.email}</span>:<span className="identity-account-unknown">{t(current?.unavailable?'CLI 账号信息暂不可读':'CLI 账号未识别')}</span>}{current?.organization&&<span className="identity-organization">{current.organization}</span>}</div>
+     <div className="identity-badges">
+      <span className={`identity-status-badge ${active?'backed-up':'unbacked'}`}>{t(active?'正在使用':'未备份')}</span>
+      {current?.plan&&<span className="identity-status-badge plan">{current.plan}</span>}
+      {authLabel(credentialStatus(current,now))&&<span title={t('仅依据本地元数据，不代表服务端认证结果。')} className={`identity-status-badge auth-${credentialStatus(current,now)}`}>{t(authLabel(credentialStatus(current,now))!)}</span>}
+      {state?.browser.enabled&&<span className="identity-browser-badge">{t('浏览器资料随身份切换')}</span>}
+     </div>
+     <div className="identity-card-footer"><Button variant="secondary" size="small" disabled={blocked} onClick={()=>choose('save')}>{browserOnly?t(active?'更新身份':'保存身份'):active?t('更新备份'):t('保存备份')}</Button>{active&&<Button variant="ghost" size="small" disabled={blocked} onClick={()=>{setRename(active);setRenameValue(active.name);setError('');}}>{t('重命名')}</Button>}<Button variant="ghost" size="small" disabled={blocked} onClick={()=>confirmDelete('current')}>{t('直接删除')}</Button></div>
+    </IdentityCard>;
  return <section className="identity-page">
   <header className="cleanup-title"><h1>{t('Claude 身份管理')}</h1><Button variant="secondary" size="small" disabled={locked||loading} leftIcon={<Refresh aria-hidden size={16} className={loading?'spin':''}/>} onClick={()=>void read()}>{t('刷新')}</Button></header>
   {error&&<p role="alert" className="cleanup-feedback error">{t(error)}</p>}
   {state?.recovery&&<div className="identity-recovery" role="alert"><strong>{t('有一次身份切换尚未完成')}</strong><Button size="small" variant="ink" disabled={locked||loading} onClick={()=>choose('recovery')}>{t('恢复原身份')}</Button></div>}
-    <section className="identity-library"><div className="identity-section-head"><h2>{t('身份')}</h2><div className="identity-library-controls"><span className="identity-count">{saved.length} {t('暂存身份')}</span><Button size="small" variant="secondary" disabled={blocked} onClick={()=>setTransfer('import')}>{t('导入')}</Button><Checkbox label={t('联动浏览器')} checked={state?.browser.enabled??false} disabled={blocked} onCheckedChange={value=>{setUseExisting(false);setBrowserReview(value===true);setError('');}}/></div></div>
+    <section className="identity-library"><div className="identity-section-head"><h2>{t('身份')}</h2><div className="identity-library-controls"><span className="identity-count">{saved.length} {t('已保存身份')}</span><Button size="small" variant="secondary" disabled={blocked} onClick={()=>setTransfer('import')}>{t('导入')}</Button><Checkbox label={t('联动浏览器')} checked={state?.browser.enabled??false} disabled={blocked} onCheckedChange={value=>{setUseExisting(false);setBrowserReview(value===true);setError('');}}/></div></div>
    <div className="identity-card-rail" ref={rail} tabIndex={0} role="region" aria-label={t('身份')}>
-    <IdentityCard className={`identity-card empty${current?.present===false?' selected':''}`} label={current?.present===false?`${t('空身份')} · ${t('当前身份')}`:t('空身份')}>
+    <IdentityCard className={`identity-card empty${current?.present===false&&!state?.browser_profile_present&&!active?' selected':''}`} label={current?.present===false&&!state?.browser_profile_present&&!active?`${t('空身份')} · ${t('当前身份')}`:t('空身份')}>
      <div className="identity-card-head"><div className="identity-avatar" aria-hidden="true">∅</div></div>
      <h3>{t('空身份')}</h3><p className="identity-empty-note">{t('清空本地登录身份；保留选定工作区资料，不影响服务端记录。')}</p>
      <div className="identity-card-footer"><Button variant="secondary" size="small" disabled={blocked} onClick={()=>choose('empty')}>{t('使用空身份')}</Button></div>
     </IdentityCard>
-    {(loading||current?.present)&&<IdentityCard className="identity-card current" label={t('当前身份')}>
-     <div className="identity-card-head"><div className="identity-avatar" aria-hidden="true">{current?.display_name||current?.email?Array.from(currentName)[0]?.toUpperCase():<ShieldCheck size={20}/>}</div><span className="identity-live-badge">{loading?t('检查中'):state?.processes==null?t('状态未知'):state.running?t('运行中'):t('进程已停止')}</span>{active&&<Button className="identity-export" variant="ghost" size="small" disabled={blocked} aria-label={t('导出保存备份')} onClick={()=>setTransfer(active)}>{t('导出')}</Button>}</div>
-     <h3>{currentName}</h3>
-     <div className="identity-account">{current?.email?<span className="identity-email">{current.email}</span>:<span className="identity-account-unknown">{t(current?.unavailable?'账号信息暂不可读':'账号信息未识别')}</span>}{current?.organization&&<span className="identity-organization">{current.organization}</span>}</div>
-     <div className="identity-badges">
-      <span className={`identity-status-badge ${active?'backed-up':'unbacked'}`}>{t(active?'已备份':'未备份')}</span>
-      {current?.plan&&<span className="identity-status-badge plan">{current.plan}</span>}
-      {authLabel(credentialStatus(current,now))&&<span title={t('仅依据本地元数据，不代表服务端认证结果。')} className={`identity-status-badge auth-${credentialStatus(current,now)}`}>{t(authLabel(credentialStatus(current,now))!)}</span>}
-      {state?.browser.enabled&&<span className="identity-browser-badge">{t('独立浏览器')}</span>}
-     </div>
-     <div className="identity-card-footer"><Button variant="secondary" size="small" disabled={blocked} onClick={()=>choose('save')}>{active?t('更新备份'):t('保存备份')}</Button><Button variant="ghost" size="small" disabled={blocked} onClick={()=>confirmDelete('current')}>{t('直接删除')}</Button></div>
-    </IdentityCard>}
-    {saved.map(row=>{const summary=state?.summaries?.[row.id];return <IdentityCard className="identity-card" key={row.id}>
+    {(loading||current?.present||browserOnly)&&!active&&currentCard}
+    {saved.map(row=>{if(row.id===active?.id)return currentCard;const summary=state?.summaries?.[row.id];return <IdentityCard className="identity-card" key={row.id}>
      <div className="identity-card-head"><div className="identity-avatar" aria-hidden="true">{Array.from(row.name)[0]?.toUpperCase()}</div><span className="identity-size">{formatBytes(row.bytes)}</span><Button className="identity-export" variant="ghost" size="small" disabled={blocked} aria-label={`${t('导出身份')} ${row.name}`} onClick={()=>setTransfer(row)}>{t('导出')}</Button></div>
      <h3>{row.name}</h3>
      {summary&&(summary.email||summary.organization)&&<div className="identity-account saved-account">{summary.email&&<span className="identity-email">{summary.email}</span>}{summary.organization&&<span className="identity-organization">{summary.organization}</span>}</div>}
      <div className="identity-badges">
       {summary?.plan&&<span className="identity-status-badge plan">{summary.plan}</span>}
       {authLabel(credentialStatus(summary,now))&&<span title={t('仅依据本地元数据，不代表服务端认证结果。')} className={`identity-status-badge auth-${credentialStatus(summary,now)}`}>{t(authLabel(credentialStatus(summary,now))!)}</span>}
-      {state?.browser.bound_ids.includes(row.id)&&<span className="identity-browser-badge">{t('独立浏览器')}</span>}
+      {state?.browser.bound_ids.includes(row.id)&&<span className="identity-browser-badge">{t('已关联浏览器资料')}</span>}
      </div>
      <time>{new Date(row.saved_at).toLocaleString(locale==='zh'?'zh-CN':'en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</time>
      <div className="identity-card-footer"><Button variant="secondary" size="small" disabled={blocked} onClick={()=>choose(row)}>{t('切换')}</Button><Button variant="ghost" size="small" disabled={blocked} onClick={()=>{setRename(row);setRenameValue(row.name);setError('');}}>{t('重命名')}</Button><Button variant="ghost" size="small" disabled={blocked} onClick={()=>confirmDelete(row)}>{t('删除')}</Button></div>
@@ -199,8 +204,8 @@ export function IdentityPanel({onBusy, initialEmpty=false}: {onBusy?: (busy:bool
   <ClaudeResiduePanel activity={activity} blocked={locked||loading||!state||!!state?.recovery} revision={residueRevision} onBusy={setResidueBusy} onChanged={async()=>{if(!await read(false))throw new Error('身份状态刷新失败，请重新检查。');}}/>
   <ClaudeCliPanel blocked={locked||loading||!!state?.recovery} onBusy={setCliBusy}/>
   <IdentityTransfer target={transfer} hasBrowser={typeof transfer==='object'&&transfer!==null&&!!state?.browser.bound_ids.includes(transfer.id)} onClose={()=>setTransfer(null)} onBusy={setTransferBusy} onState={setState} activity={activity}/>
-  <AppDialog open={!!review} onOpenChange={open=>{if(!open&&!busy)setReview(null);}} title={review==='recovery'?t('恢复原身份'):review==='save'?t(active?'更新当前身份备份':'保存当前身份备份'):review==='empty'?t('切换到空身份'):t('切换身份')} description={t(review==='save'?'将结束已识别的 Claude 进程，把当前身份原地加密写入保险库；当前工作区与登录保持不变。':'先压缩暂存当前 Claude Code 与 Desktop 状态，再切换。将结束已识别的 Claude 进程，未保存任务会中断。')} footer={<><Button variant="secondary" onClick={()=>setReview(null)}>{t('取消')}</Button><Button variant="ink" disabled={busy||loading||!state||!name.trim()||(review!=='recovery'&&!!state.recovery)} onClick={()=>void change()}>{review==='recovery'?t('确认恢复'):review==='save'?t('确认保存备份'):t('确认暂存并切换')}</Button></>}>
-   <div className="identity-confirm"><label htmlFor="identity-current-name">{t('当前身份保存为')}</label><Input id="identity-current-name" maxLength={64} value={name} onChange={e=>setName(e.target.value)}/>{typeof review==='object'&&review&&<div className="identity-confirm-target"><span>{t('目标身份')}</span><strong>{review.name}</strong></div>}{review==='save'&&<div className="identity-confirm-keep"><span>{t('纳入加密备份')}</span><strong>{[t('登录与身份数据'),...removed].join(' · ')}</strong></div>}<div className="identity-confirm-keep"><span>{t('留在工作区')}</span><strong>{kept.join(' · ')||t('无')}</strong></div><div className="identity-active-processes"><span>{t('Claude 进程（确认后结束）')}</span>{state?.processes==null?<p>{t('进程状态未知；执行前将重新核验。')}</p>:state.processes.length?<ul>{state.processes.map(process=><li key={process.pid}><code>PID {process.pid}</code><span>{process.entrypoint}</span></li>)}</ul>:<p>{t('未检测到 Claude 进程。')}</p>}{state?.processes_truncated&&<p>{t('仅显示前 32 个进程；执行时重新核验完整范围。')}</p>}</div>{state?.browser.enabled&&review!=='save'&&<p>{t('将关闭并重开关联浏览器，请先保存网页任务。')}</p>}<p>{t('只管理本地状态；失效的登录可能需要重新认证。')}</p></div>
+  <AppDialog open={!!review} onOpenChange={open=>{if(!open&&!busy)setReview(null);}} title={review==='recovery'?t('恢复原身份'):review==='save'?t(browserOnly?'保存当前身份':active?'更新当前身份备份':'保存当前身份备份'):review==='empty'?t('切换到空身份'):t('切换到已有身份')} description={t(review==='save'?(browserOnly?'将保存当前浏览器资料与身份的关联；当前工作区和浏览器保持不变。':'将结束已识别的 Claude 进程，把当前身份原地加密写入保险库；当前工作区与登录保持不变。'):'先压缩暂存当前 Claude Code 与 Desktop 状态，再切换。将结束已识别的 Claude 进程，未保存任务会中断。')} footer={<><Button variant="secondary" onClick={()=>setReview(null)}>{t('取消')}</Button><Button variant="ink" disabled={busy||loading||!state||!name.trim()||(review!=='recovery'&&!!state.recovery)} onClick={()=>void change()}>{review==='recovery'?t('确认恢复'):review==='save'?t(browserOnly?'确认保存身份':'确认保存备份'):t('保存当前身份并切换')}</Button></>}>
+   <div className="identity-confirm">{active&&review!=='recovery'?<div className="identity-confirm-keep"><span>{t('保存当前身份')}</span><strong>{active.name}</strong></div>:<><label htmlFor="identity-current-name">{t('首次保存当前身份为')}</label><Input id="identity-current-name" maxLength={64} value={name} onChange={e=>setName(e.target.value)}/></>}{typeof review==='object'&&review&&<div className="identity-confirm-target"><span>{t('切换到')}</span><strong>{review.name}</strong></div>}{state?.browser_profile_present&&<p>{t('浏览器资料保留在本机并关联此身份，不会打包进 Claude 加密归档；未识别到 CLI 账号不等于网页登录无效。')}</p>}{review==='save'&&!browserOnly&&<div className="identity-confirm-keep"><span>{t('纳入加密备份')}</span><strong>{[t('登录与身份数据'),...removed].join(' · ')}</strong></div>}<div className="identity-confirm-keep"><span>{t('留在工作区')}</span><strong>{kept.join(' · ')||t('无')}</strong></div><div className="identity-active-processes"><span>{t('Claude 进程（确认后结束）')}</span>{state?.processes==null?<p>{t('进程状态未知；执行前将重新核验。')}</p>:state.processes.length?<ul>{state.processes.map(process=><li key={process.pid}><code>PID {process.pid}</code><span>{process.entrypoint}</span></li>)}</ul>:<p>{t('未检测到 Claude 进程。')}</p>}{state?.processes_truncated&&<p>{t('仅显示前 32 个进程；执行时重新核验完整范围。')}</p>}</div>{state?.browser.enabled&&review!=='save'&&<p>{t('将关闭并重开关联浏览器，请先保存网页任务。')}</p>}<p>{t('只管理本地状态；失效的登录可能需要重新认证。')}</p></div>
   </AppDialog>
   <AppDialog alert className="identity-delete-alert" open={!!deletion} onOpenChange={open=>{if(!open&&!busy)setDeletion(null);}} title={deletion==='current'?t('直接删除当前身份'):t('删除暂存身份')} description={deletion==='current'?t('将结束 Claude 进程并删除所选本地数据。不会新增备份，已有暂存身份不受影响。'):t('永久删除这份暂存文件。当前工作区不受影响。')} footer={<><Button variant="secondary" data-dialog-cancel onClick={()=>setDeletion(null)}>{t('取消')}</Button><Button className="identity-delete-button" variant="ink" disabled={busy||!accepted} onClick={()=>void remove()}>{t('确认直接删除')}</Button></>}>
    <div className="identity-confirm"><div className="identity-delete-warning"><span aria-hidden="true">!</span><strong>{t('警告：此操作不可撤销，不会创建新备份。')}</strong></div>{deletion==='current'?<><div className="identity-confirm-keep"><span>{t('删除范围')}</span><strong>{[t('登录与身份数据'),...removed].join(' · ')}</strong></div><div className="identity-confirm-keep"><span>{t('留在工作区')}</span><strong>{kept.join(' · ')||t('无')}</strong></div></>:<strong>{deletion?.name}</strong>}{typeof deletion==='object'&&deletion&&state?.browser.bound_ids.includes(deletion.id)&&<Checkbox label={t('同时永久删除关联浏览器资料')} checked={deleteBrowser} onCheckedChange={value=>setDeleteBrowser(value===true)}/>}<Checkbox checked={accepted} onCheckedChange={setAccepted} label={t('我知道此操作无法撤销')}/></div>

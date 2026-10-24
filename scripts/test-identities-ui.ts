@@ -11,6 +11,8 @@ import {tmpdir} from 'node:os';
 import {createServer} from 'vite';
 import {chromium} from 'playwright-core';
 import {testBrowserVerification} from './test-browser-verification.ts';
+import {testBrowserDoh} from './test-browser-doh';
+import {testBrowserDns} from './test-browser-dns.ts';
 import {testBrowserProfiles} from './test-browser-profiles.ts';
 import {testBrowserCleanup} from './test-browser-cleanup.ts';
 import {testNetworkDiagnostics} from './test-network-diagnostics.ts';
@@ -139,6 +141,7 @@ try{
  await current.waitFor({state:'detached'});assert.equal(await page.evaluate(()=>(window as any).identityFixture.state.records.length),count);checks++;
  assert.equal(errors.length,0,errors.join('\n'));
  checks+=await testBrowserVerification(browser,base);
+ checks+=await testBrowserDoh(browser,base)+await testBrowserDns(browser,base);
  checks+=await testBrowserCleanup(browser,base);
  checks+=await testNetworkDiagnostics(browser,base);
  checks+=await testClaudeResidue(browser,base);

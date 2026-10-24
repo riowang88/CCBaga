@@ -1,0 +1,5 @@
+[
+  {"id":"cloudflare","name":"Cloudflare","url":"https://cloudflare-dns.com/dns-query"},
+  {"id":"google","name":"Google Public DNS","url":"https://dns.google/dns-query"},
+  {"id":"quad9","name":"Quad9","url":"https://dns.quad9.net/dns-query"}
+]

@@ -1,5 +1,5 @@
 // [INPUT]: SQLite 身份目录与脱敏认证元数据、加密压缩保险库、精确进程查询、Cleaner 事务锁和 Tauri 进度通道。
-// [OUTPUT]: 只读当前/已保存摘要及有界进程预览、用户保留选项、浏览器联动确认与真实进度的停止/备份/切换/恢复/删除命令。
+// [OUTPUT]: 只读账号摘要、与账号匹配分离的本地选择、保存完整性回归、有界进程预览、保留选项和带真实进度的身份操作命令。
 // [POS]: GUI 身份管理的原生入口；刷新只读工作区、不回收暂存文件；不提供凭据读取、任意文件或网络接口。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 mod archive;
@@ -15,6 +15,10 @@ mod credentials;
 pub(crate) mod database;
 #[cfg(test)]
 mod optimization_tests;
+#[cfg(test)]
+mod local_slot_tests;
+#[cfg(test)]
+mod save_integrity_tests;
 pub(crate) mod portable;
 pub(crate) mod private;
 mod profile;
@@ -81,6 +85,10 @@ pub struct State {
     pub processes: Option<Vec<profile::ProcessPreview>>,
     pub processes_truncated: bool,
     pub active: String,
+    // Last committed local selection; deliberately separate from account matching.
+    pub last_selected: Option<String>,
+    pub workspace_id: Option<String>,
+    pub browser_profile_present: bool,
     pub recovery: Option<String>,
     pub running: bool,
     pub current: profile::Current,
@@ -117,12 +125,17 @@ fn state(app: &tauri::AppHandle) -> Result<State, String> {
     let root_path = crate::cleaner::identity::root()?;
     // 列表读取不能无锁打开会回收归档/暂存目录的 Store；文件事务只在持锁入口运行。
     let db = database::Database::open(&vault_path)?;
-    let records = db.records()?.into_iter().filter(|r| !r.empty).collect();
+    let records: Vec<_> = db.records()?.into_iter().filter(|r| !r.empty).collect();
+    let last_selected = db.get("active")?.filter(|id| records.iter().any(|r| &r.id == id));
     let summaries = db.summaries()?;
     let (processes, processes_truncated) =
         profile::process_previews(crate::cleaner::identity::running_processes());
     // 检查失败显示未知；不能把查询错误当作已确认停止。
     let running = processes.as_ref().is_none_or(|rows| !rows.is_empty());
+    let current = profile::read(&root_path);
+    let (account_id, workspace_id) = catalog::current_ids(&vault_path, &root_path, &db)?;
+    let browser_profile_present = catalog::browser_profile_present(&vault_path, &db)?;
+    let workspace_id = workspace_id.filter(|_| (current.present || browser_profile_present) && !current.unavailable);
     Ok(State {
         browser: db.browser_link()?,
         browser_warning: app
@@ -135,11 +148,13 @@ fn state(app: &tauri::AppHandle) -> Result<State, String> {
         summaries,
         processes,
         processes_truncated,
-        active: catalog::current_id(&vault_path, &root_path, &db)?
-            .unwrap_or_else(|| "current".into()),
+        active: account_id.unwrap_or_else(|| "current".into()),
+        last_selected,
+        workspace_id,
+        browser_profile_present,
         recovery: db.get("recovery")?,
         running,
-        current: profile::read(&root_path),
+        current,
     })
 }
 #[tauri::command]

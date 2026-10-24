@@ -1,5 +1,5 @@
 // [INPUT]: 已认证本机身份归档、原生一次性文件选择、ring PBKDF2 与现有 AES-GCM/tar/Zstd 流。
-// [OUTPUT]: 密码保护的单身份 bagapack；同 OS 完整验收后重定位、以目标主密钥重封存并新增目录记录。
+// [OUTPUT]: 密码保护的单身份 bagapack；同 OS 验收后重定位并重封存；拒绝本机 v2 链接归档且不跟随链接导出目标内容。
 // [POS]: 保险库的显式跨设备边界；不导出主密钥/SQLite，不切换身份或操作钥匙串，不迁移浏览器登录资料。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use super::{archive::{self, Manifest, Stage}, codec, compression, database::Record, private, store::{problem, Store}};
@@ -132,7 +132,7 @@ impl BrowserSettings {
     }
     fn config(&self) -> Result<crate::browser::config::Config, String> {
         if self.seed == 0 || self.language.len() > 32 || self.timezone.len() > 128 || self.language.chars().chain(self.timezone.chars()).any(char::is_control) { return Err(invalid()); }
-        Ok(crate::browser::config::Config { seed: self.seed, follow_machine: self.follow_machine, language: self.language.clone(), timezone: self.timezone.clone(), native_graphics: self.native_graphics, proxy: String::new() })
+        Ok(crate::browser::config::Config { seed: self.seed, follow_machine: self.follow_machine, language: self.language.clone(), timezone: self.timezone.clone(), native_graphics: self.native_graphics, proxy: String::new(), dns: Default::default() })
     }
 }
 #[derive(Serialize, Deserialize)]
@@ -192,8 +192,12 @@ fn each_data(stage: &Stage, visit: &mut impl FnMut(&Path, &Path, bool) -> Result
     Ok(())
 }
 fn checked_data(stage: &Stage) -> Result<(usize, u64), String> {
+    if stage.manifest.version != 1 {
+        return Err("包含本机符号链接的身份暂不支持跨设备导出。".into());
+    }
     let (mut count, mut size) = (0usize, 0u64);
     each_data(stage, &mut |path, relative, directory| {
+        private::safe(path)?;
         count += 1;
         if count > MAX_ENTRIES || !valid_member(relative) { return Err(limit()); }
         if !directory { size = size.checked_add(fs::metadata(path).map_err(problem)?.len()).ok_or_else(limit)?; }

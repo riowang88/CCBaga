@@ -194,11 +194,12 @@ fn failed_database_commit_and_duplicate_account_preserve_existing_records_files_
 }
 
 #[test]
-fn optional_browser_transfers_only_fingerprint_settings_and_never_proxy_or_login_data() {
+fn optional_browser_transfers_only_fingerprint_settings_and_never_proxy_dns_or_login_data() {
     let (fixture, source, row) = saved();
     let mut config = crate::browser::config::Config::default();
     config.seed = 123456; config.follow_machine = false; config.language = "ja".into(); config.timezone = "Asia/Tokyo".into();
     config.proxy = "http://private-proxy.example.invalid:8080".into();
+    config.dns = serde_json::from_value(serde_json::json!({"mode":"secure","provider":"custom","custom_url":"https://private-resolver.invalid/dns-query"})).unwrap();
     let path = fixture.root.join("browser.bagapack");
     source.export_pack(&path, PASSWORD, &row.id, Some(config), &Reporter::channel(None)).unwrap();
     let target = Fixture::new();
@@ -209,6 +210,8 @@ fn optional_browser_transfers_only_fingerprint_settings_and_never_proxy_or_login
     assert_eq!(config.language, "ja");
     assert!(!config.follow_machine);
     assert!(config.proxy.is_empty());
+    assert_eq!(serde_json::to_value(&config.dns).unwrap()["mode"], "inherit");
+    assert!(config.dns.custom_url.is_empty());
 }
 
 #[test]

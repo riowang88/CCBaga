@@ -1,5 +1,5 @@
 // [INPUT]: 标准库文件系统、当前用户身份与 Windows ACL API。
-// [OUTPUT]: 私有目录/文件、可拒绝已存在目标的独占目录创建、链接与所有权检查、同步原子写入和 Win32 长路径调用。
+// [OUTPUT]: 私有文件与目录、严格根路径检查、仅供归档目录成员使用的不跟随目标的 Unix 链接读写、所有权检查和同步原子写入。
 // [POS]: 身份保险库的磁盘边界；创建时明确用户所有者/DACL，已有父目录仅校验而不覆写权限；Win32 调用统一使用长路径。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use std::{fs, io::Write, path::Path};
@@ -57,7 +57,7 @@ fn windows_create<T>(
 pub fn safe(path: &Path) -> Result<(), String> {
     let meta = fs::symlink_metadata(path).map_err(|_| "身份文件无法读取。")?;
     if crate::cleaner::linked(&meta) || (!meta.is_file() && !meta.is_dir()) {
-        return Err("身份路径包含链接或特殊文件。".into());
+        return Err(format!("身份路径包含链接或特殊文件：{}。", path.display()));
     }
     #[cfg(unix)]
     {
@@ -75,13 +75,37 @@ pub fn safe(path: &Path) -> Result<(), String> {
     }
     Ok(())
 }
+// Only archive directory entries may use this: inspect the link itself, never its target.
+pub(super) fn link_target(path: &Path) -> Result<Option<std::path::PathBuf>, String> {
+    let meta = fs::symlink_metadata(path).map_err(|_| "身份文件无法读取。")?;
+    #[cfg(unix)]
+    if meta.file_type().is_symlink() {
+        use std::os::unix::fs::MetadataExt;
+        extern "C" { fn getuid() -> u32; }
+        parents(path.parent().ok_or("身份路径无效。")?)?;
+        if meta.uid() != unsafe { getuid() } {
+            return Err("身份文件不属于当前用户。".into());
+        }
+        return fs::read_link(path).map(Some).map_err(|_| "身份链接无法读取。".into());
+    }
+    let _ = meta;
+    safe(path)?;
+    Ok(None)
+}
+pub(super) fn create_link(target: &Path, path: &Path) -> Result<(), String> {
+    parents(path.parent().ok_or("身份路径无效。")?)?;
+    #[cfg(unix)]
+    { std::os::unix::fs::symlink(target, path).map_err(|_| "身份链接无法恢复。".into()) }
+    #[cfg(not(unix))]
+    { let _ = target; Err("当前系统不支持此身份链接。".into()) }
+}
 pub fn parents(path: &Path) -> Result<(), String> {
     let mut cursor = Some(path);
     while let Some(p) = cursor {
         if p.exists() || fs::symlink_metadata(p).is_ok() {
             let m = fs::symlink_metadata(p).map_err(|_| "身份路径无法检查。")?;
             if crate::cleaner::linked(&m) || !m.is_dir() {
-                return Err("身份路径包含链接或特殊文件。".into());
+                return Err(format!("身份路径包含链接或特殊文件：{}。", p.display()));
             }
         }
         cursor = p.parent();

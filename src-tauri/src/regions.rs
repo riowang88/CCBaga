@@ -197,7 +197,7 @@ mod tests {
 pub fn matching(language: &str, timezone: &str) -> Option<&'static Region> {
     REGIONS
         .iter()
-        .find(|r| r.language == language && r.timezone == timezone)
+        .find(|r| (r.language == language || (r.id == "sg" && language == "zh-Hans-SG")) && r.timezone == timezone)
 }
 
 /// Extract an explicit ISO country from ICU/POSIX or BCP 47 locale identifiers.

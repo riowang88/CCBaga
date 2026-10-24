@@ -1,5 +1,5 @@
-// [INPUT]: 只读有界身份显示摘要、打包的起始页、一次启动的随机令牌、机器上下文、共享界面语言、共用出口服务目录和浏览器实测。
-// [OUTPUT]: 仅 127.0.0.1 的起始页、绑定身份/有效国家/机器上下文与观测接口；32 个并发请求、请求头与正文共用读取截止，响应前复核会话令牌；资源限定在打包目录。
+// [INPUT]: 只读有界身份显示摘要、打包的起始页、一次启动的随机令牌、独立 DNS 测试轮次、机器上下文、共享界面语言、共用出口服务目录和浏览器实测。
+// [OUTPUT]: 仅 127.0.0.1 的起始页、绑定身份/有效国家/机器上下文与观测接口；A 读取 DNS 结果、B 触发解析；32 个并发请求、请求头与正文共用读取截止，响应前复核会话令牌；资源限定在打包目录。
 // [POS]: Chromium 与工具箱之间的窄桥；不提供文件写入、脚本执行或 Tauri 命令。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use super::{network::Report, Browser, Context};
@@ -56,7 +56,7 @@ fn current_session(session: &Option<super::Session>, token: &str) -> bool {
     session.as_ref().is_some_and(|s| s.token == token)
 }
 fn answer(stream: &mut TcpStream, status: &str, kind: &str, body: &[u8]) {
-    let header=format!("HTTP/1.1 {status}\r\nContent-Type: {kind}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\nContent-Security-Policy: default-src 'self'; connect-src 'self' https://ipwho.is https://ipapi.co; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; script-src 'self'\r\n\r\n",body.len());
+    let header=format!("HTTP/1.1 {status}\r\nContent-Type: {kind}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\nContent-Security-Policy: default-src 'self'; connect-src 'self' https://ipwho.is https://ipapi.co; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.d.ip.net.coffee; font-src 'self'; script-src 'self'\r\n\r\n",body.len());
     let _ = stream.write_all(header.as_bytes());
     let _ = stream.write_all(body);
 }
@@ -195,6 +195,10 @@ fn handle(
         answer(stream, "410 Gone", "text/plain", b"Session expired");
         return;
     }
+    if (method == "POST" && path == "dns/start") || (method == "GET" && path.starts_with("dns/result/")) {
+        handle_dns(app, stream, token, path, context);
+        return;
+    }
     if method == "GET" && path == "context" {
         let mut current = context.clone();
         current.ui_language = crate::ui_language::ui_language_read(app.clone());
@@ -304,6 +308,39 @@ fn handle(
     }
     serve_resource(stream, root, path);
 }
+fn dns_error(stream: &mut TcpStream, status: &str, message: &str) {
+    answer(stream,status,"application/json",&serde_json::to_vec(&serde_json::json!({"error":message})).unwrap());
+}
+fn handle_dns(app:&tauri::AppHandle,stream:&mut TcpStream,token:&str,path:&str,context:&Context) {
+    let browser=app.state::<Browser>();
+    if path=="dns/start" {
+        let machine=match super::config::machine() {Ok(m)=>m,Err(_)=>{dns_error(stream,"503 Service Unavailable","无法读取 DNS 查询所需的系统代理状态。");return;}};
+        let proxy=if context.config.proxy.is_empty(){machine.system_proxy}else{context.config.proxy.clone()};
+        let id=match nonce(){Ok(id)=>id,Err(_)=>{dns_error(stream,"503 Service Unavailable","无法创建 DNS 检测轮次。");return;}};
+        let mut session=browser.session.lock().unwrap();
+        let Some(session)=session.as_mut().filter(|s|s.token==token) else {dns_error(stream,"410 Gone","本地检测会话已失效。");return;};
+        if session.dns.as_ref().is_some_and(|r|!r.can_replace()) {dns_error(stream,"429 Too Many Requests","DNS 检测仍在进行，请稍后重试。");return;}
+        session.dns=Some(super::dns::Run::new(id.clone(),proxy));
+        answer(stream,"200 OK","application/json",&serde_json::to_vec(&serde_json::json!({"id":id})).unwrap());
+        return;
+    }
+    let id=path.strip_prefix("dns/result/").unwrap_or("");
+    let proxy={
+        let mut session=browser.session.lock().unwrap();
+        let Some(session)=session.as_mut().filter(|s|s.token==token) else {dns_error(stream,"410 Gone","本地检测会话已失效。");return;};
+        let Some(run)=session.dns.as_mut() else {dns_error(stream,"410 Gone","DNS 检测轮次已失效，请重新检测。");return;};
+        match run.begin_poll(id) {Ok(proxy)=>proxy,Err(e)=>{dns_error(stream,"409 Conflict",&e);return;}}
+    };
+    // 请求时不持有身份会话锁；回传前再次校验，旧身份/旧轮次不得取回结果。
+    let result=tauri::async_runtime::block_on(super::dns::collect(id,&proxy));
+    let mut session=browser.session.lock().unwrap();
+    let Some(run)=session.as_mut().filter(|s|s.token==token).and_then(|s|s.dns.as_mut()).filter(|r|r.id==id) else {dns_error(stream,"410 Gone","本地检测会话已失效。");return;};
+    run.in_flight=false;
+    match result {
+        Ok(result)=>answer(stream,"200 OK","application/json",&serde_json::to_vec(&result).unwrap()),
+        Err(e)=>dns_error(stream,"502 Bad Gateway",&e),
+    }
+}
 fn media_type(path: &Path) -> Option<&'static str> {
     Some(
         match path.extension().and_then(|x| x.to_str()).unwrap_or("") {
@@ -373,6 +410,7 @@ mod tests {
         ));
         client.join().unwrap();
         let session = Some(super::super::Session {
+            dns: None,
             token: "new".into(),
             received_at: None,
             report: None,

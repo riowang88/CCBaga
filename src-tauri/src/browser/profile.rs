@@ -1,5 +1,5 @@
 // [INPUT]: 宿主独立资料目录、原生进程核验与已验证配置。
-// [OUTPUT]: 浏览资料占用保护、偏好更新、缓存/站点清理及用户显式确认的完整资料重置；全量预检后按实际删除项目报告 n/N。
+// [OUTPUT]: 浏览资料占用保护、偏好更新与当前资料严格 DoH/原值恢复、缓存/站点清理及用户显式确认的完整资料重置；全量预检后按实际删除项目报告 n/N。
 // [POS]: 当前绑定 user-data-dir 的文件边界；完整重置含所有子 Profile 与密码密钥，仅允许 unlink 当前用户的根级 Chromium 崩溃锁，拒绝其他链接/外部所有者，不访问系统钥匙串或其他身份。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 #[cfg(target_os = "linux")]
@@ -122,6 +122,7 @@ pub fn preferences(
         json!({"approximate":2,"precise":2});
     data["profile"]["content_settings"]["exceptions"]["geolocation"] = json!({});
     data["profile"]["content_settings"]["exceptions"]["geolocation_with_options"] = json!({});
+    super::doh::apply(profile, &config.dns)?;
     write_json(&path, &data)
 }
 pub const CACHE: &[&str] = &[

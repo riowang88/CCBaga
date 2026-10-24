@@ -42,6 +42,8 @@ test('跟随机器按有效区域识别台湾并保留简体偏好，不放过�
 test('目标未知和未读到有效区域保持待测，不能冒充已知冲突或通过',()=>{
  const result=verifyBrowser({...context,region:null},report,true,'',false);
  expect(result.phase).toBe('failed');
+ expect(result.problems).toContain('当前浏览器语言与时区未匹配到支持的目标地区。请在浏览器环境中检查配置。');
+ expect(verifyBrowser({...context,region:null,config:{...context.config,follow_machine:true}},report,true,'',false).problems).toContain('跟随本机模式下，系统区域与时区未匹配到支持的目标地区。');
  expect(result.checks.find(row=>row.label==='出口国家')?.ok).toBeNull();
  expect(result.checks.find(row=>row.label==='本机区域')?.ok).toBeNull();
  expect(result.checks.find(row=>row.label==='网页语言')?.ok).toBe(true);

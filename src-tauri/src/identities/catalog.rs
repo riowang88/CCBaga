@@ -1,8 +1,8 @@
 // [INPUT]: 有界 OAuth 账号元数据、本机密钥、已认证旧归档与 SQLite 目录。
-// [OUTPUT]: 稳定的本机 HMAC 账号索引、显式事务内旧账号索引迁移与已提交归档代次回收；缺摘要不主动解包。
-// [POS]: 只按账号 UUID/组织（缺失时邮箱/组织）匹配；令牌刷新、名称变更不产生新身份。
+// [OUTPUT]: 本机 HMAC 账号索引、与当前浏览器选择一致的本地槽位、安全资料目录存在性、旧索引迁移与归档回收；不据此声称登录有效。
+// [POS]: 云账号只按 UUID/组织（缺失时邮箱/组织）匹配；本地槽位连续性独立于认证判断，不按名字合并未知账号。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
-use super::{database::Database, private, store::Store};
+use super::{database::{Database, Record}, private, store::Store};
 use ring::hmac;
 use serde_json::Value;
 use std::{fs, io::Read, path::Path};
@@ -59,14 +59,60 @@ fn file_key(path: &Path, key: &[u8]) -> Result<Option<String>, String> {
 pub(super) fn live_key(home: &Path, key: &[u8]) -> Result<Option<String>, String> {
     file_key(&home.join(".claude.json"), key)
 }
+// A selected local archive is a stable workspace slot, not a recognized cloud
+// account. Never use this fallback to merge names or overwrite a known account
+// whose metadata has disappeared; an observed account always takes precedence.
+pub(super) fn snapshot_record(db: &Database, live_key: Option<&str>) -> Result<Option<Record>, String> {
+    if let Some(key) = live_key {
+        return db.by_account(key);
+    }
+    let active = db.get("active")?;
+    let records = db.records()?;
+    let local = |record: &&Record| !record.empty && record.account_key.as_deref().is_none_or(str::is_empty);
+    let browser_slot = if db.browser_link()?.enabled { Some(db.browser_slot()?) } else { None };
+    if let Some(record) = records.iter().filter(local).find(|record| active.as_deref() == Some(record.id.as_str())) {
+        let bound = db.browser_for(&record.id)?;
+        // 联动重开后新资料不属于旧 active；保留旧档案，另存当前资料。
+        if browser_slot.as_ref().is_none_or(|slot| bound.as_ref().is_none_or(|bound| bound == slot)) {
+            return Ok(Some(record.clone()));
+        }
+    }
+    // 首次原地保存不改变 CLI 的 active；由当前浏览器的独占绑定找回该本地档案。
+    if let Some(slot) = browser_slot {
+        for record in records.iter().filter(local) {
+            if db.browser_for(&record.id)?.as_deref() == Some(slot.as_str()) { return Ok(Some(record.clone())); }
+        }
+    }
+    Ok(None)
+}
+pub(super) fn browser_profile_present(vault: &Path, db: &Database) -> Result<bool, String> {
+    if !db.browser_link()?.enabled { return Ok(false); }
+    let root = vault.parent().ok_or("应用目录不可用。")?.join("browser");
+    let slot = db.browser_slot()?;
+    let profile = if slot == "legacy" { root.join("profile") } else { root.join("contexts").join(slot).join("profile") };
+    private::parents(&profile)?;
+    match fs::symlink_metadata(profile) {
+        Ok(meta) => Ok(meta.is_dir()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(_) => Err("浏览器资料无法读取。".into()),
+    }
+}
 pub(super) fn current_id(
     vault: &Path,
     home: &Path,
     db: &Database,
 ) -> Result<Option<String>, String> {
+    Ok(current_ids(vault, home, db)?.0)
+}
+// Cloud-account match and the actual snapshot destination have different meanings.
+pub(super) fn current_ids(
+    vault: &Path,
+    home: &Path,
+    db: &Database,
+) -> Result<(Option<String>, Option<String>), String> {
     let key_path = vault.join("key.bin");
     if !key_path.exists() {
-        return Ok(None);
+        return Ok((None, None));
     }
     private::parents(vault)?;
     private::safe(&key_path)?;
@@ -78,10 +124,13 @@ pub(super) fn current_id(
         return Err("身份密钥无效。".into());
     }
     let key = zeroize::Zeroizing::new(fs::read(key_path).map_err(|_| "身份密钥无法读取。")?);
-    Ok(match live_key(home, &key)? {
-        Some(key) => db.by_account(&key)?.map(|r| r.id),
+    let live = live_key(home, &key)?;
+    let account = match live.as_deref() {
+        Some(key) => db.by_account(key)?.map(|r| r.id),
         None => None,
-    })
+    };
+    let workspace = snapshot_record(db, live.as_deref())?.map(|r| r.id);
+    Ok((account, workspace))
 }
 impl Store {
     pub(super) fn index_legacy(&self) -> Result<(), String> {

@@ -3,6 +3,8 @@
 // [POS]: 独立浏览器模块的唯一编排入口；改变资料前必须退出浏览器；不自行改系统默认浏览器，只发起系统确认。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 pub(crate) mod config;
+mod dns;
+pub(crate) mod doh;
 mod launch;
 mod network;
 mod profile;
@@ -67,6 +69,7 @@ struct Session {
     token: String,
     received_at: Option<u64>,
     report: Option<Report>,
+    dns: Option<dns::Run>,
 }
 #[derive(Clone, Serialize)]
 pub struct Context {
@@ -213,6 +216,7 @@ fn open_session(
     };
     let web = web(app)?;
     *state.session.lock().unwrap() = Some(Session {
+        dns: None,
         token: token.clone(),
         report: None,
         received_at: None,

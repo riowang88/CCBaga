@@ -1,5 +1,5 @@
 // [INPUT]: 白名单身份源、SQLite 账号目录、Zstandard/旧 gzip 与认证加密流。
-// [OUTPUT]: 不可变归档代次与短期解包区，逐源完成/压缩落盘/完整归档验收的真实局部进度；排除明确瞬态锁但不删除原件，首身份复用空浏览器编号。
+// [OUTPUT]: 稳定账号/已选择本地槽位的不可变归档代次；v2 保存目录内链接且不跟随目标，完整认证后创建链接；v1 兼容。
 // [POS]: 保险库的数据格式边界，与 store 的工作区切换事务分离，旧 gzip 归档保持可读。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use super::{
@@ -46,7 +46,7 @@ pub(super) fn walk(
     base: &Path,
     visit: &mut impl FnMut(&Path, &Path, bool) -> Result<(), String>,
 ) -> Result<(), String> {
-    private::safe(path)?;
+    private::link_target(path)?;
     let meta = fs::symlink_metadata(path).map_err(problem)?;
     visit(
         path,
@@ -95,6 +95,7 @@ impl Store {
             )
             .map_err(problem)?;
             let mut files = std::collections::HashSet::new();
+            let mut links = Vec::new();
             {
                 let mut tar = tar::Archive::new(&mut input);
                 for entry in tar.entries().map_err(problem)? {
@@ -109,6 +110,13 @@ impl Store {
                         return Err("身份归档成员无效。".into());
                     }
                     let kind = entry.header().entry_type();
+                    if cfg!(unix) && kind.is_symlink() && entry.size() == 0 {
+                        let target = entry.link_name().map_err(problem)?
+                            .filter(|p| !p.as_os_str().is_empty()).ok_or("身份链接无效。")?
+                            .into_owned();
+                        links.push((path, target));
+                        continue;
+                    }
                     if !kind.is_file() && !kind.is_dir() {
                         return Err("身份归档包含链接或特殊文件。".into());
                     }
@@ -128,7 +136,7 @@ impl Store {
             let manifest: Manifest =
                 serde_json::from_slice(&fs::read(folder.join("manifest.json")).map_err(problem)?)
                     .map_err(problem)?;
-            if manifest.version != 1
+            if !matches!(manifest.version, 1 | 2)
                 || manifest.id != record.id
                 || manifest.home != self.home
                 || manifest.platform != std::env::consts::OS
@@ -136,12 +144,15 @@ impl Store {
             {
                 return Err("身份不属于当前电脑或归档版本无效。".into());
             }
-            if manifest
+            if !links.is_empty() && manifest.version != 2 {
+                return Err("身份归档包含链接或特殊文件。".into());
+            }
+            if let Some(source) = manifest
                 .sources
                 .iter()
-                .any(|s| !identity::allowed(&self.home, s))
+                .find(|s| !identity::allowed(&self.home, s))
             {
-                return Err("身份路径超出允许范围。".into());
+                return Err(format!("身份路径超出允许范围：{}", source.path.display()));
             }
             let expected: std::collections::HashSet<_> = manifest
                 .sources
@@ -176,6 +187,20 @@ impl Store {
                         return Err("身份配置不是对象。".into());
                     }
                 }
+            }
+            // Materialize links only after authenticated extraction and source validation.
+            // A link cannot be a source root, a JSON source, or a parent of any member.
+            for (path, target) in links {
+                let parts: Vec<_> = path.components().collect();
+                if parts.len() < 3 {
+                    return Err("身份归档成员无效。".into());
+                }
+                let n: usize = parts[1].as_os_str().to_str().ok_or("身份归档成员无效。")?
+                    .parse().map_err(|_| "身份归档成员无效。")?;
+                if manifest.sources.get(n).is_none_or(|s| !s.keys.is_empty()) {
+                    return Err("身份归档成员无效。".into());
+                }
+                private::create_link(&target, &folder.join(path))?;
             }
             Ok(manifest)
         })();
@@ -258,11 +283,12 @@ impl Store {
         } else {
             None
         };
-        let previous = account_key
-            .as_deref()
-            .map(|key| self.db.by_account(key))
-            .transpose()?
-            .flatten();
+        let browser_present = reuse && super::catalog::browser_profile_present(&self.vault, &self.db)?;
+        let previous = if reuse && (!sources.is_empty() || !credentials.is_empty() || browser_present) {
+            super::catalog::snapshot_record(&self.db, account_key.as_deref())?
+        } else {
+            None
+        };
         // 空资料的随机编号预留给首次保存的身份，避免登录后第一次暂存又改变种子。
         let draft = if reuse {
             self.db.browser_draft()?
@@ -275,7 +301,7 @@ impl Store {
             .or(draft)
             .unwrap_or(super::new_id()?);
         let generation = super::new_id()?;
-        let manifest = Manifest {
+        let mut manifest = Manifest {
             version: 1,
             id: id.clone(),
             home: self.home.clone(),
@@ -316,7 +342,15 @@ impl Store {
                             .strip_prefix(source.path.file_name().unwrap())
                             .map_err(problem)?;
                         let target = archive_path.join(suffix);
-                        if directory {
+                        if let Some(link) = private::link_target(path)? {
+                            let mut header = tar::Header::new_gnu();
+                            header.set_entry_type(tar::EntryType::Symlink);
+                            header.set_size(0);
+                            header.set_mode(0o777);
+                            tar.append_link(&mut header, target, link).map_err(problem)?;
+                            manifest.version = 2;
+                            Ok(())
+                        } else if directory {
                             tar.append_dir(target, path).map_err(problem)
                         } else {
                             let mut file = fs::File::open(path).map_err(problem)?;
@@ -412,7 +446,7 @@ impl Store {
                     .as_millis() as u64,
                 bytes: fs::metadata(&destination).map_err(problem)?.len(),
                 policy: policy.clone(),
-                empty: manifest.sources.is_empty() && manifest.credentials.is_empty(),
+                empty: manifest.sources.is_empty() && manifest.credentials.is_empty() && !browser_present,
                 account_key: Some(account_key.unwrap_or_default()),
             };
             reporter.log(

@@ -1,8 +1,106 @@
 // [INPUT]: 身份保险库与临时文件系统样本。
-// [OUTPUT]: SQLite 策略持久化、完整认证归档、真实阶段/局部完成计数/回滚事件与 Windows 超长暂存路径回归，不读取真实 Claude 凭据。
+// [OUTPUT]: 策略/认证/回滚回归，Unix 链接往返、链接父路径与根路径拒绝、特殊文件路径诊断和 Windows 超长路径；不读取真实凭据。
 // [POS]: 身份管理的离线验证入口；平台真实登入需用户验收。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use super::*;
+
+#[cfg(unix)]
+#[test]
+fn nested_symlinks_round_trip_without_reading_or_changing_their_targets() {
+    use std::os::unix::fs::symlink;
+    let f = optimization_tests::Fixture::new();
+    f.login("A", "one", "fixture-token");
+    f.write(".claude/debug/session.txt", b"fixture-log");
+    f.write(".claude/skills/local/SKILL.md", b"local skill");
+    let external = f.root.join("external");
+    std::fs::create_dir(&external).unwrap();
+    std::fs::write(external.join("untouched"), b"external-private-content").unwrap();
+    symlink(f.home.join(".claude/debug/session.txt"), f.home.join(".claude/debug/latest")).unwrap();
+    symlink(&external, f.home.join(".claude/skills/shared")).unwrap();
+    symlink("missing.log", f.home.join(".claude/debug/dangling")).unwrap();
+    let mut s = store::Store::open(&f.vault, &f.home).unwrap();
+    let p = Policy::all();
+    let r = Reporter::channel(None);
+    s.switch("empty", "A", &p, &r).unwrap();
+    let a = s.records().into_iter().find(|row| row.name == "A").unwrap();
+    assert!(!f.home.join(".claude/debug").exists());
+    s.switch(&a.id, "empty", &p, &r).unwrap();
+    assert_eq!(std::fs::read_link(f.home.join(".claude/debug/latest")).unwrap(), f.home.join(".claude/debug/session.txt"));
+    assert_eq!(std::fs::read_link(f.home.join(".claude/skills/shared")).unwrap(), external);
+    assert_eq!(std::fs::read_link(f.home.join(".claude/debug/dangling")).unwrap(), std::path::Path::new("missing.log"));
+    assert_eq!(std::fs::read(external.join("untouched")).unwrap(), b"external-private-content");
+    assert_eq!(std::fs::read(f.home.join(".claude/debug/session.txt")).unwrap(), b"fixture-log");
+    let stage = s.load(&a).unwrap();
+    assert_eq!(stage.manifest.version, 2);
+    let export = f.root.join("linked.bagapack");
+    assert!(s.export_pack(&export, "fixture-long-password", &a.id, None, &r).is_err());
+    assert!(!export.exists(), "local links must not be followed by portable export");
+}
+
+#[cfg(unix)]
+#[test]
+fn authenticated_archives_cannot_write_through_links_or_replace_source_roots_with_links() {
+    use std::{fs, path::Path};
+    let f = optimization_tests::Fixture::new();
+    f.login("A", "one", "fixture-token");
+    f.write(".claude/debug/session.txt", b"fixture-log");
+    let outside = f.root.join("outside");
+    fs::create_dir(&outside).unwrap();
+    fs::write(outside.join("sentinel"), b"keep").unwrap();
+    let s = store::Store::open(&f.vault, &f.home).unwrap();
+    let (record, mut stage) = s.save("A", &Policy::default(), &Reporter::channel(None)).unwrap();
+    let source = stage.manifest.sources.iter().position(|s| s.path == f.home.join(".claude/debug")).unwrap();
+    for scenario in ["parent", "root", "legacy", "hardlink"] {
+        stage.manifest.version = if scenario == "legacy" { 1 } else { 2 };
+        let mut record = record.clone();
+        record.archive = format!("{}.baga", new_id().unwrap());
+        let seal = codec::Seal::new(private::create(&f.vault.join(&record.archive)).unwrap(), &s.key).unwrap();
+        let mut tar = tar::Builder::new(compression::encode(seal).unwrap());
+        for n in 0..stage.manifest.sources.len() {
+            if scenario == "root" && n == source { continue; }
+            let data = stage.path.join(format!("data/{n}"));
+            archive::walk(&data, &data, &mut |path, relative, directory| {
+                let target = Path::new("data").join(n.to_string()).join(relative);
+                if directory { tar.append_dir(target, path) }
+                else { tar.append_file(target, &mut fs::File::open(path).unwrap()) }.map_err(store::problem)
+            }).unwrap();
+        }
+        let link = if scenario == "root" { format!("data/{source}") } else { format!("data/{source}/link") };
+        let mut header = tar::Header::new_gnu();
+        header.set_entry_type(if scenario == "hardlink" { tar::EntryType::Link } else { tar::EntryType::Symlink });
+        header.set_size(0);header.set_mode(0o777);
+        tar.append_link(&mut header, &link, &outside).unwrap();
+        if scenario == "parent" {
+            let mut header = tar::Header::new_gnu();
+            header.set_size(4);header.set_mode(0o600);header.set_cksum();
+            tar.append_data(&mut header, format!("{link}/sentinel"), &b"evil"[..]).unwrap();
+        }
+        let bytes = serde_json::to_vec(&stage.manifest).unwrap();
+        let mut header = tar::Header::new_gnu();
+        header.set_size(bytes.len() as u64);header.set_mode(0o600);header.set_cksum();
+        tar.append_data(&mut header, "manifest.json", bytes.as_slice()).unwrap();
+        tar.into_inner().unwrap().finish().unwrap().finish().unwrap().sync_all().unwrap();
+        assert!(s.load(&record).is_err(), "{scenario} must be refused");
+        assert_eq!(fs::read(outside.join("sentinel")).unwrap(), b"keep");
+        assert_eq!(fs::read(f.home.join(".claude/debug/session.txt")).unwrap(), b"fixture-log");
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn special_files_are_refused_before_changing_workspace() {
+    let f = optimization_tests::Fixture::new();
+    f.login("A", "one", "fixture-token");
+    f.write(".claude/debug/session.txt", b"fixture-log");
+    let path = f.home.join(".claude/debug/live.fifo");
+    assert!(std::process::Command::new("mkfifo").arg(&path).status().unwrap().success());
+    let mut s = store::Store::open(&f.vault, &f.home).unwrap();
+    let error = s.switch("empty", "A", &Policy::default(), &Reporter::channel(None)).unwrap_err();
+    assert!(error.contains(path.to_str().unwrap()), "the error must identify the offending path: {error}");
+    assert_eq!(f.token(), "fixture-token");
+    assert_eq!(std::fs::read(f.home.join(".claude/debug/session.txt")).unwrap(), b"fixture-log");
+    assert!(s.db.get("recovery").unwrap().is_none());
+}
 #[cfg(windows)]
 use dunce::canonicalize;
 #[cfg(not(windows))]

@@ -1,8 +1,9 @@
 // [INPUT]: 虚构 UUID/组织/凭据、隔离文件系统和归档格式。
-// [OUTPUT]: A/B 往返去重、刷新凭据覆盖、跨组织隔离、旧版迁移与覆盖故障、macOS/Windows 不同 Desktop 账号与 Linux 排除 macOS 路径、个人设置和共享代理保留回归。
+// [OUTPUT]: A/B 往返去重、已清除历史备份恢复与路径边界、刷新凭据覆盖、跨组织隔离、旧版迁移与覆盖故障、跨平台账号隔离、个人设置和共享代理保留回归。
 // [POS]: 账号匹配与不可变归档代次的离线证明，不读取真实用户数据。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use super::*;
+use crate::cleaner;
 #[cfg(windows)]
 use dunce::canonicalize;
 #[cfg(not(windows))]
@@ -60,6 +61,52 @@ impl Drop for Fixture {
         let _ = fs::remove_dir_all(&self.root);
     }
 }
+#[test]
+fn home_config_backups_restore_after_switch_removed_the_originals() {
+    let f = Fixture::new();
+    f.login("A", "one", "a-token");
+    for name in [".claude.json.backup", ".claude.json.backup.1234567890"] {
+        f.write(name, b"saved account backup");
+    }
+    let mut s = store::Store::open(&f.vault, &f.home).unwrap();
+    let p = Policy::default();
+    let r = Reporter::channel(None);
+    s.switch("empty", "A", &p, &r).unwrap();
+    let a = s.records()[0].id.clone();
+    for name in [".claude.json.backup", ".claude.json.backup.1234567890"] {
+        assert!(!f.home.join(name).exists());
+    }
+    s.switch(&a, "empty", &p, &r).unwrap();
+    assert_eq!(f.token(), "a-token");
+    for name in [".claude.json.backup", ".claude.json.backup.1234567890"] {
+        assert_eq!(fs::read(f.home.join(name)).unwrap(), b"saved account backup");
+    }
+}
+
+#[test]
+fn absent_home_config_backup_allowlist_keeps_path_category_and_key_boundaries() {
+    let f = Fixture::new();
+    for name in [".claude.json.backup", ".claude.json.backup.1234567890"] {
+        let source = cleaner::identity::Source {
+            path: f.home.join(name), category: "backups".into(), keys: vec![],
+        };
+        assert!(cleaner::identity::allowed(&f.home, &source));
+        for category in ["account", "settings", "desktop"] {
+            assert!(!cleaner::identity::allowed(&f.home, &cleaner::identity::Source {
+                category: category.into(), ..source.clone()
+            }));
+        }
+        assert!(!cleaner::identity::allowed(&f.home, &cleaner::identity::Source {
+            keys: vec!["oauthAccount".into()], ..source
+        }));
+    }
+    for name in [".claude.json.backup-evil", ".claude.json.backups", "nested/.claude.json.backup", "../.claude.json.backup", ".claude.json.backup.x/child"] {
+        assert!(!cleaner::identity::allowed(&f.home, &cleaner::identity::Source {
+            path: f.home.join(name), category: "backups".into(), keys: vec![],
+        }), "unexpectedly allowed {name}");
+    }
+}
+
 #[test]
 fn repeated_accounts_update_one_slot_and_keep_latest_tokens_and_history() {
     let f = Fixture::new();

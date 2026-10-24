@@ -111,12 +111,14 @@ impl Database {
         &self,
         record: &Record,
         summary: &super::profile::SavedSummary,
+        browser_present: bool,
     ) -> Result<(), String> {
-        // 同连接上的目录、名称和摘要一起提交；不改 active、恢复日志或浏览器资料选择。
+        // 同连接上的目录、名称、摘要及已有浏览器资料的首次绑定一起提交；不改选择指针。
         let tx = self.connection.unchecked_transaction().map_err(error)?;
         self.remember(record)?;
         self.rename(&record.id, &record.name)?;
         self.set_summary(&record.id, summary)?;
+        if browser_present { super::browser_link::backup(&tx, record)?; }
         tx.commit().map_err(error)
     }
     pub(super) fn import_record(

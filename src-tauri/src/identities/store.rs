@@ -1,5 +1,5 @@
 // [INPUT]: SQLite 目录、用户策略、白名单源、已验收归档代次、认证加密与平台凭据桥。
-// [OUTPUT]: 不改工作区/浏览器选择的原地备份、先暂存后切换、持久恢复记录、原位配置合并、显式删除与真实阶段进度；旧归档瞬态锁不恢复。
+// [OUTPUT]: 原地备份、稳定本地档案往返、同档案重选不回灌旧凭据或所选本地资料、回滚与真实进度；目录内链接按链接恢复，旧归档瞬态锁不恢复。
 // [POS]: 身份的文件事务；SQLite 与文件系统由恢复日志协调，不能假装是同一原子事务。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use super::{
@@ -235,7 +235,7 @@ impl Store {
         for (index, (_, source)) in sources.iter().enumerate() {
             self.stopped()?;
             if !identity::allowed(&self.home, source) {
-                return Err("身份路径超出允许范围。".into());
+                return Err(format!("身份路径超出允许范围：{}", source.path.display()));
             }
             match fs::symlink_metadata(&source.path) {
                 Err(error) if error.kind() == io::ErrorKind::NotFound => {}
@@ -307,7 +307,10 @@ impl Store {
                     walk(&data, &data, &mut |path, relative, directory| {
                         self.during_io()?;
                         let target = source.path.join(relative);
-                        if directory {
+                        if let Some(link) = private::link_target(path)? {
+                            private::directory(target.parent().unwrap())?;
+                            private::create_link(&link, &target)
+                        } else if directory {
                             private::directory(&target)
                         } else {
                             private::directory(target.parent().unwrap())?;
@@ -437,13 +440,13 @@ impl Store {
         record.name = name.into();
         reporter.log("commit", "running", "正在保存身份备份。", 0, Some(1));
         self.db
-            .backup(&record, &super::profile::summarize_stage(&stage))?;
+            .backup(&record, &super::profile::summarize_stage(&stage), super::catalog::browser_profile_present(&self.vault, &self.db)?)?;
         let _ = self.collect_generations();
         reporter.log("commit", "ok", "身份备份已保存。", 1, Some(1));
         reporter.log(
             "verify",
             "ok",
-            "当前身份已加密备份到保险库，无需退出当前工作区。",
+            "当前身份已保存；Claude 状态进入加密归档，已关联的浏览器资料保留在本机。",
             1,
             Some(1),
         );
@@ -462,8 +465,18 @@ impl Store {
         reporter.log("validate", "running", "正在核对当前身份。", 0, None);
         let live_key = super::catalog::live_key(&self.home, &self.key)?;
         reporter.log("validate", "ok", "当前本地身份已核对。", 1, Some(1));
-        if target != "empty" && live_key.is_some() && self.record(target)?.account_key == live_key {
-            // 当前账号仍是最新状态；避免用自己的旧快照覆盖当前刷新过的登录。
+        let same_slot = target != "empty" && match live_key.as_deref() {
+            Some(key) => self.record(target)?.account_key.as_deref() == Some(key),
+            None => super::catalog::snapshot_record(&self.db, None)?
+                .is_some_and(|record| record.id == target)
+                && (super::profile::read(&self.home).present
+                    || super::catalog::browser_profile_present(&self.vault, &self.db)?
+                    || identity::sources(&self.home, policy)?.iter().any(|source| {
+                        !identity::transient_lock(&self.home, &source.path, &source.path)
+                    })),
+        };
+        if same_slot {
+            // 历史等所选资料也是当前状态；无账号元数据不代表可用旧快照覆盖它。
             reporter.log("commit", "running", "正在保存当前身份选择。", 0, Some(1));
             self.db.complete(target)?;
             self.db.compact()?;
@@ -623,7 +636,7 @@ impl Store {
         reporter.log(
             "verify",
             "ok",
-            "身份切换完成，原身份已压缩暂存。",
+            if record.empty { "身份切换完成；原状态没有可保存的身份资料。" } else { "身份切换完成，原身份已保存。" },
             1,
             Some(1),
         );

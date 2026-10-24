@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 宿主上下文、真实浏览器观测、回传/连接状态与检测阶段。
- * [OUTPUT]: 每项的实际值、目标值、明确失败原因和红/黄/绿状态；未知值单项保持待测，语言按有效配置、区域按规范化国家核验。
+ * [OUTPUT]: 每项的实际值、目标值、按跟随本机/手动配置区分目标缺失原因和红/黄/绿状态；未知值单项保持待测，语言按有效配置、区域按规范化国家核验。
  * [POS]: 起始页的纯核验模型，与 DOM/网络分离，沿用宿主的时区、语言及设备规则。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -13,7 +13,7 @@ export function verifyBrowser(context:BrowserContext|null,report:Report|null,lin
  if(error)problems.push(error);
  if(report?.error)problems.push(report.error);
  if(!linked&&!busy)problems.push('与 CCBaga-A的连接已断开，请在清理器内重新打开实测页。');
- if(!context?.region&&!busy)problems.push('请先在主应用选择目标地区。');
+ if(context&&!context.region&&!busy)problems.push(context.config.follow_machine?'跟随本机模式下，系统区域与时区未匹配到支持的目标地区。':'当前浏览器语言与时区未匹配到支持的目标地区。请在浏览器环境中检查配置。');
  if(!report&&!busy&&!error)problems.push('尚未取得完整检测结果。');
  if(context&&report){
   const {machine,region,config}=context, exit=report.exit;

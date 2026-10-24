@@ -48,3 +48,17 @@ test-package-linux-browser.py: 四种目录移动取消恢复及取消后恢复�
 test-browser-cleanup.ts: 复用身份测试入口的 browser 模式，验证无缓存全清理、默认取消/强制勾选、精确删除参数、任务锁/真实 Channel 进度、失败与双语；仅内存 IPC，无原生或真实用户资料。
 test-browser-profiles.ts: 固定引擎的真实持久资料隔离回归；虚构 Cookie/LocalStorage 的 A/B 隔离、重开恢复和空资料，仅临时 HOME/本机页面。
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+
+test-identity-regressions.ts: 隔离浏览器的保留选项跨页面持久化、备份确认不覆盖选择、无账号元数据的最后本地档案显示与外部账号优先回归；仅虚构 IPC，禁止外网请求。
+
+test-local-identity-sessions.mjs: 启动仅回环的虚构登录服务，经原生隔离身份测试执行 A→B→A；真实 Chromium 仅使用临时资料和 mock keychain，验证持久 HttpOnly Cookie 不串档，关闭重开仍认证；不连接 Claude、不访问用户浏览器资料。
+
+test-identity-regressions.ts 额外验证未知账号本地卡片只出现一次、原卡片高亮、切换已有档案无另存输入，以及外部账号首次保存仍可命名。
+
+伴生检测页明确系统区域来源、目标地区与模式；B 触发独立随机域名，A 通过固定 Net.Coffee 接口读取同轮 DNS 结果，页面显示解析器 IP/地区/运营商。空结果、失败和部分归属地未知不冒充安全；DNS 单独列示，原有 12 项基础核验条件不变。
+
+test-browser-dns.ts: 仅虚构 DNS/回环响应，验证无外泄回环 Referer/Cookie、IPv4/IPv6 展示、部分归属地未知、空结果/403、取消旧轮次与宿主断连清除结果；加入既有 UI 测试入口。
+
+test-browser-doh.ts：隔离内存配置覆盖 zh-Hans-SG、两模式、服务商、自定义地址、保存回读及运行中禁用，中英文范围/回退说明；不写用户网络设置。
+
+test-identity-regressions.ts 追加 browser-only 保存入口、命名提交、当前卡与空模板高亮回归；test-local-identity-sessions.mjs 同时执行无账号元数据与纯浏览器身份的真实 HttpOnly 会话往返，临时 HOME/XDG、合成 Cookie、本机 HTTP 样本，不读真实资料。

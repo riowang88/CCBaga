@@ -5,6 +5,8 @@
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 -->
 
+> **本地维护仓库：**本仓库保存已安装的 `0.2.49+local.identity.6` 修复，后续维护见[维护基线](LOCAL-DEVELOPMENT.md)。下方下载链接和应用内更新仍指向上游版本。
+
 # CCBaga
 
 [English](README.md) · **简体中文**

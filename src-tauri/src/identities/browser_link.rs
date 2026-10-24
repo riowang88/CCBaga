@@ -1,5 +1,5 @@
 // [INPUT]: 身份 SQLite 事务、本软件随机身份 ID、浏览器资料槽位及只读有界本地账号显示字段。
-// [OUTPUT]: 身份到独占浏览器资料的绑定、稳定非零种子、同步提交的选择指针与不含凭据的绑定身份摘要。
+// [OUTPUT]: 身份到独占浏览器资料的绑定、已有资料的首次原地保存关联、稳定种子与不含凭据的本地身份摘要；不把未识别 CLI 账号当作浏览器资料为空。
 // [POS]: 浏览器联动的持久元数据；不读取 Cookie，不保存网站凭据，不把账号 UUID 暴露给引擎。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use super::{
@@ -96,6 +96,14 @@ fn bind(tx: &Transaction<'_>, id: &str, preferred: Option<&str>) -> Result<Strin
         }
     }
     Err("无法分配独立浏览器种子。".into())
+}
+pub(super) fn backup(tx: &Transaction<'_>, record: &Record) -> Result<(), String> {
+    if record.empty || get(tx, "browser.enabled")?.as_deref() != Some("1") { return Ok(()); }
+    let slot = get(tx, "browser.active")?.ok_or("浏览器资料选择无效。")?;
+    // 只给尚未绑定的当前资料建关联；外部 CLI 账号的备份不能抢走其他身份的浏览器。
+    let occupied: i64 = tx.query_row("SELECT COUNT(*) FROM browser_bindings WHERE identity=?1 OR slot=?2", params![record.id, slot], |r| r.get(0)).map_err(error)?;
+    if occupied == 0 { bind(tx, &record.id, Some(&slot))?; }
+    Ok(())
 }
 pub(super) fn pending(tx: &Transaction<'_>, record: &Record, target: &str) -> Result<(), String> {
     if get(tx, "browser.enabled")?.as_deref() != Some("1") {
@@ -214,7 +222,7 @@ impl Database {
         let slot = self.browser_slot()?;
         let bound=self.connection.query_row("SELECT i.id,i.name FROM browser_bindings b JOIN identities i ON i.id=b.identity WHERE b.slot=?1",[slot],|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?))).optional().map_err(error)?;
         let current = super::profile::read(home);
-        let local = super::catalog::current_id(vault, home, self);
+        let local = super::catalog::current_ids(vault, home, self).map(|(_, workspace)| workspace);
         let unavailable = current.unavailable || local.is_err();
         let matches = bound
             .as_ref()
@@ -223,10 +231,10 @@ impl Database {
             "unknown"
         } else if bound.is_some() && !matches {
             "mismatch"
-        } else if !current.present {
-            "empty"
         } else if matches {
             "linked"
+        } else if !current.present {
+            "empty"
         } else {
             "draft"
         };

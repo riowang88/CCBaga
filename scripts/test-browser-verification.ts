@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 现有隔离 Playwright 引擎、Vite 本机地址与虚构出口/宿主响应。
- * [OUTPUT]: 顶部身份卡顺序/双语/联动/不匹配/空身份与真实 browser.html 的黄波纹/绿通过/红失败、图片解码、紧凑宽度/高度、未知目标单项黄色待测、重测与双语 DOM 回归。
+ * [OUTPUT]: 顶部身份卡顺序/双语/联动/不匹配/空身份与真实 browser.html 的黄波纹/绿通过/红失败、图片解码、紧凑宽度/高度、未知目标单项黄色待测、区域来源、DNS 独立观测区不混入基础通过项数、逐项配置说明/重启语义、DNS 只读路径说明、重测与双语 DOM 回归。
  * [POS]: 身份 UI 回归共用引擎的伴生页验证，不截图、不调用真实宿主或外网。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -25,7 +25,7 @@ export async function testBrowserVerification(browser:Browser,base:string) {
     const high=await (navigator as any).userAgentData?.getHighEntropyValues(['platformVersion','uaFullVersion']);
     return {platform:navigator.platform.toLowerCase().includes('mac')?'macos':navigator.platform==='Win32'?'windows':'linux',version:high?.platformVersion||'',cores:navigator.hardwareConcurrency,engine:high?.uaFullVersion||navigator.userAgent.match(/(?:Chrome|Chromium)\/([\d.]+)/)?.[1]||''};
    });
-   return route.fulfill({json:{identity,ui_language:language,exit_services:[base+'/fixture-exit'],region:unknown?null:{id:'us-la',country:'US',language:'en-US',locale:'en_US',timezone:'America/Los_Angeles'},config:{follow_machine:false,language:'en-US',timezone:'America/Los_Angeles'},machine:{platform:observed.platform,version:observed.version,cores:observed.cores,timezone:'America/Los_Angeles',languages:['en-US'],locale:'en_US',locale_country:'US',location_enabled:false},engine_version:observed.engine}});
+   return route.fulfill({json:{identity,ui_language:language,exit_services:[base+'/fixture-exit'],region:unknown?null:{id:'us-la',label:'United States',country:'US',language:'en-US',locale:'en_US',timezone:'America/Los_Angeles'},config:{follow_machine:false,language:'en-US',timezone:'America/Los_Angeles'},machine:{platform:observed.platform,version:observed.version,cores:observed.cores,timezone:'America/Los_Angeles',languages:['en-US'],locale:'en_US',locale_country:'US',location_enabled:false},engine_version:observed.engine}});
   }
   if(url===base+'/fixture-exit')return route.fulfill({json:{ip:'203.0.113.1',country_code:failure?'JP':'US',city:'Fixture',timezone:'America/Los_Angeles'}});
   if(url===base+'/report'){reports++;return route.fulfill({json:{ok:true}});}
@@ -38,6 +38,15 @@ export async function testBrowserVerification(browser:Browser,base:string) {
   release();
   await page.waitForFunction(()=>document.querySelector('[data-verification]')?.getAttribute('data-verification')==='passed');
   assert.equal(await page.locator('.verification-check.failed').count(),0);assert(reports>0);
+  await page.getByRole('region',{name:'DNS 解析器实测',exact:true}).waitFor();
+  assert.equal(await page.locator('.verification-check').count(),12);
+  assert.equal(await page.locator('.verification-check details summary').count(),12);
+  const languageHelp=page.locator('.verification-check').filter({has:page.getByRole('heading',{name:'网页语言',exact:true})});
+  await languageHelp.getByText('如何设置',{exact:true}).click();
+  assert.match(await languageHelp.innerText(),/正常退出 B.*保存设置.*重新启动/s);
+  await page.getByText('DNS 在哪里配置',{exact:true}).click();
+  assert.match(await page.locator('.verification-dns-help').innerText(),/DNS 解析设置选择沿用现有解析或指定 DoH/);
+  assert.match(await page.locator('.verification-dns-help').innerText(),/自动模式可能回退普通 DNS/);
   const badge=page.getByRole('region',{name:'浏览器身份',exact:true});
   await badge.getByRole('heading',{name:'Fixture identity',exact:true}).waitFor();
   assert.match(await badge.innerText(),/fixture@example.invalid/);assert.match(await badge.innerText(),/身份已联动/);
@@ -57,13 +66,18 @@ export async function testBrowserVerification(browser:Browser,base:string) {
   await page.getByRole('button',{name:'重新实测',exact:true}).click();
   await page.locator('.verification-check.pending').filter({has:page.getByRole('heading',{name:'出口国家',exact:true})}).waitFor();
   assert.equal(await page.locator('.verification-check.pending').count(),2);
+  assert.match(await page.getByRole('region',{name:'检测依据',exact:true}).innerText(),/手动配置.*目标地区.*尚未识别/s);
+  assert.match(await page.locator('.verification-check.pending').filter({has:page.getByRole('heading',{name:'本机区域',exact:true})}).innerText(),/系统区域格式.*目标地区未识别/s);
   assert.equal(await page.locator('.verification-check.failed').count(),0);
-  assert.equal(await page.locator('.verification-check.pending').first().getByLabel('尚未核验',{exact:true}).innerText(),'—');
+  assert.equal(await page.locator('.verification-check.pending').first().getByLabel('尚未核验',{exact:true}).innerText(),'尚未核验');
   unknown=false;language='en';
   await page.getByRole('button',{name:'重新实测',exact:true}).click();
   await page.getByRole('heading',{name:'Checks passed',exact:true}).waitFor();
   await page.getByRole('button',{name:'Run check',exact:true}).waitFor();
+  assert.equal(await page.locator('.verification-check details summary').filter({hasText:'How to configure'}).count(),12);
+  assert.match(await page.locator('.verification-dns-help').innerText(),/Automatic mode may fall back/);
   assert.match(await page.locator('.verification-identity').innerText(),/Identity linked/);
+  await page.getByRole('region',{name:'DNS resolver test',exact:true}).getByRole('button',{name:'Check DNS again'}).waitFor();
   identity={linked:true,status:'mismatch',name:'Archived identity A',email:null,organization:null};
   await page.getByRole('button',{name:'Run check',exact:true}).click();
   await page.locator('.verification-identity').getByText('Identity out of sync',{exact:true}).waitFor();

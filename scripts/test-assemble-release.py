@@ -83,6 +83,17 @@ class ReleaseAssemblyTests(unittest.TestCase):
                     path.write_bytes(original)
                     self.write_lists()
 
+    def test_adhoc_notice_preserves_verified_updater(self):
+        path = self.out / 'latest.json'
+        manifest = json.loads(path.read_text())
+        manifest['macos_signing'] = 'adhoc'
+        expected = manifest['platforms']['darwin-aarch64'].copy()
+        path.write_text(json.dumps(manifest))
+        self.write_lists()
+        assembly.main()
+        self.assertEqual(json.loads(path.read_text())['platforms']['darwin-aarch64'], expected)
+        self.assertIn('not notarized by Apple', (self.root / 'release-notes.md').read_text())
+
     def test_omitted_artifact_cannot_be_rehashed_and_published(self):
         for manifest, artifact in [('SHA256SUMS', self.dmg), ('Windows-SHA256SUMS', self.windows),
                                    *[('Linux-SHA256SUMS', name) for name in self.linux],

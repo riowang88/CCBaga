@@ -31,7 +31,7 @@ export async function testIdentityOperation(browser:Browser,base:string) {
   assert.equal(await operation.count(),0);
   await page.evaluate(()=>(window as any).identityFixture.defer('identities_stop','identities_switch'));
   await page.getByRole('button',{name:'使用空身份',exact:true}).click();
-  await page.getByRole('dialog').getByRole('button',{name:'确认暂存并切换',exact:true}).click();
+  await page.getByRole('dialog').getByRole('button',{name:'保存当前身份并切换',exact:true}).click();
   await pending(page,'identities_stop');await operation.waitFor();
   assert.equal(await operation.evaluate(node=>node.previousElementSibling?.classList.contains('identity-card-rail')),true);
   const bar=operation.getByRole('progressbar');
@@ -61,7 +61,7 @@ export async function testIdentityOperation(browser:Browser,base:string) {
   await page.evaluate(()=>(window as any).identityFixture.defer('identities_switch'));
   const saved=page.locator('.identity-card').filter({has:page.getByRole('heading',{name:'Identity 3',exact:true})});
   await saved.getByRole('button',{name:'切换',exact:true}).click();
-  await page.getByRole('dialog').getByRole('button',{name:'确认暂存并切换',exact:true}).click();
+  await page.getByRole('dialog').getByRole('button',{name:'保存当前身份并切换',exact:true}).click();
   await pending(page,'identities_switch');
   await emit(page,'identities_switch',{stage:'restore',message:'fixture restoring saved identity',current:2,total:8});
   await operation.getByText('fixture restoring saved identity').first().waitFor();
@@ -96,7 +96,7 @@ export async function testIdentityOperation(browser:Browser,base:string) {
   // ----- 失败事件与回滚不能被百分比或已完成样式掩盖 -----
   await page.evaluate(()=>(window as any).identityFixture.defer('identities_switch'));
   await page.getByRole('button',{name:'使用空身份',exact:true}).click();
-  await page.getByRole('dialog').getByRole('button',{name:'确认暂存并切换',exact:true}).click();
+  await page.getByRole('dialog').getByRole('button',{name:'保存当前身份并切换',exact:true}).click();
   await pending(page,'identities_switch');
   await emit(page,'identities_switch',{stage:'archive',status:'error',message:'fixture archive verification failed',current:1,total:4});
   await emit(page,'identities_switch',{stage:'rollback',status:'running',message:'fixture rollback restoring current files'});

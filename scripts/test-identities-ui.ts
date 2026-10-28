@@ -47,7 +47,9 @@ try{
  assert.equal(await cards.count(),41);assert.equal(await cards.first().getByRole('heading').innerText(),'空身份');
  assert.equal(await page.locator('.identity-switcher').count(),0);
  assert.equal(await page.getByText('上次使用',{exact:true}).count(),0);
- assert.equal(await cards.filter({has:page.getByRole('heading',{name:'Identity 1',exact:true})}).count(),0);
+ // 已保存的当前档案保留原名称，并且只出现一次，不能再生成一张暂存卡。
+ assert.equal(await cards.filter({has:page.getByRole('heading',{name:'Identity 1',exact:true})}).count(),1);
+ assert.equal(await page.locator('.identity-card.current').getByRole('heading').innerText(),'Identity 1');
  assert.match(await cards.first().innerText(),/清空本地登录身份/);checks++;
  const geometry=await cards.evaluateAll(nodes=>nodes.slice(0,3).map(node=>{const r=node.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};}));
  assert.equal(geometry[0].y,geometry[2].y);assert(geometry[2].x+geometry[2].width<1040-150);assert(Math.abs(geometry[0].width/geometry[0].height-54/85.6)<.01);checks++;
@@ -66,7 +68,7 @@ try{
  await page.waitForFunction(()=>(window as any).identityFixture.state.browser.enabled===true);checks++;
  const current=page.locator('.identity-card.current');
  const light=await current.evaluate(node=>getComputedStyle(node,'::before').boxShadow);assert.match(light,/67, 228, 132/);
- await page.mouse.move(geometry[1].x+150,geometry[1].y+85);
+ await current.hover({position:{x:30,y:70}});
  await page.waitForFunction(()=>document.querySelector('.identity-card.current')?.getAttribute('style')?.includes('rotate'));
  await page.mouse.move(10,10);checks++;
  const rail=page.locator('.identity-card-rail');
@@ -84,7 +86,7 @@ try{
  await page.mouse.click(3,3);assert.equal(await dialog.count(),1);
  await dialog.getByRole('button',{name:'取消'}).click();
  assert.equal(await page.evaluate(()=>((window as any).identityFixture.commands as any[]).filter(row=>row.command==='identities_delete').length),0);checks++;
- assert.match(await current.innerText(),/已备份/);assert.match(await current.innerText(),/Pro/);assert.match(await current.innerText(),/本地未过期/);
+ assert.match(await current.innerText(),/正在使用/);assert.match(await current.innerText(),/Pro/);assert.match(await current.innerText(),/本地未过期/);
  const savedSecond=cards.filter({has:page.getByRole('heading',{name:'Identity 2',exact:true})});
  assert.match(await savedSecond.innerText(),/user2@example\.invalid/);assert.match(await savedSecond.innerText(),/Org 2/);
  await current.getByRole('button',{name:'更新备份',exact:true}).click();
@@ -100,15 +102,17 @@ try{
  await page.getByText('切换账号时保持不变的内容',{exact:true}).click();
  await page.getByRole('checkbox',{name:'Skills 与命令'}).uncheck();
  await cards.first().getByRole('button',{name:'使用空身份'}).click();
- dialog=page.getByRole('dialog');await dialog.waitFor();await dialog.getByLabel('当前身份保存为').fill('First archive');
- await dialog.getByRole('button',{name:'确认暂存并切换'}).click();
+ dialog=page.getByRole('dialog');await dialog.waitFor();
+ assert.equal(await dialog.getByLabel('首次保存当前身份为').count(),0);
+ assert.match(await dialog.innerText(),/Identity 1/);
+ await dialog.getByRole('button',{name:'保存当前身份并切换'}).click();
  await page.waitForFunction(()=>!(window as any).identityFixture.state.current.present);
  assert.equal(await page.locator('.identity-card.current').count(),0);
  const request=await page.evaluate(()=>((window as any).identityFixture.commands as any[]).find(row=>row.command==='identities_switch').args);
- assert.equal(request.policy.skills,false);assert.equal(request.targetId,'empty');assert.equal(request.currentName,'First archive');checks++;
+ assert.equal(request.policy.skills,false);assert.equal(request.targetId,'empty');assert.equal(request.currentName,'Identity 1');checks++;
  const target=page.locator('.identity-card:not(.current)').filter({has:page.getByRole('heading',{name:'Identity 3',exact:true})});
  await target.getByRole('button',{name:'切换',exact:true}).click();
- await page.getByRole('dialog').getByRole('button',{name:'确认暂存并切换'}).click();await page.getByText('Fixture team',{exact:true}).waitFor();checks++;
+ await page.getByRole('dialog').getByRole('button',{name:'保存当前身份并切换'}).click();await page.getByText('Fixture team',{exact:true}).waitFor();checks++;
  assert.equal(await target.count(),0);checks++;
  const bound=cards.filter({has:page.getByRole('heading',{name:'Identity 1',exact:true})});
  await bound.getByRole('button',{name:'删除',exact:true}).click();
@@ -128,7 +132,7 @@ try{
  await cards.first().getByRole('button',{name:'Use empty identity'}).waitFor();assert.match(await cards.first().innerText(),/local sign-in/);checks++;
  await page.evaluate(()=>{(window as any).identityFixture.setFailure('identities_switch');});
  await cards.first().getByRole('button',{name:'Use empty identity'}).click();
- await page.getByRole('dialog').getByRole('button',{name:'Archive & switch'}).click();
+ await page.getByRole('dialog').getByRole('button',{name:'Save current identity & switch'}).click();
  await page.getByText(/fixture operation failed/).first().waitFor();assert.equal(await page.evaluate(()=>(window as any).identityFixture.state.current.present),true);checks++;
  await page.evaluate(()=>{(window as any).identityFixture.recover();});
  await page.getByRole('button',{name:'Refresh',exact:true}).click();

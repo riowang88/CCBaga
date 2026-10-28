@@ -12,16 +12,16 @@ package-browser.ps1: Windows 固定引擎前置核验，不打包用户资料或
 test-skill-install.ts: Agent Skills metadata/完整公开文件与 npm skills 1.7.2 的四项真实安装；临时 HOME 和缓存，关闭统计，验证共享目录、完整文件与无 symlink。
 test-network-diagnostics.ts: 共用隔离引擎验证真实网络页的 Claude 出口四态、逐域 403 原因、命令异常/空返回拒绝、重测清旧结果和双语；不访问真实网络。
 test-browser-verification.ts: 顶部身份卡顺序、双语与不匹配/空身份/未联动 DOM 回归； 复用隔离 Playwright 引擎，真实 browser.html 的三态背景/波纹、原因、图片实际解码、紧凑布局、重测和双语 DOM 回归；虚构本机 HTTP 回报，无截图/真实账号。
-test-identities-ui.ts: 默认勾选、关闭确认/取消与恢复联动； Node.js 标准管道 + 固定引擎 + playwright-core 的隔离 DOM 模拟；40 个虚构账号验证当前槽位去重/无最近使用卡片、竖式工牌、弹簧/视差、Alert 安全默认、双语、保留选择与切换/删除/失败/恢复，临时 HOME/XDG，不调用真实 IPC、不截图或外连。 允许 CCBAGA_TEST_ENGINE 指定已知本机测试引擎；严格断言保留，当前旧的 Identity 1 数量断言与本地槽位显示行为冲突，单独报告。
+test-identities-ui.ts: 默认勾选、关闭确认/取消与恢复联动； Node.js 标准管道 + 固定引擎 + playwright-core 的隔离 DOM 模拟；40 个虚构账号验证当前槽位去重/无最近使用卡片、竖式工牌、弹簧/视差、Alert 安全默认、双语、保留选择与切换/删除/失败/恢复，临时 HOME/XDG，不调用真实 IPC、不截图或外连。 允许 CCBAGA_TEST_ENGINE 指定已知本机测试引擎；核对当前档案名称只出现一次且位于当前卡；保留原名切换并对齐已确认按钮文案，悬停基于当前定位而非弹窗前旧坐标。
 test-claude-residue.ts: 复用身份页内存 IPC 验证显式扫描、仅精确缓存默认选择、不完整项禁选、JSON 键提示、不可逆确认默认取消、精确 ID 提交、部分失败和停止失败后的重扫读回、旧计划失效与英文确认；不触碰本机文件或钥匙串。
 test-identity-transfer.ts: 临时身份迁移 DOM 回归，选择取消、密码边界/清空、真实进度与失败后重选票据/重选和取消清除可信确认/提交后状态失败读回、导入不切换、双语和本地期限到期/进程未知显示；无真实文件。
 test-identity-operation.ts: 通过延期 IPC 和官方 Channel 回调验证工牌下方共享进度；未知总量不制造百分比，实际 1/4 事件显示且停留 25%，空身份/暂存身份/清理复查走同一进度，失败与回滚保留真实状态；不截图或触碰本机资料。
 test-windows.py: 子进程大小写无关地清除继承 PSModulePath，90 秒冷启动预算/逐项日志保留安全断言；Windows 原生/npm/WinGet 程序隔离样本的卸载重装、PATH外全局npm启动器识别；离线原生安装器字节/文本响应、安装/版本失败恢复哈希、junction 阻断回滚保留备份、下载/解析失败保留旧程序、安装失败不报告成功与自定义启动器拒绝；CI 实际语言/区域写入、输入法保留和完整还原。
 fetch-browser.py: 固定上游引擎与 SHA-256，核验版本/架构；在目标旁完整复制后公开三平台引擎，失败清理暂存目录，清理失败报告路径；干净 CI 检出不依赖维护者本机引擎。
 test-fetch-browser.py: 三平台真实临时文件树与显式下载/摘要/平台工具替身，回归复制失败后可重试、完整资源/权限/链接、既有引擎不变与清理失败路径；不下载或运行真实引擎。
-release-macos.py: 外部凭据与可选 CC_RELEASE_VERSION 驱动三阶段公证装订，票据服务网络错误最多重试三次、其他验证失败立即阻断；明确将原生构建目录 Browser.app 暂存为交付名 CCBaga-B.app，再由 dmgbuild 无头写入 Finder 布局；装订后的宿主单独归档并签名绑定版本，更新私钥仅传给签名子进程；Apple 凭据不进入构建、DMG 或更新签名子进程，公证工具只通过明确参数接收其认证输入；官方更新器回归核验后生成公开 latest.json；产物和哈希记录写入被忽略的 releases/。
+release-macos.py: 显式 adhoc/notarized 模式与可选 CC_RELEASE_VERSION；默认 notarized 仍需外部 Apple 凭据，CI 选择 adhoc 不调用公证/Gatekeeper且如实记录；两模式强制更新签名与载荷完整性；notarized 驱动三阶段公证装订，票据服务网络错误最多重试三次、其他验证失败立即阻断；明确将原生构建目录 Browser.app 暂存为交付名 CCBaga-B.app，再由 dmgbuild 无头写入 Finder 布局；装订后的宿主单独归档并签名绑定版本，更新私钥仅传给签名子进程；Apple 凭据不进入构建、DMG 或更新签名子进程，公证工具只通过明确参数接收其认证输入；官方更新器回归核验后生成公开 latest.json；产物和哈希记录写入被忽略的 releases/。
 dmg-settings.py: 固定 800×500 像素背景、两应用到 Applications 的拖拽坐标；通知文件保留在盘内但默认隐藏，不依赖 Finder 自动化。
-verify-dmg.py: 复用 browser_ui 的宿主页面实际资源引用验收；只读挂载实际安装盘，校验双应用名称、包标识与启动入口，再校验严格签名与 Gatekeeper、Applications 链接和像素背景；Finder 元数据不得破坏应用签名。
+verify-dmg.py: 复用 browser_ui 的宿主页面实际资源引用验收；只读挂载实际安装盘，校验双应用名称、包标识与启动入口，再校验严格签名、Applications 链接和像素背景；仅显式 --adhoc 不要求 Gatekeeper；Finder 元数据不得破坏应用签名。
 release-requirements.txt: dmgbuild、ds-store 与 mac-alias 的完整版本及 wheel SHA-256；仅发布阶段安装，不增大应用包。
 package-browser.sh: 先品牌化签名，再打包引擎，ditto 保留 Framework 链接与可执行权限；归档进入应用资源；Linux 将源引擎暂存后完整替换 CARGO_TARGET_DIR 的 release 资源树中的 LinuxBrowser，保持源码/Arch 安装契约，系统包另走 libexec。
 dev-install.py: 本机 Apple Silicon 快速 debug/custom-protocol 构建、临时签名与双应用重装，安装前验证 Chromium 实际 CLI 可加载；过滤 Apple/更新私钥环境；不公证、不生成 DMG、不发布。
@@ -63,7 +63,7 @@ test-browser-doh.ts：隔离内存配置覆盖 zh-Hans-SG、两模式、服务�
 
 test-identity-regressions.ts 追加 browser-only 保存入口、命名提交、当前卡与空模板高亮回归；test-local-identity-sessions.mjs 同时执行无账号元数据与纯浏览器身份的真实 HttpOnly 会话往返，临时 HOME/XDG、合成 Cookie、本机 HTTP 样本，不读真实资料。
 
-本仓库更新产物：release-macos.py 从 tauri.conf.json 的更新地址派生下载仓库；sign-windows-update.py 与 assemble-release.py 固定 riowang88/CCBaga，装配回归覆盖新地址接受与旧地址拒绝。所有既有摘要、签名、公证和跨平台交付检查保留。
+本仓库更新产物：release-macos.py 从 tauri.conf.json 的更新地址派生下载仓库；sign-windows-update.py 与 assemble-release.py 固定 riowang88/CCBaga，装配回归覆盖新地址接受与旧地址拒绝。摘要、更新签名和跨平台交付检查保留，Apple 公证仅在显式 notarized 模式要求。
 
 test-identity-regressions.ts: 隔离虚构 IPC 验证保留策略、本地槽位、运行标签、仅浏览器保存与分端资料、旧档案未知、维护窗口、双语及查看引导不触发登录/保存；可用 CCBAGA_TEST_ENGINE 指定已知引擎。
 

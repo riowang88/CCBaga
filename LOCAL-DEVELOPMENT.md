@@ -23,11 +23,11 @@
 
 身份保险库、浏览器资料、Cookie、密钥和个人配置属于应用运行数据，不放入源码仓库。`releases/`、身份归档和密钥沿用现有 Git 忽略规则。
 
-应用内更新地址已配置为 `https://github.com/riowang88/CCBaga/releases/latest/download/latest.json`，使用本仓库独立公钥，仍强制校验签名与版本。macOS/Windows 更新下载地址和发布权限同步到本仓库，仅 `riowang88` 可触发及重跑发布；原有跨平台验收、公证和正式签名要求保留。Linux 仍通过安装包或包管理器更新。
+应用内更新地址已配置为 `https://github.com/riowang88/CCBaga/releases/latest/download/latest.json`，使用本仓库独立公钥，仍强制校验签名与版本。macOS/Windows 更新下载地址和发布权限同步到本仓库，仅 `riowang88` 可触发及重跑发布；跨平台、载荷和更新签名验收保留；2026-10-28 用户明确按 GitHub Releases 安装包交付，Apple 签名公证改为可选。Linux 仍通过安装包或包管理器更新。
 
 独立更新密钥位于本机仓库外的 `~/.config/ccbaga-release/`（目录 0700、加密私钥与密码文件 0600），已配置 GitHub Secrets `TAURI_SIGNING_PRIVATE_KEY` 和 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`。私钥不进入应用或 Git；维护者应妥善备份该目录。
 
-截至更新渠道迁移时，本仓库没有 Release。正式发布仍缺六项 Apple Secrets：`APPLE_CERTIFICATE`、`APPLE_CERTIFICATE_PASSWORD`、`APPLE_API_PRIVATE_KEY`、`APPLE_API_KEY`、`APPLE_API_ISSUER`、`CC_SIGN_IDENTITY`。取得有效凭据、完成发布验收后，才能生成可用的 `latest.json` 与签名更新包。没有 Release 时新地址返回错误，不能宣称“已是最新版本”。
+截至更新渠道迁移时，本仓库没有 Release。当时公证模式缺六项 Apple Secrets：`APPLE_CERTIFICATE`、`APPLE_CERTIFICATE_PASSWORD`、`APPLE_API_PRIVATE_KEY`、`APPLE_API_KEY`、`APPLE_API_ISSUER`、`CC_SIGN_IDENTITY`。现已按用户授权显式选择 adhoc 模式，不以这些 Apple 凭据阻塞 GitHub Release；更新密钥和发布验收仍必需。没有 Release 时新地址返回错误，不能宣称“已是最新版本”。
 
 当前安装的 `0.2.49+local.identity.6` 内嵌的仍是上游地址及公钥。源码配置不会修改已安装应用；首次迁移需安装包含新地址和公钥的构建，之后才能使用本仓库的更新。此次未构建、安装或发布新应用。
 
@@ -41,3 +41,6 @@
 本轮提交检查：前端构建通过，110项前端测试通过；Rust custom-protocol测试172通过/5忽略/0失败；原生进程隔离及临时Keychain身份检查通过；7组identity-regressions通过。完整test-identities-ui.ts在第50行失败：要求Identity 1名称不存在，而基线HEAD和当前实现都优先保留当前档案名称。该套件因此未完成后续场景，不标为通过；本轮未改业务或放宽断言换取通过。证据在/tmp/ccbaga-0.2.50-check/。Windows/Linux和正式签名、公证、线上更新未重验；最新官方授权地址修复仅通过隔离验证，真实授权未再次执行。
 
 本地候选已构建并启动，界面显示v0.2.50；路径/tmp/ccbaga-0.2.50-check/CCBaga-A.app，/Applications安装版未覆盖。
+
+
+2026-10-28 发布返修：用户明确 GitHub Releases 下载交付，CI 显式 CC_MACOS_SIGNING_MODE=adhoc。Apple 公证不再是本模式前提，更新签名、安装包完整性和跨平台验收仍必需；安装说明公开未公证和首次打开可能被系统拦截。完整 UI 旧名称/按钮/悬停断言已按既有契约修正，75项全部通过。发布装配4项、凭据隔离/模式回归、既有签名与安装边界通过，前端构建与单元测试通过。此次无应用业务逻辑变化，macOS Apple 公证结果明确未验证/未请求，Windows/Linux实际安装交CI发布验收。

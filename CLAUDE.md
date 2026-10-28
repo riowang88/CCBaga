@@ -3,7 +3,7 @@
 Tauri 2.12.1 + Rust + macOS AppKit/UniformTypeIdentifiers/Accessibility/Security/CoreLocation + SHA-256 + React 19.3.0 + TypeScript 5.9.3 + Cromma UI 本地副本 + Radix UI 1.6.7 + Tailwind CSS 4.3.3 + Motion 14.0.0 + Vite 7.3.6 + YAML 2.9.1（仅构建）
 
 <directory>
-.github/ - PR 的 Ubuntu/macOS/Windows 无凭据回归、release 分支自动测试、公证与发布工作流，以及依赖更新；见其 CLAUDE.md
+.github/ - PR 的 Ubuntu/macOS/Windows 无凭据回归、release 分支自动测试、可选公证与发布工作流，以及依赖更新；见其 CLAUDE.md
 src/ - 黑色主题的 Laper 最新 Landing 斜纹/点阵/细线内容壳、Cromma UI 极简侧栏导航与右侧傻瓜设置（国家地区选择和四个快捷按钮）、Claude 身份竖式立体工牌（白底空身份始终最左、当前账号其次、顶部挂孔绿光表示当前身份、弹簧横滚/视差与卡片直接切换）与 CLI 卸载/重装、浏览器核验、电脑设置与网络环境（三步固定资源入口、五项 AI 图标分段、问号服务规格与双语安装/运行提示词）及 YAML 中英文切换与只读编号帮助页（账号说明原生折叠）；见其 CLAUDE.md
 src-tauri/ - 白名单身份暂存/切换、Claude Code CLI 安装管理、独立指纹浏览器、国家地区目录、电脑环境设置与固定网络资源导航；见其 CLAUDE.md
 browser-runtime/ - 固定摘要的独立 Fingerprint Chromium 引擎与保留 Framework 链接的打包归档；见其 CLAUDE.md
@@ -43,8 +43,8 @@ NOTICE.md - 第三方引擎、组件与图标的授权边界
 网络：GUI 提供固定 VPS/家宽/Skill 入口、五项 AI 的双语 npm 安装/运行提示词，以及用户点击才运行的「Claude 出口」四域名只读连通性探针，待测/检测中/成功/失败及逐域原因明确呈现；下载源只在 HTTP 200 且最多 64 字节的公开三段数字版本正文验证后通过，不能由根目录或畸形响应推断可下载。不携带认证、不跟随重定向，连接对端不冒充出口或分流验证。SSH/三文件/家宽资料和确认部署归独立 Skill；私密资料留在 Git/Skill 外，后续严格主机指纹验证，订阅私密交付后引导 TUN 开/系统代理关。供应商设置唯一来源 skills/ccbaga-network/providers.json，完整原始地址由回归锁定。
 CLI 管理：Claude 身份页提供一键卸载/重装，确认后结束全部已识别 Claude 进程；原生、Homebrew 与登录终端/nvm 全局 npm 按官方流程卸载程序，配置、会话、技能、项目与钥匙串保留。拒绝删除自定义启动器或外部链接；重装沿用已识别包管理器，无安装时用官方原生安装器；原生重装以唯一目录暂存原程序，捕获安装/核验失败时恢复（Windows 验哈希），回滚受阻保留文件并如实报告；强制终止不承诺自动恢复。版本核验成功且收到完整回报才报告完成。超时结束本次子进程组，错误保留部分修改的事实。
 发布权限：本仓库版本仅由仓库所有者 riowang88 在 riowang88/CCBaga 发布，CI 同时核对仓库、触发者与重跑者；PR/main 检查不接触签名凭据。README 不承载发布、公证操作文章。
-发布契约：开发构建默认临时签名；release-macos.py 使用外部环境变量指定 Developer ID 和 Apple API key，先公证装订浏览器，再将其归档嵌入宿主，最后公证宿主与双应用 DMG。单个 DMG 同时交付两个应用；每次品牌化都明确设置浏览器 Bundle ID（不能依赖本机旧引擎）；安装盘验收核对双应用名称/标识/入口。哈希锁定的 dmgbuild 只用于发布，写入像素背景与固定拖拽布局，不依赖 Finder GUI。必须取得 Accepted、装订票据并通过 Gatekeeper；不以移除隔离属性替代验收。装订后的 A 由官方 CLI 生成带版本签名的 .app.tar.gz 与公开 latest.json；仅公钥进入应用，原生 updater 强制验证版本，安装后重启，B 继续使用完整 DMG。CI 只缓存 Rust 依赖，签名私钥不传给构建子进程。密钥和发布产物不入 Git。
-交付流程：视觉验收由项目所有者完成；获得发布授权后，同步推送 main 与 release 的同一已验收提交，release 触发递增版本和 tag；公开产物验收成功后核对两分支一致，再回复并关闭相关 issue，避免提交中的关闭关键字提前结束问题。版本说明描述当前产品与安装方式。所有平台构建、载荷、签名更新清单和公开下载验收成功后完成交付；历史 Release 与 tag 默认全部保留，方便回退和对比，失败时保留当前可用版本。源码安装与引擎替换：可捕获的取消包含在回滚范围内，目录实际移动后发生异常也按磁盘状态恢复；双重失败保留并报告恢复目录。Mac/Linux 安装前、三平台正式载荷与构建 CI 共用页面实际资源引用检查，不用任意 JS 存在替代完整性。此契约不宣称断电/强制结束的崩溃原子性或并发安装安全。本机开发使用 bun run dev:install：debug/custom-protocol 内嵌 UI、临时签名、双应用事务重装到 /Applications 并启动/激活；开发模式拒绝外部安装盘，只允许临时签名包。正式交付使用 Developer ID、公证/Gatekeeper 和双应用 DMG，公开安装包保持强验收。
+发布契约：开发构建默认临时签名；release-macos.py 支持显式 CC_MACOS_SIGNING_MODE=adhoc/notarized，脚本默认 notarized，本仓库 CI 明确选择 adhoc；不因缺凭据静默降级。adhoc 使用临时签名且不宣称 Apple 信任，notarized 使用外部 Developer ID 和 Apple API key，依次公证装订浏览器、宿主与 DMG。单个 DMG 同时交付两个应用；每次品牌化都明确设置浏览器 Bundle ID（不能依赖本机旧引擎）；安装盘验收核对双应用名称/标识/入口。哈希锁定的 dmgbuild 只用于发布，写入像素背景与固定拖拽布局，不依赖 Finder GUI。notarized 模式必须取得 Accepted、装订票据并通过 Gatekeeper；adhoc 保留严格代码签名完整性、安装盘内容和更新验签检查，下载说明明确首次打开可能被系统拦截。不自动移除用户下载的隔离属性。最终 A 由官方 CLI 生成带版本签名的 .app.tar.gz 与公开 latest.json；仅公钥进入应用，原生 updater 强制验证版本，安装后重启，B 继续使用完整 DMG。CI 只缓存 Rust 依赖，签名私钥不传给构建子进程。密钥和发布产物不入 Git。
+交付流程：视觉验收由项目所有者完成；获得发布授权后，同步推送 main 与 release 的同一已验收提交，release 触发递增版本和 tag；公开产物验收成功后核对两分支一致，再回复并关闭相关 issue，避免提交中的关闭关键字提前结束问题。版本说明描述当前产品与安装方式。所有平台构建、载荷、签名更新清单和公开下载验收成功后完成交付；历史 Release 与 tag 默认全部保留，方便回退和对比，失败时保留当前可用版本。源码安装与引擎替换：可捕获的取消包含在回滚范围内，目录实际移动后发生异常也按磁盘状态恢复；双重失败保留并报告恢复目录。Mac/Linux 安装前、三平台正式载荷与构建 CI 共用页面实际资源引用检查，不用任意 JS 存在替代完整性。此契约不宣称断电/强制结束的崩溃原子性或并发安装安全。本机开发使用 bun run dev:install：debug/custom-protocol 内嵌 UI、临时签名、双应用事务重装到 /Applications 并启动/激活；开发模式拒绝外部安装盘，只允许临时签名包。GitHub Releases 交付双应用 DMG；Apple 签名公证为显式可选模式，下载页据真实模式说明限制，安装包完整性验收保持。
 安全契约：src-tauri/SECURITY.md 描述数据流、外部连接与已确认上游依赖风险；进程参数只在原生层识别，Machine.system_proxy 禁止序列化；宿主无用户信息上传服务；验证未覆盖的第三方、桌面或远程行为不得宣称通过。
 Linux x86_64 适配：见 docs/linux.md；平台配置拆分为 tauri.macos.conf.json / tauri.linux.conf.json。Linux 原生边界位于 src-tauri/src/linux.rs，浏览器使用带哈希固定的 LinuxBrowser 与 XDG 启动项；标准 Linux 包在 Ubuntu 22.04 构建并逐个检查实际 ELF 的 glibc 2.35 上限，Arch 保持独立当前发行版；版本任务后并行构建 macOS/Ubuntu/Arch；DEB/RPM/AppImage 引擎隔离在 libexec，避免宿主打包工具改写；Linux 实际安装包均解包核验，四格式与 macOS 同批验收后由所有者统一发布，Linux 不接触 Apple/更新私钥。
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -72,6 +72,6 @@ Windows x64：平台桥使用当前用户 SID、文件所有权、reparse-point 
 
 保存完整性修复：所选历史等本地资料不因缺少登录元数据而被同档案重选回灌；联动重开产生不同资料后另存本地档案，重复保存更新新档案，保留旧档案及浏览器绑定。原有空工作区恢复、保留策略与账号隔离不变。
 
-本仓库更新渠道：公开 riowang88/CCBaga Releases 的 latest.json 与独立更新公钥；强制签名版本、篡改拒绝、所有者发布/重跑和跨平台验收保持。版本基数 0.2.50，CI 按运行号递增；首次使用新渠道需要安装包含新地址与公钥的构建，既有安装版不会因源码修改自动迁移。更新私钥只放仓库外与 GitHub Secrets，Apple 公证凭据缺失时不发布。
+本仓库更新渠道：公开 riowang88/CCBaga Releases 的 latest.json 与独立更新公钥；强制签名版本、篡改拒绝、所有者发布/重跑和跨平台验收保持。版本基数 0.2.50，CI 按运行号递增；首次使用新渠道需要安装包含新地址与公钥的构建，既有安装版不会因源码修改自动迁移。更新私钥只放仓库外与 GitHub Secrets，仅 notarized 模式要求 Apple 公证凭据；本次用户授权 GitHub Releases 安装包采用 adhoc 模式。
 
 首版人工维护窗口（2026-10-28 用户裁决）：对将快照或替换的客户端资料由用户保持静止；进程查询/生命周期/helper/资料占用检查和已检测冲突锁存、持久恢复仍保留，不承诺拦截检查间完成的外部启动/写入/退出，不引入系统级服务。原地备份仅保存 B 绑定时仍可保持 B 运行。身份页分端资料与本地摘要不等于登录有效，旧摘要字段缺失及未读取的 Keychain 明确未知；CLI 受控登录仅限已验证的 macOS 默认原生 2.1.307，显式确认后向当前 B 资料交付官方链接，取消可能晚于凭据写入；不自动归档。单端更新明确目标，保持另一端旧归档及 B 绑定，CLI 本地账号/组织冲突拒绝，App 仅记用户核对；该来源不随跨设备迁移导出。真实候选回调、默认 Keychain 保存恢复、App 登录控制及 CLI/App 选择重启尚待完成，不宣称 D1/D2 整体验收通过。

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # [INPUT]: 实际 DMG、macOS 签名/挂载、ds-store 与 browser_ui 的实际资源引用验收。
-# [OUTPUT]: 包内双应用名称/标识/入口契约、严格签名/Gatekeeper、Applications 链接和背景完整性校验；失败退出。
+# [OUTPUT]: 双应用名称/标识/入口、严格签名、链接与背景验收；显式 --adhoc 仅跳过 Gatekeeper，不跳过完整性。
 # [POS]: 公证前的最终载荷验收，防止 Finder 布局设置破坏已签名应用。
 # [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+import argparse
 import hashlib
 import os
 import plistlib
@@ -21,10 +22,14 @@ def run(*args):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('dmg', type=Path)
+    parser.add_argument('--adhoc', action='store_true', help='Verify an explicitly selected ad-hoc release without claiming Apple trust')
+    args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='cctool-dmg-verify-') as temporary:
         mount = Path(temporary) / 'mount'
         mount.mkdir()
-        run('hdiutil', 'attach', '-readonly', '-nobrowse', '-mountpoint', mount, Path(sys.argv[1]).resolve())
+        run('hdiutil', 'attach', '-readonly', '-nobrowse', '-mountpoint', mount, args.dmg.resolve())
         try:
             if os.readlink(mount / 'Applications') != '/Applications':
                 raise SystemExit('DMG Applications shortcut is invalid')
@@ -45,7 +50,8 @@ def main():
                 if info.get('CFBundleName') != name[:-4] or info.get('CFBundleExecutable') != executable:
                     raise SystemExit(f'Unexpected name or executable for {name}')
                 run('codesign', '--verify', '--deep', '--strict', app)
-                run('spctl', '--assess', '--type', 'execute', app)
+                if not args.adhoc:
+                    run('spctl', '--assess', '--type', 'execute', app)
                 if name == 'CCBaga-A.app':
                     verify_browser_ui(app / 'Contents/Resources/browser-ui')
                 print(f'DMG payload verified: {name}', flush=True)

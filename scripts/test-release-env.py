@@ -5,7 +5,9 @@
 # [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 import importlib.util
 import os
+import json
 import subprocess
+import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -34,3 +36,58 @@ for results, expected, passes in [([network, success], 2, True), ([invalid], 1, 
         assert command.call_count == expected
         assert command.call_args.kwargs['env'] == release.BUILD_ENV
 print('Ticket retries preserve validation failures and secret isolation.')
+
+# 显式选择临时签名才能免 Apple 凭据；更新签名仍强制，默认公证不能静默降级。
+with patch.dict(os.environ, {}, clear=True):
+    assert release.signing_mode() == 'notarized'
+    try:
+        release.main()
+        raise AssertionError('Missing Apple credentials were accepted')
+    except SystemExit as error:
+        assert 'CC_SIGN_IDENTITY' in str(error)
+with patch.dict(os.environ, {'CC_MACOS_SIGNING_MODE': 'adhoc'}, clear=True):
+    try:
+        release.main()
+        raise AssertionError('Unsigned updater was accepted')
+    except SystemExit as error:
+        assert 'updater signing private key' in str(error)
+with patch.dict(os.environ, {'CC_MACOS_SIGNING_MODE': 'typo'}, clear=True):
+    try:
+        release.main()
+        raise AssertionError('Unknown mode was accepted')
+    except SystemExit as error:
+        assert 'must be adhoc or notarized' in str(error)
+
+# 真实入口 + 临时载荷 + 外部工具替身：不读取真实凭据，也不假称密码学验签通过。
+with tempfile.TemporaryDirectory(prefix='ccbaga-release-mode-') as temporary:
+    root = Path(temporary)
+    (root / 'package.json').write_text('{"version":"1.2.3"}')
+    host = root / 'CCBaga-A.app'
+    host.mkdir()
+    (host / 'fixture').write_text('disposable app payload')
+    (root / 'browser-runtime').mkdir()
+    (root / 'browser-runtime/Browser.zip').write_text('disposable engine archive')
+    (root / 'src-tauri').mkdir()
+    (root / 'src-tauri/tauri.conf.json').write_text(json.dumps({'plugins': {'updater': {'endpoints': ['https://github.com/riowang88/CCBaga/releases/latest/download/latest.json']}}}))
+    commands = []
+    def fake_run(*args, env=None):
+        commands.append(tuple(map(str, args)))
+        assert not any(key.startswith(('APPLE_', 'TAURI_SIGNING_PRIVATE_KEY')) for key in (env or release.BUILD_ENV))
+        if args[:3] == ('bun', 'run', 'tauri'):
+            assert json.loads(args[-1])['bundle']['macOS']['signingIdentity'] == '-'
+    def fake_sign(args, **kwargs):
+        assert args[:5] == ['bun', 'run', 'tauri', 'signer', 'sign']
+        assert kwargs['env']['TAURI_SIGNING_PRIVATE_KEY'] == 'disposable-fixture'
+        assert not any(key.startswith('APPLE_') for key in kwargs['env'])
+        Path(args[-1] + '.sig').write_text('fixture-signature')
+    def fake_dmg(path, *args, **kwargs):
+        Path(path).write_text('disposable dmg')
+    with patch.dict(os.environ, {'CC_MACOS_SIGNING_MODE': 'adhoc', 'CC_RELEASE_VERSION': '1.2.3', 'TAURI_SIGNING_PRIVATE_KEY': 'disposable-fixture'}, clear=True), patch.object(release, 'ROOT', root), patch.object(release, 'HOST', host), patch.object(release, 'BROWSER', root / 'Browser.app'), patch.object(release, 'run', side_effect=fake_run), patch.object(release.subprocess, 'run', side_effect=fake_sign), patch.object(release.dmgbuild, 'build_dmg', side_effect=fake_dmg):
+        release.main()
+    assert not any(cmd[0] in ('xcrun', 'spctl') for cmd in commands)
+    assert any(cmd[:4] == ('codesign', '--verify', '--deep', '--strict') for cmd in commands)
+    assert any('updater_tests::published_archive_matches_embedded_key_and_signed_version' in cmd for cmd in commands)
+    assert any('scripts/verify-dmg.py' in cmd and '--adhoc' in cmd for cmd in commands)
+    assert all(row['status'] == 'NotRequested' for row in json.loads((root / 'releases/notarization.json').read_text()))
+    assert json.loads((root / 'releases/latest.json').read_text())['macos_signing'] == 'adhoc'
+print('Explicit ad-hoc release retains payload checks and updater signing; default notarization stays required.')

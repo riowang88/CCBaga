@@ -1,4 +1,4 @@
-# [INPUT]: riowang88/CCBaga 的 release 分支 commit、锁定依赖与 GitHub Secrets 中的 Apple 与更新签名凭据。
+# [INPUT]: release 分支 commit、锁定依赖与更新签名凭据；显式 adhoc 发布，notarized 模式才读取 Apple 凭据。
 # [OUTPUT]: macOS 双应用 DMG、Linux DEB/RPM/AppImage/Arch 包、Windows 当前用户 NSIS 安装器、带版本签名的主程序更新与公开清单、SHA-256、递增版本 tag 和 GitHub Release。
 # [POS]: release 自动发布与 main 手动旧安装样本验证；后者不签名/发布，仅仓库所有者触发/重跑，拒绝 fork、PR 或其他发布者。
 # [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -17,6 +17,7 @@ permissions:
   contents: read
 env:
   MACOSX_DEPLOYMENT_TARGET: "12.0"
+  CC_MACOS_SIGNING_MODE: adhoc
 jobs:
   version:
     if: github.repository == 'riowang88/CCBaga' && (github.ref == 'refs/heads/release' || (github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.installer_run != '')) && github.actor == 'riowang88' && github.triggering_actor == 'riowang88'
@@ -96,7 +97,7 @@ jobs:
           bash -n skills/ccbaga-network/scripts/setup-vps.sh
           CC_SIGN_IDENTITY=- sh scripts/package-browser.sh
           cargo test --locked --manifest-path src-tauri/Cargo.toml --features custom-protocol
-      - name: Import signing credentials and publishable build
+      - name: Build release with selected macOS signing mode
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -111,7 +112,17 @@ jobs:
         run: |
           set -euo pipefail
           umask 077
-          for variable in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_API_PRIVATE_KEY APPLE_API_KEY APPLE_API_ISSUER CC_SIGN_IDENTITY TAURI_SIGNING_PRIVATE_KEY TAURI_SIGNING_PRIVATE_KEY_PASSWORD; do
+          for variable in TAURI_SIGNING_PRIVATE_KEY TAURI_SIGNING_PRIVATE_KEY_PASSWORD; do
+            test -n "${!variable}" || { echo "Missing GitHub Secret: $variable" >&2; exit 1; }
+          done
+          if [ "$CC_MACOS_SIGNING_MODE" = adhoc ]; then
+            export CC_SIGN_IDENTITY=-
+            unset APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_API_PRIVATE_KEY APPLE_API_KEY APPLE_API_ISSUER
+            python3 scripts/release-macos.py
+            exit 0
+          fi
+          test "$CC_MACOS_SIGNING_MODE" = notarized || { echo 'Invalid macOS signing mode' >&2; exit 1; }
+          for variable in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_API_PRIVATE_KEY APPLE_API_KEY APPLE_API_ISSUER CC_SIGN_IDENTITY; do
             test -n "${!variable}" || { echo "Missing GitHub Secret: $variable" >&2; exit 1; }
           done
           certificate="$RUNNER_TEMP/cctool-signing.p12"
@@ -130,7 +141,7 @@ jobs:
           unset APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_API_PRIVATE_KEY
           python3 scripts/release-macos.py
       - name: Remove signing credentials
-        if: always()
+        if: always() && env.CC_MACOS_SIGNING_MODE == 'notarized'
         shell: bash
         run: |
           security delete-keychain "$RUNNER_TEMP/cctool-signing.keychain-db" 2>/dev/null || true

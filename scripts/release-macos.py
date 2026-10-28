@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# [INPUT]: 双应用源代码、外部 Developer ID、Apple API 与更新签名凭据、哈希锁定的 dmgbuild 与 macOS 发布工具。
-# [OUTPUT]: 公证并装订票据的双应用 DMG、带版本签名的主程序更新归档/清单、SHA256SUMS 和实际签名/公证记录。
+# [INPUT]: 双应用源代码、显式 adhoc/notarized 模式、更新签名凭据；公证模式另需 Developer ID 与 Apple API。
+# [OUTPUT]: 双应用 DMG、带版本签名的更新归档/清单、SHA256SUMS 与真实公证状态；adhoc 不宣称 Gatekeeper 通过。
 # [POS]: 发布唯一顺序入口；浏览器票据先进入宿主资源；票据网络失败限次重试，仍要求验收通过；更新私钥只传给签名子进程。
 # [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 from datetime import datetime, timezone
@@ -42,9 +42,17 @@ def staple(action, target):
         time.sleep(3 * (attempt + 1))
 
 
+def signing_mode():
+    mode = os.environ.get('CC_MACOS_SIGNING_MODE', 'notarized')
+    if mode not in ('adhoc', 'notarized'):
+        raise SystemExit('CC_MACOS_SIGNING_MODE must be adhoc or notarized')
+    return mode
+
+
 def main():
+    notarized = signing_mode() == 'notarized'
     required = ['CC_SIGN_IDENTITY', 'APPLE_API_KEY', 'APPLE_API_ISSUER', 'APPLE_API_KEY_PATH']
-    for key in required:
+    for key in required if notarized else []:
         if not os.environ.get(key):
             raise SystemExit(f'Missing environment variable: {key}')
     signing_env = BUILD_ENV | {key: os.environ[key] for key in SIGNING_KEYS if key in os.environ}
@@ -53,10 +61,11 @@ def main():
     # ----- 第三方 DMG 工具的子进程也不继承更新私钥 -----
     for key in SIGNING_KEYS:
         os.environ.pop(key, None)
-    identity = os.environ['CC_SIGN_IDENTITY']
-    if identity == '-':
+    identity = os.environ['CC_SIGN_IDENTITY'] if notarized else '-'
+    BUILD_ENV['CC_SIGN_IDENTITY'] = identity
+    if notarized and identity == '-':
         raise SystemExit('Public releases require a Developer ID Application identity')
-    if not Path(os.environ['APPLE_API_KEY_PATH']).is_file():
+    if notarized and not Path(os.environ['APPLE_API_KEY_PATH']).is_file():
         raise SystemExit('Apple API key file does not exist')
     version = os.environ.get('CC_RELEASE_VERSION', json.loads((ROOT / 'package.json').read_text())['version'])
     if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', version):
@@ -64,9 +73,13 @@ def main():
     output = ROOT / 'releases'
     output.mkdir(exist_ok=True)
     records = []
-    auth = ['--key', os.environ['APPLE_API_KEY_PATH'], '--key-id', os.environ['APPLE_API_KEY'], '--issuer', os.environ['APPLE_API_ISSUER']]
+    auth = ['--key', os.environ['APPLE_API_KEY_PATH'], '--key-id', os.environ['APPLE_API_KEY'], '--issuer', os.environ['APPLE_API_ISSUER']] if notarized else []
 
     def notarize(archive, ticket_target):
+        if not notarized:
+            records.append({'artifact': archive.name, 'status': 'NotRequested', 'mode': 'adhoc'})
+            (output / 'notarization.json').write_text(json.dumps(records, indent=2) + '\n')
+            return
         print(f'Notarizing {archive.name}', flush=True)
         result = subprocess.run(['xcrun', 'notarytool', 'submit', str(archive), *auth, '--no-s3-acceleration', '--wait', '--output-format', 'json'], cwd=ROOT, check=True, capture_output=True, text=True, env=BUILD_ENV)
         record = json.loads(result.stdout)
@@ -106,8 +119,9 @@ def main():
         with tarfile.open(update_archive, 'r:gz') as bundle:
             bundle.extractall(unpacked, filter='tar')
         run('codesign', '--verify', '--deep', '--strict', unpacked / HOST.name)
-        staple('validate', unpacked / HOST.name)
-        run('spctl', '--assess', '--type', 'execute', unpacked / HOST.name)
+        if notarized:
+            staple('validate', unpacked / HOST.name)
+            run('spctl', '--assess', '--type', 'execute', unpacked / HOST.name)
         subprocess.run(['bun', 'run', 'tauri', 'signer', 'sign', '--app-version', version, str(update_archive)], cwd=ROOT, check=True, capture_output=True, env=signing_env)
         signature = Path(str(update_archive) + '.sig')
         endpoint = json.loads((ROOT / 'src-tauri/tauri.conf.json').read_text())['plugins']['updater']['endpoints'][0]
@@ -116,6 +130,7 @@ def main():
         manifest.write_text(json.dumps({
             'version': version,
             'notes': 'CCBaga-A update. For both applications, download the DMG from GitHub Releases.',
+            'macos_signing': 'notarized' if notarized else 'adhoc',
             'pub_date': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
             'platforms': {'darwin-aarch64': {
                 'url': f'{repository}/releases/download/v{version}/{update_archive.name}',
@@ -129,17 +144,23 @@ def main():
         stage.mkdir()
         for app, name in [(HOST, 'CCBaga-A.app'), (BROWSER, 'CCBaga-B.app')]:
             run('codesign', '--verify', '--deep', '--strict', app)
-            run('spctl', '--assess', '--type', 'execute', '--verbose=2', app)
+            if notarized:
+                run('spctl', '--assess', '--type', 'execute', '--verbose=2', app)
             run('ditto', app, stage / name)
         for name in ['LICENSE', 'NOTICE.md']:
             run('ditto', ROOT / name, stage / name)
-        (stage / 'Install.txt').write_text('Drag both apps into Applications. Requires Apple Silicon and macOS 12 or later.\n')
+        install_note = 'Drag both apps into Applications. Requires Apple Silicon and macOS 12 or later.\n'
+        if not notarized:
+            install_note += 'This build uses ad-hoc signing and is not notarized by Apple. macOS may block first launch; review the downloaded app in System Settings > Privacy & Security. Organization policy may prohibit opening it.\n'
+        (stage / 'Install.txt').write_text(install_note)
         dmg = output / f'CCBaga-{version}-macos-arm64.dmg'
         dmgbuild.build_dmg(str(dmg), 'CCBaga', settings_file=str(ROOT / 'scripts/dmg-settings.py'), defines={'stage': str(stage), 'root': str(ROOT)})
-        run(sys.executable, 'scripts/verify-dmg.py', dmg)
-        run('codesign', '--force', '--sign', identity, '--timestamp', dmg)
+        run(sys.executable, 'scripts/verify-dmg.py', dmg, *([] if notarized else ['--adhoc']))
+        run('codesign', '--force', '--sign', identity, *(['--timestamp'] if notarized else []), dmg)
         notarize(dmg, dmg)
-        run('spctl', '--assess', '--type', 'open', '--context', 'context:primary-signature', '--verbose=2', dmg)
+        if notarized:
+            run('spctl', '--assess', '--type', 'open', '--context', 'context:primary-signature', '--verbose=2', dmg)
+        run('codesign', '--verify', '--strict', dmg)
     digests = []
     for artifact in [dmg, update_archive, signature, manifest]:
         with artifact.open('rb') as stream:

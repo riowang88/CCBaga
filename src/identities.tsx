@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 原生身份命令、保留策略、Motion 弹簧/浏览器媒体订阅、共享确认窗/进度、文件残留与 CLI 维护。
- * [OUTPUT]: 空/未保存/已有身份竖式立体工牌，未识别 CLI 但有浏览器资料时仍可命名保存，当前本地档案在原卡片高亮且保存确认明确更新原档案、原地备份与订阅/凭据徽章、顶部绿光、弹簧横滚/视差、明确标注 Claude 客户端进程与浏览器资料联动、删除确认；卡片下统一显示身份/空身份/文件清理的真实阶段动画和结果。
+ * [OUTPUT]: 空/未保存/已有身份竖式立体工牌，未识别 CLI 但有浏览器资料时仍可命名保存，当前本地档案在原卡片高亮且保存确认明确更新原档案、原地备份与订阅/凭据徽章、顶部绿光、弹簧横滚/视差、CLI/App 分端名称、登录权益/进程预检与单端备份入口、折叠本机数据详情与操作期间提示、明确标注 Claude 客户端进程与浏览器资料联动、删除确认；卡片下统一显示身份/空身份/文件清理的真实阶段动画和结果。
  * [POS]: 身份管理 GUI；只呈现脱敏元数据，身份正文留在原生保险库；可选浏览器绑定/旧资料采用确认与重开重试，关联浏览器资料删除单独选择。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -16,7 +16,7 @@ import {formatBytes} from './cleaner-model';
 import {IdentityTransfer} from './identity-transfer';
 import {ClaudeCliPanel} from './claude-cli-panel';
 import {ClaudeResiduePanel} from './claude-residue-panel';
-import {credentialStatus, identityPolicyKey, readIdentityPolicy, policyRows, type Identity, type IdentityState} from './identity-model';
+import {credentialStatus, identityPolicyKey, readIdentityPolicy, policyRows, type ClientMaterials, type Identity, type IdentityState} from './identity-model';
 type Target = Identity | 'empty' | 'recovery' | 'save';
 function authLabel(status:string|null|undefined) {
  if(status==='local_unexpired')return '本地未过期';
@@ -36,6 +36,11 @@ export function IdentityPanel({onBusy, initialEmpty=false}: {onBusy?: (busy:bool
  const [transfer,setTransfer]=useState<Identity|'import'|null>(null),[transferBusy,setTransferBusy]=useState(false);
  const [browserReview,setBrowserReview]=useState<boolean|null>(null),[useExisting,setUseExisting]=useState(false);
  const [review,setReview]=useState<Target|null>(initialEmpty?'empty':null);
+ const [loginGuide,setLoginGuide]=useState(false);
+ const [association,setAssociation]=useState<'cli'|'desktop'|null>(null),[associationAccepted,setAssociationAccepted]=useState(false);
+ const [loginEmail,setLoginEmail]=useState(''),[loginAccepted,setLoginAccepted]=useState(false),[loginBusy,setLoginBusy]=useState(false);
+ const [loginResult,setLoginResult]=useState<{email:string;organization:string|null;subscription:string|null}|null>(null);
+ const [readAt,setReadAt]=useState<number|null>(null);
  const [name,setName]=useState(t('当前身份'));
  const [rename,setRename]=useState<Identity|null>(null), [renameValue,setRenameValue]=useState('');
  const [deleteBrowser,setDeleteBrowser]=useState(false);
@@ -45,9 +50,10 @@ export function IdentityPanel({onBusy, initialEmpty=false}: {onBusy?: (busy:bool
  const reduceMotion=useIdentityReducedMotion();
  const scrollSpring=useSpring(0,{stiffness:170,damping:25,mass:.8});
  const scrollTarget=useRef(0);
- const locked=busy||cliBusy||residueBusy||transferBusy||transfer!==null||!!review||!!rename||!!deletion||browserReview!==null;
+ const locked=busy||loginBusy||cliBusy||residueBusy||transferBusy||transfer!==null||loginGuide||!!association||!!review||!!rename||!!deletion||browserReview!==null;
  const current=state?.current;
  const active=state?.records.find(row=>row.id===(state.workspace_id===undefined?state.active:state.workspace_id));
+ const associationTarget=state?.records.find(row=>row.id===(state.browser.enabled?state.browser.current_id:active?.id??state.last_selected));
  const browserOnly=!!state?.browser_profile_present&&!current?.present;
  const currentName=active?.name||current?.display_name||current?.email?.split('@')[0]||t('当前身份');
  const saved=state?.records??[];
@@ -88,7 +94,7 @@ export function IdentityPanel({onBusy, initialEmpty=false}: {onBusy?: (busy:bool
   setLoading(true);
   try {
    const next=await invoke<IdentityState>('identities_read');
-   setState(next);if(invalidateResidue)setResidueRevision(value=>value+1);setError('');
+   setState(next);setReadAt(Date.now());if(invalidateResidue)setResidueRevision(value=>value+1);setError('');
    if(review==='empty'){
     const resolved=next.records.find(row=>row.id===(next.workspace_id??next.active))?.name||next.current.display_name||next.current.email?.split('@')[0]||t('当前身份');
     setName(old=>old===t('当前身份')?resolved.slice(0,64):old);
@@ -100,6 +106,28 @@ export function IdentityPanel({onBusy, initialEmpty=false}: {onBusy?: (busy:bool
  async function refreshAfterError() {
   setResidueRevision(value=>value+1);
   try {setState(await invoke<IdentityState>('identities_read'));} catch {/* 保留操作错误，不掩盖恢复失败。 */}
+ }
+ async function associate() {
+  if(!association||!associationTarget||!associationAccepted||busy)return;
+  setBusy(true);setError('');
+  try {
+   const next=await invoke<IdentityState>('identities_associate',{id:associationTarget.id,client:association,confirmed:true,onProgress:activity.start('identity','更新指定端资料')});
+   setState(next);setAssociation(null);setResidueRevision(value=>value+1);activity.finish(true,'指定端资料已更新到原档案；其他端、工作区与 B 绑定保持不变。');
+  }catch(e){setError(String(e));activity.finish(false,String(e));await refreshAfterError();}
+  finally{setBusy(false);setAssociationAccepted(false);}
+ }
+ async function login() {
+  if(loginBusy||!loginAccepted||!loginEmail.trim())return;
+  setLoginBusy(true);setLoginResult(null);setError('');
+  try {
+   const result=await invoke<{email:string;organization:string|null;subscription:string|null}>('identities_login',{email:loginEmail.trim(),onProgress:activity.start('login','CLI 官方登录')});
+   setLoginResult(result);activity.finish(true,'CLI 官方登录已完成；邮箱符合输入目标，B 组织未自动核对，尚未关联档案。');
+   await read();
+  } catch(e) {setError(String(e));activity.finish(false,String(e));await refreshAfterError();}
+  finally {setLoginBusy(false);setLoginAccepted(false);}
+ }
+ async function cancelLogin() {
+  try {await invoke('identities_login_cancel');}catch(e){setError(String(e));}
  }
  async function configureBrowser() {
   if(browserReview===null||busy)return;
@@ -199,19 +227,66 @@ export function IdentityPanel({onBusy, initialEmpty=false}: {onBusy?: (busy:bool
    </div>
    <IdentityOperationProgress activity={activity.state}/>
   </section>
+  <section className="identity-cli identity-client-status" aria-label={t('分端资料与登录')}>
+   <div className="identity-section-head"><h2>{t('分端资料与登录')}</h2><Button variant="secondary" size="small" disabled={blocked} onClick={()=>{setLoginGuide(true);void read(false);}}>{t('登录与关联说明')}</Button></div>
+   <p className="identity-caption">{t('桌面版请在 Claude App 中登录。各端需要分别登录同一个账号。')}</p>
+   <div className="identity-section-head identity-backup-actions"><span>{t('单端更新目标')}：<strong>{associationTarget?.name||t('请先保存并选择目标本地档案')}</strong></span><div><Button variant="secondary" size="small" disabled={blocked||!associationTarget} onClick={()=>{setAssociation('cli');setAssociationAccepted(false);setError('');}}>{t('只更新 CLI')}</Button><Button variant="secondary" size="small" disabled={blocked||!associationTarget} onClick={()=>{setAssociation('desktop');setAssociationAccepted(false);setError('');}}>{t('只更新 App')}</Button></div></div>
+   <p className="identity-caption">{t('重新登录后，保存对应的备份。以后切换账号时会恢复这份备份。')}</p>
+   <details className="identity-client-details"><summary>{t('查看本机数据')}</summary>
+    <ClientMaterialRows clients={current?.clients} browser={state?.browser_profile_present}/>
+    <p className="identity-caption">{t('资料存在不代表已登录；App 与 B 的账号及组织仍需在客户端确认。')}</p>
+    {associationTarget&&Object.entries(state?.summaries[associationTarget.id]?.client_checks??{}).filter(([key])=>key==='cli'||key==='desktop').map(([key,check])=><p className="identity-caption" key={key}>{key==='cli'?'CLI':t('Claude App')} · {t(check.source==='local_metadata'?'来源：本地账号元数据':'来源：用户核对，非自动匹配')} · {new Date(check.checked_at).toLocaleString(locale==='zh'?'zh-CN':'en-US')}</p>)}
+    <p className="identity-caption">{t('来源：本地 CLI 元数据、App 路径元数据与 B 目录；不读取钥匙串或 Cookie，不验证云端登录。')}{readAt&&<time> {new Date(readAt).toLocaleTimeString(locale==='zh'?'zh-CN':'en-US')}</time>}</p>
+   </details>
+  </section>
   <details className="identity-policy"><summary><strong>{t('保留在工作区')}</strong><span>{kept.length} / {policyRows.length}</span></summary>{options}</details>
   {state?.browser_warning&&<div className="identity-recovery" role="alert"><span>{t(state.browser_warning)}</span><Button size="small" variant="secondary" disabled={blocked} onClick={()=>void retryBrowser()}>{t('打开浏览器')}</Button></div>}
   <ClaudeResiduePanel activity={activity} blocked={locked||loading||!state||!!state?.recovery} revision={residueRevision} onBusy={setResidueBusy} onChanged={async()=>{if(!await read(false))throw new Error('身份状态刷新失败，请重新检查。');}}/>
   <ClaudeCliPanel blocked={locked||loading||!!state?.recovery} onBusy={setCliBusy}/>
   <IdentityTransfer target={transfer} hasBrowser={typeof transfer==='object'&&transfer!==null&&!!state?.browser.bound_ids.includes(transfer.id)} onClose={()=>setTransfer(null)} onBusy={setTransferBusy} onState={setState} activity={activity}/>
   <AppDialog open={!!review} onOpenChange={open=>{if(!open&&!busy)setReview(null);}} title={review==='recovery'?t('恢复原身份'):review==='save'?t(browserOnly?'保存当前身份':active?'更新当前身份备份':'保存当前身份备份'):review==='empty'?t('切换到空身份'):t('切换到已有身份')} description={t(review==='save'?(browserOnly?'将保存当前浏览器资料与身份的关联；当前工作区和浏览器保持不变。':'将结束已识别的 Claude 进程，把当前身份原地加密写入保险库；当前工作区与登录保持不变。'):'先压缩暂存当前 Claude Code 与 Desktop 状态，再切换。将结束已识别的 Claude 进程，未保存任务会中断。')} footer={<><Button variant="secondary" onClick={()=>setReview(null)}>{t('取消')}</Button><Button variant="ink" disabled={busy||loading||!state||!name.trim()||(review!=='recovery'&&!!state.recovery)} onClick={()=>void change()}>{review==='recovery'?t('确认恢复'):review==='save'?t(browserOnly?'确认保存身份':'确认保存备份'):t('保存当前身份并切换')}</Button></>}>
-   <div className="identity-confirm">{active&&review!=='recovery'?<div className="identity-confirm-keep"><span>{t('保存当前身份')}</span><strong>{active.name}</strong></div>:<><label htmlFor="identity-current-name">{t('首次保存当前身份为')}</label><Input id="identity-current-name" maxLength={64} value={name} onChange={e=>setName(e.target.value)}/></>}{typeof review==='object'&&review&&<div className="identity-confirm-target"><span>{t('切换到')}</span><strong>{review.name}</strong></div>}{state?.browser_profile_present&&<p>{t('浏览器资料保留在本机并关联此身份，不会打包进 Claude 加密归档；未识别到 CLI 账号不等于网页登录无效。')}</p>}{review==='save'&&!browserOnly&&<div className="identity-confirm-keep"><span>{t('纳入加密备份')}</span><strong>{[t('登录与身份数据'),...removed].join(' · ')}</strong></div>}<div className="identity-confirm-keep"><span>{t('留在工作区')}</span><strong>{kept.join(' · ')||t('无')}</strong></div><div className="identity-active-processes"><span>{t('Claude 进程（确认后结束）')}</span>{state?.processes==null?<p>{t('进程状态未知；执行前将重新核验。')}</p>:state.processes.length?<ul>{state.processes.map(process=><li key={process.pid}><code>PID {process.pid}</code><span>{process.entrypoint}</span></li>)}</ul>:<p>{t('未检测到 Claude 进程。')}</p>}{state?.processes_truncated&&<p>{t('仅显示前 32 个进程；执行时重新核验完整范围。')}</p>}</div>{state?.browser.enabled&&review!=='save'&&<p>{t('将关闭并重开关联浏览器，请先保存网页任务。')}</p>}<p>{t('只管理本地状态；失效的登录可能需要重新认证。')}</p></div>
+   <div className="identity-confirm"><p>{t('人工维护窗口：保存、切换或恢复期间，不要从 Dock、终端或其他入口启动、登录客户端或修改资料；等待操作结束。检查无法拦截所有外部写入。')}</p>{typeof review==='object'&&review&&<><strong>{t('目标档案内资料')}</strong><ClientMaterialRows saved clients={state?.summaries[review.id]?.clients} browser={state?.browser.bound_ids.includes(review.id)}/><p>{t('旧档案未标注时显示未知；网页资料仅绑定在本机，不在加密归档内。')}</p></>}{active&&review!=='recovery'?<div className="identity-confirm-keep"><span>{t('保存当前身份')}</span><strong>{active.name}</strong></div>:<><label htmlFor="identity-current-name">{t('首次保存当前身份为')}</label><Input id="identity-current-name" maxLength={64} value={name} onChange={e=>setName(e.target.value)}/></>}{typeof review==='object'&&review&&<div className="identity-confirm-target"><span>{t('切换到')}</span><strong>{review.name}</strong></div>}{state?.browser_profile_present&&<p>{t('浏览器资料保留在本机并关联此身份，不会打包进 Claude 加密归档；未识别到 CLI 账号不等于网页登录无效。')}</p>}{review==='save'&&!browserOnly&&<div className="identity-confirm-keep"><span>{t('纳入加密备份')}</span><strong>{[t('登录与身份数据'),...removed].join(' · ')}</strong></div>}<div className="identity-confirm-keep"><span>{t('留在工作区')}</span><strong>{kept.join(' · ')||t('无')}</strong></div><div className="identity-active-processes"><span>{t('Claude 进程（确认后结束）')}</span>{state?.processes==null?<p>{t('进程状态未知；执行前将重新核验。')}</p>:state.processes.length?<ul>{state.processes.map(process=><li key={process.pid}><code>PID {process.pid}</code><span>{process.entrypoint}</span></li>)}</ul>:<p>{t('未检测到 Claude 进程。')}</p>}{state?.processes_truncated&&<p>{t('仅显示前 32 个进程；执行时重新核验完整范围。')}</p>}</div>{state?.browser.enabled&&review!=='save'&&<p>{t('将关闭并重开关联浏览器，请先保存网页任务。')}</p>}<p>{t('只管理本地状态；失效的登录可能需要重新认证。')}</p></div>
   </AppDialog>
   <AppDialog alert className="identity-delete-alert" open={!!deletion} onOpenChange={open=>{if(!open&&!busy)setDeletion(null);}} title={deletion==='current'?t('直接删除当前身份'):t('删除暂存身份')} description={deletion==='current'?t('将结束 Claude 进程并删除所选本地数据。不会新增备份，已有暂存身份不受影响。'):t('永久删除这份暂存文件。当前工作区不受影响。')} footer={<><Button variant="secondary" data-dialog-cancel onClick={()=>setDeletion(null)}>{t('取消')}</Button><Button className="identity-delete-button" variant="ink" disabled={busy||!accepted} onClick={()=>void remove()}>{t('确认直接删除')}</Button></>}>
    <div className="identity-confirm"><div className="identity-delete-warning"><span aria-hidden="true">!</span><strong>{t('警告：此操作不可撤销，不会创建新备份。')}</strong></div>{deletion==='current'?<><div className="identity-confirm-keep"><span>{t('删除范围')}</span><strong>{[t('登录与身份数据'),...removed].join(' · ')}</strong></div><div className="identity-confirm-keep"><span>{t('留在工作区')}</span><strong>{kept.join(' · ')||t('无')}</strong></div></>:<strong>{deletion?.name}</strong>}{typeof deletion==='object'&&deletion&&state?.browser.bound_ids.includes(deletion.id)&&<Checkbox label={t('同时永久删除关联浏览器资料')} checked={deleteBrowser} onCheckedChange={value=>setDeleteBrowser(value===true)}/>}<Checkbox checked={accepted} onCheckedChange={setAccepted} label={t('我知道此操作无法撤销')}/></div>
   </AppDialog>
   <AppDialog open={browserReview!==null} onOpenChange={open=>{if(!open&&!busy)setBrowserReview(null);}} title={t(browserReview?'联动浏览器':'关闭浏览器联动')} description={t('将正常关闭并重开浏览器，请先保存网页任务。')} footer={<><Button variant="secondary" disabled={busy} onClick={()=>setBrowserReview(null)}>{t('取消')}</Button><Button variant="ink" disabled={busy} loading={busy} onClick={()=>void configureBrowser()}>{t('确认')}</Button></>}>
    <div className="identity-confirm"><p>{t(browserReview?'每个身份使用独立网页资料和稳定指纹，切换时自动恢复。首次仍需登录网站。':'恢复使用原有通用浏览器资料。各身份的独立资料会保留。')}</p>{browserReview&&<Checkbox label={t('将现有浏览器资料关联给当前身份')} checked={useExisting} disabled={busy} onCheckedChange={value=>setUseExisting(value===true)}/>}<p>{t('默认创建新资料，现有资料不会删除。资料隔离不会改变出口 IP。')}</p>{error&&<p role="alert">{t(error)}</p>}</div>
+  </AppDialog>
+  <AppDialog alert open={!!association} onOpenChange={open=>{if(!open&&!busy){setAssociation(null);setAssociationAccepted(false);setError('');}}} title={t('更新指定端资料')} footer={<><Button variant="secondary" data-dialog-cancel disabled={busy} onClick={()=>setAssociation(null)}>{t('取消')}</Button><Button variant="ink" disabled={busy||!associationAccepted||!associationTarget} onClick={()=>void associate()}>{t('确认更新该端')}</Button></>}>
+   <div className="identity-confirm"><strong>{associationTarget?.name} · {association==='cli'?'CLI':'App'}</strong>
+    <p>{t('只更新指定端的受支持资料，沿用目标档案保留策略；其他端使用原归档，不吸收其当前资料，不更改 B 绑定或切换工作区。')}</p>
+    <p>{t('CLI 账号或组织不符会拒绝。App 目前只记录用户核对，不能据此宣称自动账号匹配或服务端登录有效。')}</p>
+    <p>{t('请先自行退出 CLI/App。本操作不会结束程序；B 仅保存绑定，可保持运行。操作期间不要启动或登录客户端。')}</p>
+    {associationTarget&&<p>{t('目标 CLI 元数据')}：{state?.summaries[associationTarget.id]?.email||t('CLI 账号未识别')} · {state?.summaries[associationTarget.id]?.organization||t('组织未知')}</p>}
+    <Checkbox label={t('我已核对该端账号与组织，已退出 CLI/App 并保持维护窗口')} checked={associationAccepted} disabled={busy} onCheckedChange={value=>setAssociationAccepted(value===true)}/>
+    {error&&<p role="alert">{t(error)}</p>}
+   </div>
+  </AppDialog>
+  <AppDialog open={loginGuide} onOpenChange={open=>{if(!loginBusy){setLoginGuide(open);setLoginAccepted(false);setLoginResult(null);setError('');}}} title={t('登录与关联说明')} footer={<>{loginBusy?<Button variant="secondary" onClick={()=>void cancelLogin()}>{t('取消登录')}</Button>:<Button variant="secondary" onClick={()=>{setLoginGuide(false);setLoginAccepted(false);setLoginResult(null);setError('');}}>{t('关闭')}</Button>}<Button variant="ink" disabled={loginBusy||!loginAccepted||!loginEmail.trim()} onClick={()=>void login()}>{t('在当前 B 中授权 CLI')}</Button></>}>
+   <div className="identity-confirm">
+    <p>{t('先切换到目标本地档案，再分别在官方客户端核对账号和组织。异号时不要更新备份；不要把卡片名称当作登录证明。')}</p>
+
+    <p>{t('CLI 订阅登录需要 Pro、Max，或具有 CLI 权限的 Team / Enterprise。免费账号不适用；此入口不支持 Console / API 登录。')}</p>
+    <div className="identity-active-processes"><span>{t('登录前检查')}</span>
+     <p>{t('需要新登录时，请先保存任务并退出 CLI 和 App；B 浏览器保持打开。不会自动结束程序。已有同邮箱登录只核对状态。')}</p>
+     {loading?<p>{t('检查中')}</p>:state?.processes==null?<p>{t('进程状态未知；执行前将重新核验。')}</p>:state.processes.length?<details><summary>{t('查看运行程序（{v0}）',{v0:state.processes.length})}</summary><ul>{state.processes.map(process=><li key={process.pid}><code>PID {process.pid}</code><span>{process.entrypoint==='Claude Code'?'CLI':process.entrypoint==='Claude Desktop'?'App':process.entrypoint}</span></li>)}</ul></details>:<p>{t('未检测到 Claude 进程。')}</p>}
+     {state?.processes_truncated&&<p>{t('仅显示前 32 个进程；执行时重新核验完整范围。')}</p>}
+     <Button variant="secondary" size="small" disabled={loginBusy||loading} onClick={()=>void read(false)}>{t('刷新进程')}</Button>
+    </div>
+    <label htmlFor="identity-login-email">{t('目标账号邮箱')}</label>
+    <Input id="identity-login-email" aria-label={t('目标账号邮箱')} value={loginEmail} disabled={loginBusy} maxLength={254} onChange={e=>{setLoginEmail(e.target.value);setLoginAccepted(false);setLoginResult(null);}}/>
+    <Checkbox label={t('我已核对当前 B 资料与目标邮箱，允许官方 CLI 写入登录凭据')} checked={loginAccepted} disabled={loginBusy} onCheckedChange={value=>setLoginAccepted(value===true)}/>
+    <p>{t('登录后请保存备份。取消不一定撤销已完成的登录。')}</p>
+    {loginBusy&&<p role="status">{t('请在 B 中完成官方验证；邮箱与组织需要本人核对。')}</p>}
+    {loginResult&&<div role="status"><strong>{t('CLI 官方回报')}</strong><p>{loginResult.email} · {loginResult.organization||t('组织未知')} · {loginResult.subscription||t('状态未知')}</p><p>{t('邮箱符合输入目标；B 组织未自动核对，尚未关联档案。')}</p></div>}
+    {error&&<p role="alert">{t(error)}</p>}
+    <details><summary>{t('支持范围与登录说明')}</summary>
+     <p>{t('CLI：仅支持已验证的 macOS 原生 2.1.307。先打开目标 B 资料；官方授权页将在该资料的新标签中打开。已有登录只核对，不自动登出。')}</p>
+     <p>{t('只完成官方登录，不保存或切换档案，不发送模型请求。最多等待 10 分钟；取消可能发生在凭据写入后，不自动登出或回滚。')}</p>
+     <p>{t('App：使用官方登录入口，由本人完成验证；若跳转浏览器，先确认是目标 B 资料。B：沿用已绑定资料登录，不复制其他端令牌。')}</p>
+    </details>
+   </div>
   </AppDialog>
   <AppDialog open={!!rename} onOpenChange={open=>{if(!open&&!busy){setRename(null);setError('');}}} title={t('重命名身份')} footer={<><Button variant="secondary" onClick={()=>{setRename(null);setError('');}}>{t('取消')}</Button><Button variant="ink" disabled={busy||!renameValue.trim()} onClick={()=>void saveName()}>{t('保存')}</Button></>}><Input aria-label={t('身份名称')} maxLength={64} value={renameValue} onChange={e=>setRenameValue(e.target.value)}/>{error&&<p role="alert">{t(error)}</p>}</AppDialog>
  </section>;
@@ -236,3 +311,13 @@ function IdentityCard({className,children,label}:{className:string;children:Reac
 const motionPreference=typeof window==='undefined'?null:window.matchMedia('(prefers-reduced-motion: reduce)');
 const subscribeMotion=(notify:()=>void)=>{motionPreference?.addEventListener('change',notify);return()=>motionPreference?.removeEventListener('change',notify);};
 function useIdentityReducedMotion(){return useSyncExternalStore(subscribeMotion,()=>motionPreference?.matches??true,()=>true);}
+
+function ClientMaterialRows({clients,browser,saved=false}:{clients?:ClientMaterials|null;browser?:boolean;saved?:boolean}) {
+ const {t}=useI18n();
+ const material=(value:string|undefined)=>t(value==='present'?'有受支持资料':value==='absent'?'未发现受支持资料':'资料状态未知');
+ return <div className="identity-confirm">
+  <div className="identity-confirm-keep"><span>{t('Claude Code CLI')}</span><strong>{material(clients?.cli)}</strong></div>
+  <div className="identity-confirm-keep"><span>{t('Claude App')}</span><strong>{material(clients?.desktop)}</strong></div>
+  <div className="identity-confirm-keep"><span>CCBaga-B</span><strong>{t(browser===true?(saved?'已关联本机浏览器资料':'本机浏览器资料存在'):browser===false?(saved?'无本机浏览器资料关联':'未发现本机浏览器资料'):'资料状态未知')}</strong></div>
+ </div>;
+}

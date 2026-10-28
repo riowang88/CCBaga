@@ -3,6 +3,7 @@
 // [POS]: GUI 身份管理的原生入口；刷新只读工作区、不回收暂存文件；不提供凭据读取、任意文件或网络接口。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 mod archive;
+pub(crate) mod association;
 #[cfg(test)]
 mod backup_tests;
 pub(crate) mod browser_link;
@@ -12,6 +13,7 @@ mod catalog;
 mod codec;
 mod compression;
 mod credentials;
+pub(crate) mod login;
 pub(crate) mod database;
 #[cfg(test)]
 mod optimization_tests;

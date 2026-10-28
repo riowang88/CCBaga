@@ -5,8 +5,22 @@ IdentityTests.m: 临时独立钥匙串与虚构字段，编译期替换默认钥
 Identity.m: 经用户确认读取默认 Code/Desktop 凭据到原生保险库；系统授权、写前复核正文、单条删除与恢复，不经命令行/UI/网络。
 Keychain.m: 用户触发登录钥匙串解锁，不读取翻译 Key，不禁用清理的系统授权弹窗。
 CleanupTests.m: 独立临时钥匙串复现外部应用所有者 -25244，并验证原生删除、同服务账号隔离与非 Claude 凭据保留，不触碰登录钥匙串。
-Cleanup.m: libproc 按外层 Claude 应用标识识别全部辅助进程；sysctl 仅识别 Node/Bun 首个官方 Claude CLI 脚本参数，不输出完整命令；已知凭据服务；只读属性核验后将单条持久引用解析为系统项目引用；文件钥匙串原生单项删除兼容共享密码，其他实现使用单项查询删除，保留系统错误代码和原因，不读取密码或保留撤回副本。
+Processes.h: 当前用户进程快照、内核创建时间与路径复核、有界 argv；区分查询未知与内核确认退出，僵尸可排除；已移除可执行文件的 ENOENT 使用内核保存 exec 路径，不信任 argv[0]；不输出参数/环境。KERN_PROCARGS2 长度/正文查询失败附带阶段、PID、执行路径、返回码、即时 errno、字节数与退出确认；诊断不外带参数或环境；确认退出与有界复核规则见下。
+ProcessTests.m: 替换 libproc/sysctl/kill 的原生夹具，覆盖未知/列表截断/PID 复用、参数不外送、僵尸与已移除程序、无关同名程序、含空格精确资料、主进程/helper/孤儿及锁保留；新增参数查询失败、查询间退出、errno 保存与错误正文隐私断言；不操作真实客户端。
+Cleanup.m: 共用进程快照并携带内核创建时间，候选查询失败向上传递；libproc 按外层 Claude 应用标识识别全部辅助进程；sysctl 只识别 Node/Bun 执行入口，原生默认版本路径或自定义位置的官方签名标识，不凭任意同名进程匹配；结束前复核创建时间和路径，不输出完整命令；已知凭据服务；只读属性核验后将单条持久引用解析为系统项目引用；文件钥匙串原生单项删除兼容共享密码，其他实现使用单项查询删除，保留系统错误代码和原因，不读取密码或保留撤回副本。
 System.m: Foundation 首选语言、地区格式和时区、CoreLocation 状态、系统授权及稳定标识/语义标签定位开关；定位关闭结果必须经系统读取确认。
-Browser.m: 真实机器状态与代理，NSLocale 读取包含 rg 覆盖的有效国家并保留原始区域标识；LaunchServices 注册独立浏览器、按包标识查询运行、读取 http/https 默认处理程序并以 LSSetDefaultHandlerForURLScheme/LSSetDefaultRoleHandlerForContentType 请求设为默认（系统弹窗确认）；进程身份核验（Chromium 或 CCBrowser 可执行名）。
+Browser.m: 真实机器状态与代理，NSLocale 读取包含 rg 覆盖的有效国家并保留原始区域标识；LaunchServices 注册独立浏览器、按包标识查询运行、读取 http/https 默认处理程序并以 LSSetDefaultHandlerForURLScheme/LSSetDefaultRoleHandlerForContentType 请求设为默认（系统弹窗确认）；当前用户受管应用主进程/helper 按精确 user-data-dir 或同应用父进程归属核对；孤儿未知、冲突参数和未知锁保留并拒绝；退出前复核生命周期，不强杀 helper。
 Clipboard.m: 主线程文本复制、辅助功能设置入口与共享响应释放；不捕获选区、不模拟键盘。
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+
+Identity.m 的单端快照使用固定 scope：CLI 仅读默认 Code 服务，Desktop 仅读 Claude Safe Storage，非法范围拒绝；原全端快照兼容。IdentityTests.m 使用独立临时钥匙串验证两端互不读取，不改系统默认钥匙串。
+
+浏览器占用桥的 running 使用 JSON true/false，原生夹具同时检查实际序列化类型与两种占用语义；Rust 的严格布尔反序列化不放宽。
+
+应用根识别兼容本机已观察到的 macOS code_sign_clone `.app.bundle/Contents/`；仍按实际 Info.plist 包标识、进程生命周期和资料参数匹配，不凭克隆形状信任程序。夹具覆盖已知 B 克隆与无关包标识拒绝。
+
+参数查询与原有枚举阶段统一内核确认退出语义：EINVAL/ESRCH 最多额外查询一次（间隔 10ms），只在内核确认退出时返回无进程；存活不可读、查询未知及生命周期变化仍拒绝。两个调用方显式处理已退出结果，Store 冲突锁存不改；无按程序路径的豁免。
+
+参数退出窗口补正：KERN_PROCARGS2 返回 EINVAL/ESRCH 时，生命周期查询暂时失败也进入既有 10ms 单次复核；明确生命周期变化立即拒绝，最终未知继续拒绝，成功参数读取仍复核原生命周期。覆盖真实正常退出时 pidinfo 先返回 ESRCH、退出确认稍后到达的窗口；不豁免任何应用，不解除身份冲突锁存。ProcessTests 同时覆盖长度/正文查询窗口、持续未知、恢复可读后的 CLI 识别及复核后 PID 复用。
+
+共用进程读取退出窗口：首次身份读取、路径读取与末次身份复核失败均通过同一退出确认函数，先查内核状态，未确认则等待10ms后再查一次；只在确认退出时返回无进程。持续未知/仍存活/PID复用保持拒绝，成功读回但生命周期变化不走等待；错误包含阶段、PID、返回码和调用后立即保存的errno。ProcessTests覆盖三个阶段的延迟退出、未知和复用；不重试整个身份事务、不发信号。

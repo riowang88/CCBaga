@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 当前用户进程的可执行路径/Node 启动脚本、Claude 应用标识与 Security 钥匙串接口。
- * [OUTPUT]: Claude Desktop 全部辅助进程与 Claude Code Node 入口编号、脱敏凭据发现及原生单条直接删除。
+ * [OUTPUT]: 带内核创建时间的 Claude Desktop/Code 进程快照、候选查询未知/已确认退出区分与按生命周期复核的结束、脱敏凭据发现及原生单条直接删除。
  * [POS]: 清理的 macOS 边界；只读取凭据属性，扫描逐查询禁止交互，删除允许系统授权，不读取密码、不保留恢复副本。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -16,69 +16,79 @@ static char *cleanResponse(NSDictionary *data) {
     return strdup([[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding].UTF8String);
 }
 static char *credentialError(OSStatus status, NSString *stage);
-// ----- 辅助进程按所属应用标识识别；Node 只识别官方 CLI 脚本，不匹配用户参数 -----
-static BOOL claudeNode(pid_t pid) {
-    int mib[] = {CTL_KERN, KERN_PROCARGS2, pid};
-    size_t size = 0;
-    if (sysctl(mib, 3, NULL, &size, NULL, 0) != 0 || size > 1048576 || size <= sizeof(int)) return NO;
-    size_t allocated = size;
-    char *raw = calloc(1, allocated);
-    if (!raw) return NO;
-    BOOL found = NO;
-    if (sysctl(mib, 3, raw, &size, NULL, 0) == 0) {
-        int argc = 0; memcpy(&argc, raw, sizeof(argc));
-        char *cursor = raw + sizeof(argc), *end = raw + size;
-        cursor += strnlen(cursor, end - cursor);
-        while (cursor < end && *cursor == 0) cursor++;
-        for (int i = 0; i < argc && cursor < end; i++) {
-            size_t length = strnlen(cursor, end - cursor);
-            if (length == (size_t)(end - cursor)) break;
-            NSString *arg = [[NSString alloc] initWithBytes:cursor length:length encoding:NSUTF8StringEncoding];
-            cursor += length + 1;
-            if (i == 0) continue;
-            if ([arg hasPrefix:@"-e"] || [arg hasPrefix:@"-p"] || [arg isEqualToString:@"--eval"] || [arg hasPrefix:@"--eval="] || [arg isEqualToString:@"--print"] || [arg hasPrefix:@"--print="]) break;
-            if ([arg hasPrefix:@"-"]) continue;
-            found = [arg hasSuffix:@"/node_modules/@anthropic-ai/claude-code/cli.js"];
-            break;
-        }
+#include "Processes.h"
+// Node 参数只用于确定执行入口，参数不可读时必须返回未知。
+static BOOL claudeNode(NSArray<NSString *> *args, NSString **error) {
+    NSSet *takesValue=[NSSet setWithArray:@[@"-r",@"--require",@"--import",@"--loader",@"--experimental-loader",@"--conditions",@"-C",@"--inspect-port",@"--icu-data-dir",@"--openssl-config",@"--title"]];
+    for (NSUInteger i=1;i<args.count;i++) {
+        NSString *arg=args[i];
+        if ([arg isEqual:@"-e"] || [arg isEqual:@"-p"] || [arg isEqual:@"--eval"] || [arg hasPrefix:@"--eval="] || [arg isEqual:@"--print"] || [arg hasPrefix:@"--print="]) return NO;
+        if ([takesValue containsObject:arg]) { if (++i>=args.count) *error=@"Node 启动参数不完整。"; continue; }
+        if ([arg isEqual:@"--"]) { if (++i>=args.count) return NO; arg=args[i]; }
+        else if ([arg hasPrefix:@"-"]) continue;
+        return [arg hasSuffix:@"/node_modules/@anthropic-ai/claude-code/cli.js"];
     }
-    memset(raw, 0, allocated); free(raw);
-    return found;
+    return NO;
 }
-char *rf_claude_pids(void) {
-    NSMutableArray *pids = [NSMutableArray array];
-    NSMutableDictionary *bundles = [NSMutableDictionary dictionary];
-    int capacity = proc_listallpids(NULL, 0) + 64;
-    if (capacity <= 64) return NULL;
-    pid_t *all = calloc(capacity, sizeof(pid_t));
-    if (!all) return NULL;
-    int count = proc_listallpids(all, capacity * sizeof(pid_t));
-    if (count <= 0) { free(all); return NULL; }
-    if (count > capacity) count = capacity;
-    for (int i = 0; i < count; i++) {
-        struct proc_bsdinfo info;
-        char path[PROC_PIDPATHINFO_MAXSIZE] = {0};
-        if (all[i] <= 1 || proc_pidinfo(all[i], PROC_PIDTBSDINFO, 0, &info, sizeof(info)) != sizeof(info) || info.pbi_uid != getuid()) continue;
-        if (proc_pidpath(all[i], path, sizeof(path)) <= 0) continue;
-        NSString *file = @(path);
-        NSString *name = file.lastPathComponent;
-        BOOL match = ([name isEqualToString:@"node"] || [name isEqualToString:@"nodejs"] || [name isEqualToString:@"bun"]) && claudeNode(all[i]);
-        NSRange marker = [file rangeOfString:@".app/Contents/"];
-        if (marker.location != NSNotFound) {
-            NSString *root = [file substringToIndex:marker.location + 4];
-            NSNumber *known = bundles[root];
-            if (!known) {
-                NSString *identifier = [NSBundle bundleWithPath:root].bundleIdentifier ?: @"";
-                known = @([identifier isEqualToString:@"com.anthropic.claudefordesktop"] || [identifier hasPrefix:@"com.anthropic.claudefordesktop."]);
-                bundles[root] = known;
-            }
-            match = match || known.boolValue;
+static BOOL nativeClaude(NSString *path) {
+    NSString *versions=[NSHomeDirectory() stringByAppendingPathComponent:@".local/share/claude/versions"];
+    NSArray *parts=[path.lastPathComponent componentsSeparatedByString:@"."];
+    if ([path.stringByDeletingLastPathComponent isEqual:versions] && parts.count==3) {
+        BOOL numeric=YES;
+        for (NSString *part in parts) {
+            if (!part.length) numeric=NO;
+            for (NSUInteger i=0;i<part.length;i++) if ([part characterAtIndex:i]<'0' || [part characterAtIndex:i]>'9') numeric=NO;
         }
-        if (match) [pids addObject:@(all[i])];
+        if (numeric) return YES;
     }
-    free(all);
-    NSData *json = [NSJSONSerialization dataWithJSONObject:pids options:0 error:NULL];
+    if (![@[@"claude",@"claude.exe",@"claude-code",@"claude-code-vm"] containsObject:path.lastPathComponent]) return NO;
+    // 自定义位置只接受官方签名标识，不能凭同名进程结束无关程序。
+    SecStaticCodeRef code=NULL; CFDictionaryRef raw=NULL; BOOL match=NO;
+    if (SecStaticCodeCreateWithPath((__bridge CFURLRef)[NSURL fileURLWithPath:path],kSecCSDefaultFlags,&code)==errSecSuccess) {
+        if (SecCodeCopySigningInformation(code,kSecCSSigningInformation,&raw)==errSecSuccess) {
+            NSDictionary *info=CFBridgingRelease(raw);
+            match=[info[(__bridge id)kSecCodeInfoIdentifier] isEqual:@"com.anthropic.claude-code"] && [info[(__bridge id)kSecCodeInfoTeamIdentifier] isEqual:@"Q6L2SF6YDW"];
+        }
+        CFRelease(code);
+    }
+    return match;
+}
+char *rf_claude_processes(void) {
+    NSString *error=nil; NSArray *rows=bagaProcessList(&error);
+    if (error) return cleanResponse(@{@"error":error});
+    NSMutableArray *matches=[NSMutableArray array];
+    for (NSDictionary *row in rows) {
+        NSString *path=row[@"executable"], *name=path.lastPathComponent;
+        NSString *app=bagaProcessApp(path), *bundle=app?BAGA_PROCESS_BUNDLE(app):@"";
+        BOOL desktop=[bundle isEqual:@"com.anthropic.claudefordesktop"] || [bundle hasPrefix:@"com.anthropic.claudefordesktop."];
+        BOOL cli=nativeClaude(path);
+        if ([@[@"node",@"nodejs",@"bun"] containsObject:name]) {
+            NSArray *args=bagaProcessArgs(row,&error);
+            if (error) return cleanResponse(@{@"error":error});
+            if (!args) continue; // 查询期间已由内核确认退出；未知与 PID 复用仍返回错误。
+            cli=claudeNode(args,&error);
+            if (error) return cleanResponse(@{@"error":error});
+        }
+        if (desktop || cli) {
+            NSMutableDictionary *result=[row mutableCopy];
+            result[@"name"]=cli?@"Claude Code":([name isEqual:@"Claude"]?@"Claude Desktop":name);
+            [matches addObject:result];
+        }
+    }
+    NSData *json=[NSJSONSerialization dataWithJSONObject:matches options:0 error:NULL];
     return strdup([[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding].UTF8String);
+}
+char *rf_process_identity(int pid) {
+    NSString *error=nil; NSDictionary *row=bagaReadProcess(pid,&error);
+    return cleanResponse(error?@{@"error":error}:@{@"process":row?:NSNull.null});
+}
+char *rf_signal_process(int pid, unsigned long long created, const char *executable, int signal) {
+    NSString *error=nil; NSDictionary *row=bagaReadProcess(pid,&error);
+    if (error) return cleanResponse(@{@"error":error});
+    NSDictionary *expected=@{@"pid":@(pid),@"created":@(created),@"executable":@(executable)};
+    if (!bagaSameProcess(expected,row)) return cleanResponse(@{@"ok":@YES});
+    if (kill(pid,signal)!=0 && !bagaProcessGone(pid)) return cleanResponse(@{@"error":@"无法结束已核对的客户端进程。"});
+    return cleanResponse(@{@"ok":@YES});
 }
 // ----- 只识别 Claude 的已知服务，发现阶段不读取密码 -----
 static BOOL credentialService(NSString *service) {

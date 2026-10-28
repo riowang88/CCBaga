@@ -1,5 +1,5 @@
 // [INPUT]: Claude 白名单、所选文件夹发现、配置变换、原子写入、官方原生 CLI 版本路径及 macOS/Linux/Windows 白名单路径边界。
-// [OUTPUT]: 全机/文件夹元数据扫描、文件残留专用快照与选择清理、实时 Claude 进程检查与停止；CLI、身份和残留操作共用互斥锁。
+// [OUTPUT]: 全机/文件夹元数据扫描、文件残留专用快照与选择清理、实时 Claude 进程检查与停止（macOS 查询未知向上传递、结束前复核创建时间与路径）；CLI、身份和残留操作共用互斥锁。
 // [POS]: 白名单与进程共用边界；身份由 identities 编排，残留入口仅允许文件操作且不访问钥匙串。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use crate::native;
@@ -44,6 +44,7 @@ mod tests;
 #[cfg(unix)]
 extern "C" {
     fn getuid() -> u32;
+    #[cfg(target_os = "linux")]
     fn kill(pid: i32, signal: i32) -> i32;
 }
 #[derive(Clone, PartialEq, Eq)]
@@ -409,18 +410,18 @@ fn diagnostics(scan: &mut Scan) {
         status: "ok",
     });
 }
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, serde::Deserialize)]
 pub struct ClaudeProcess {
     pub pid: i32,
     pub name: String,
-    #[serde(skip)]
+    #[serde(skip_serializing)]
     #[allow(dead_code)]
     pub executable: String,
-    #[cfg(windows)]
-    #[serde(skip)]
+    #[cfg(any(windows, target_os = "macos"))]
+    #[serde(skip_serializing)]
     pub created: u64,
 }
-#[cfg(not(target_os = "windows"))]
+#[cfg(any(target_os = "linux", all(test, not(target_os = "windows"))))]
 fn process_row(line: &str, desktop: &[i32], uid: u32) -> Option<ClaudeProcess> {
     let mut fields = line.trim().splitn(2, char::is_whitespace);
     if fields.next()?.parse::<u32>().ok()? != uid {
@@ -469,22 +470,13 @@ fn process_row(line: &str, desktop: &[i32], uid: u32) -> Option<ClaudeProcess> {
             name.into()
         },
         executable,
+        #[cfg(target_os = "macos")]
+        created: 0,
     })
 }
 #[cfg(target_os = "macos")]
 fn processes() -> Result<Vec<ClaudeProcess>, String> {
-    let desktop = native::claude_pids()?;
-    let output = std::process::Command::new("/bin/ps")
-        .args(["-axo", "uid=,pid=,comm="])
-        .output()
-        .map_err(|_| "无法检查 Claude 进程，请刷新重试。")?;
-    if !output.status.success() {
-        return Err("无法检查 Claude 进程，请刷新重试。".into());
-    }
-    Ok(String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .filter_map(|line| process_row(line, &desktop, unsafe { getuid() }))
-        .collect())
+    native::claude_processes()
 }
 #[cfg(target_os = "linux")]
 fn processes() -> Result<Vec<ClaudeProcess>, String> {
@@ -530,7 +522,11 @@ pub async fn cleaner_processes() -> Result<Vec<ClaudeProcess>, String> {
         .await
         .map_err(|_| "进程检查被中断。".to_string())?
 }
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "macos")]
+fn signal_same_process(target: &ClaudeProcess, signal: i32) -> Result<(), String> {
+    native::signal_process(target, signal)
+}
+#[cfg(target_os = "linux")]
 fn signal_same_process(target: &ClaudeProcess, signal: i32) -> Result<(), String> {
     if processes()?
         .iter()

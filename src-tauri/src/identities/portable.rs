@@ -233,6 +233,8 @@ impl Store {
         let mut manifest: Manifest = serde_json::from_value(serde_json::to_value(&stage.manifest).map_err(problem)?).map_err(problem)?;
         manifest.credentials = credentials(&manifest.credentials, &manifest.policy)?;
         manifest.account_key = None;
+        // Local observation/attestation is not proof of identity on a different computer.
+        manifest.client_checks.clear();
         let metadata = Metadata { version: 1, name: record.name, manifest, browser: browser.map(BrowserSettings::from_config) };
         validate_metadata(&metadata)?;
         let serialized = Zeroizing::new(serde_json::to_vec(&metadata).map_err(problem)?);

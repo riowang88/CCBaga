@@ -17,7 +17,7 @@ export type Progress = {
     total: number | null;
     elapsed_ms: number;
 };
-type Kind = 'scan' | 'clean' | 'stop' | 'system' | 'browser' | 'cli' | 'identity';
+type Kind = 'scan' | 'clean' | 'stop' | 'system' | 'browser' | 'cli' | 'identity' | 'login';
 export type Activity = {
     kind: Kind;
     title?: string;
@@ -28,7 +28,7 @@ export type Activity = {
     warning?: boolean;
 };
 const labels: Record<string, string> = { delete:'直接删除',archive:'身份暂存',switch:'身份切换',identity:'身份管理',validate: '检查', clean: '逐项清理', verify: '复查', scan: '深度扫描', stop: '进程检查', system: '应用设置', browser: '浏览器操作', cli: 'CLI 安装', done: '结果' };
-const phaseLabels:Record<string,string>={...labels,transfer_validate:'验收迁移包',transfer_archive:'写入迁移包',transfer_auth:'认证迁移包',transfer_commit:'保存导入身份',identity:'准备身份操作',stop:'结束 Claude 进程',archive:'压缩暂存',compress:'写入加密归档',verify_archive:'验证身份归档',clear:'清空当前工作区',credentials:'处理登录凭据',restore:'恢复目标身份',commit:'保存身份状态',rollback:'恢复原有状态'};
+const phaseLabels:Record<string,string>={...labels,login:'CLI 官方登录',transfer_validate:'验收迁移包',transfer_archive:'写入迁移包',transfer_auth:'认证迁移包',transfer_commit:'保存导入身份',identity:'准备身份操作',stop:'结束 Claude 进程',archive:'压缩暂存',compress:'写入加密归档',verify_archive:'验证身份归档',clear:'清空当前工作区',credentials:'处理登录凭据',restore:'恢复目标身份',commit:'保存身份状态',rollback:'恢复原有状态'};
 export function useCleanupActivity() {
     const [state, setState] = useState<Activity | null>(null);
     const sequence = useRef(0);
@@ -58,7 +58,7 @@ export function useCleanupActivity() {
         sequence.current++;
         began.current = performance.now();
         setState({ kind, title, started: began.current, entries: [], running: true, failed: false });
-        log(kind === 'clean' ? 'validate' : kind, 'running', kind === 'clean' ? "已提交所选清单，等待快照核验。" : kind === 'scan' ? "开始扫描本地数据。" : kind === 'system' ? "开始应用电脑设置。" : kind === 'browser' ? "开始浏览器操作。" : kind === 'identity' ? "开始本地身份操作。" : kind === 'cli' ? "开始 Claude Code CLI 安装管理。" : "检查并结束已确认的 Claude 进程。");
+        log(kind === 'clean' ? 'validate' : kind, 'running', kind === 'clean' ? "已提交所选清单，等待快照核验。" : kind === 'scan' ? "开始扫描本地数据。" : kind === 'system' ? "开始应用电脑设置。" : kind === 'browser' ? "开始浏览器操作。" : kind === 'login' ? "检查 CLI 登录条件。" : kind === 'identity' ? "开始本地身份操作。" : kind === 'cli' ? "开始 Claude Code CLI 安装管理。" : "检查并结束已确认的 Claude 进程。");
         return channel();
     }
     function finish(success: boolean, message: string) {

@@ -27,6 +27,11 @@ int main(void){@autoreleasepool{
         add(@"Claude Code",@"first",@"fixture-api");add(@"Claude Safe Storage",@"first",@"fixture-storage");
         add(@"Claude Code-credentials-custom",@"first",@"custom-kept");add(@"unrelated-fixture",@"first",@"unrelated-kept");
         NSArray *saved=json(rf_identity_snapshot())[@"items"];NSCAssert(saved.count==4,@"snapshot escaped default services");
+        NSArray *cli=json(rf_identity_snapshot_for(1))[@"items"],*desktop=json(rf_identity_snapshot_for(2))[@"items"];
+        NSCAssert(cli.count==3 && desktop.count==1,@"single-client scope incorrect");
+        for(NSDictionary *row in cli)NSCAssert(![row[@"service"] isEqual:@"Claude Safe Storage"],@"CLI snapshot absorbed Desktop");
+        NSCAssert([desktop[0][@"service"] isEqual:@"Claude Safe Storage"],@"Desktop snapshot absorbed CLI");
+        NSCAssert(json(rf_identity_snapshot_for(3))[@"error"]!=nil,@"invalid scope accepted");
         NSDictionary *first=nil;for(NSDictionary *row in saved)if([row[@"service"] isEqual:@"Claude Code-credentials"]&&[row[@"account"] isEqual:@"first"])first=row;
         NSCAssert(first!=nil,@"Code fixture missing");
         NSMutableDictionary *partial=[first mutableCopy];partial[@"remaining"]=[[@"{\"mcpOAuth\":\"keep\"}" dataUsingEncoding:NSUTF8StringEncoding] base64EncodedStringWithOptions:0];

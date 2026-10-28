@@ -1,5 +1,5 @@
 // [INPUT]: SQLite 目录、用户策略、白名单源、已验收归档代次、认证加密与平台凭据桥。
-// [OUTPUT]: 原地备份、稳定本地档案往返、同档案重选不回灌旧凭据或所选本地资料、回滚与真实进度；目录内链接按链接恢复，旧归档瞬态锁不恢复。
+// [OUTPUT]: 原地备份、稳定本地档案往返、同档案重选不回灌旧凭据或所选本地资料、回滚与真实进度；切换/恢复复查当前及目标 B 资料；已观察到的进程冲突锁存到本次操作结束，保留恢复记录；目录内链接按链接恢复，旧归档瞬态锁不恢复。
 // [POS]: 身份的文件事务；SQLite 与文件系统由恢复日志协调，不能假装是同一原子事务。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use super::{
@@ -25,6 +25,14 @@ pub struct Store {
     pub(super) key: Zeroizing<Vec<u8>>,
     pub(super) db: Database,
     process_check: std::cell::Cell<std::time::Instant>,
+    process_conflict: std::cell::Cell<bool>,
+    browser_profiles: Vec<PathBuf>,
+    #[cfg(test)]
+    pub(super) process_probe: Option<Box<dyn Fn() -> Result<(), String>>>,
+    #[cfg(test)]
+    pub(super) browser_probe: Option<Box<dyn Fn(&Path) -> Result<bool, String>>>,
+    #[cfg(test)]
+    pub(super) before_write: Option<Box<dyn Fn(&Path)>>,
     #[cfg(test)]
     pub(super) fail_after_clear: bool,
 }
@@ -101,8 +109,16 @@ impl Store {
             key,
             db,
             process_check: std::cell::Cell::new(std::time::Instant::now()),
+            process_conflict: std::cell::Cell::new(false),
+            browser_profiles: Vec::new(),
             #[cfg(test)]
             fail_after_clear: false,
+            #[cfg(test)]
+            process_probe: None,
+            #[cfg(test)]
+            browser_probe: None,
+            #[cfg(test)]
+            before_write: None,
         };
         if maintenance && store.db.get("recovery")?.is_none() {
             store.index_legacy()?;
@@ -111,12 +127,49 @@ impl Store {
         Ok(store)
     }
     pub(super) fn stopped(&self) -> Result<(), String> {
+        if self.process_conflict.get() {
+            return Err("本次操作已检测到进程冲突或无法确认退出；请退出相关客户端后重试；如有未完成切换，请先恢复。".into());
+        }
+        self.process_check.set(std::time::Instant::now());
+        let result = self.check_processes().and_then(|_| self.check_browsers());
+        if result.is_err() {
+            // 后续空列表不能证明短暂启动的客户端没有读取或写回资料。
+            self.process_conflict.set(true);
+        }
+        result
+    }
+    fn check_processes(&self) -> Result<(), String> {
+        #[cfg(test)]
+        if let Some(probe) = &self.process_probe {
+            return probe();
+        }
         #[cfg(test)]
         if identity::root().ok().as_ref() != Some(&self.home) {
             return Ok(());
         }
-        self.process_check.set(std::time::Instant::now());
         identity::ensure_stopped()
+    }
+    fn watch_browsers(&mut self, targets: &[&str]) -> Result<(), String> {
+        self.browser_profiles = crate::browser::identity_profiles(&self.vault, &self.db, targets)?;
+        self.check_browsers()
+    }
+    fn check_browsers(&self) -> Result<(), String> {
+        for profile in &self.browser_profiles {
+            #[cfg(test)]
+            let running = if let Some(probe) = &self.browser_probe {
+                probe(profile)?
+            } else if identity::root().ok().as_ref() != Some(&self.home) {
+                false
+            } else {
+                crate::browser::profile_running(profile)?
+            };
+            #[cfg(not(test))]
+            let running = crate::browser::profile_running(profile)?;
+            if running {
+                return Err("当前或目标浏览器资料仍被占用，请完整退出关联浏览器后重试。".into());
+            }
+        }
+        Ok(())
     }
     pub(super) fn during_io(&self) -> Result<(), String> {
         if self.process_check.get().elapsed() >= std::time::Duration::from_millis(250) {
@@ -137,6 +190,7 @@ impl Store {
         restore: bool,
         policy: &Policy,
     ) -> Result<(), String> {
+        self.stopped()?;
         #[cfg(test)]
         if identity::root().ok().as_ref() != Some(&self.home) {
             return Ok(());
@@ -243,6 +297,8 @@ impl Store {
                 Ok(_) => {
                     private::parents(source.path.parent().unwrap())?;
                     private::safe(&source.path)?;
+                    #[cfg(test)]
+                    if let Some(before_write) = &self.before_write { before_write(&source.path); }
                     if !source.keys.is_empty() {
                         identity::apply_config(source, &serde_json::json!({}))?;
                     } else if source.path.is_dir() {
@@ -438,6 +494,7 @@ impl Store {
             return Err("当前未检测到可暂存的登录凭据或身份数据。".into());
         }
         record.name = name.into();
+        self.stopped()?;
         reporter.log("commit", "running", "正在保存身份备份。", 0, Some(1));
         self.db
             .backup(&record, &super::profile::summarize_stage(&stage), super::catalog::browser_profile_present(&self.vault, &self.db)?)?;
@@ -462,6 +519,7 @@ impl Store {
         if self.db.get("recovery")?.is_some() {
             return Err("请先恢复未完成的身份切换。".into());
         }
+        self.watch_browsers(&[target])?;
         reporter.log("validate", "running", "正在核对当前身份。", 0, None);
         let live_key = super::catalog::live_key(&self.home, &self.key)?;
         reporter.log("validate", "ok", "当前本地身份已核对。", 1, Some(1));
@@ -507,6 +565,7 @@ impl Store {
         };
         let (record, outgoing) = self.save(name, policy, reporter)?;
         let previous = self.db.get("active")?.unwrap_or_else(|| "current".into());
+        self.stopped()?;
         self.db.pending(&record, target)?;
         let current = Self::selected(&outgoing, policy);
         let next = incoming
@@ -573,6 +632,7 @@ impl Store {
                 0,
                 Some(1),
             );
+            self.stopped()?;
             self.db.complete(target)?;
             if !record.empty {
                 let _ = self
@@ -614,6 +674,7 @@ impl Store {
                         reporter,
                         "rollback",
                     )?;
+                    self.stopped()?;
                     self.db.complete(&record.id)
                 })();
                 if rollback.is_ok() {
@@ -645,6 +706,8 @@ impl Store {
     pub fn recover(&mut self, name: &str, reporter: &Reporter) -> Result<(), String> {
         let id = self.db.get("recovery")?.ok_or("没有需要恢复的身份事务。")?;
         let record = self.record(&id)?;
+        let target = self.db.get("target")?.unwrap_or_else(|| "empty".into());
+        self.watch_browsers(&[&id, &target])?;
         reporter.log(
             "verify_archive",
             "running",
@@ -660,7 +723,6 @@ impl Store {
             1,
             Some(1),
         );
-        let target = self.db.get("target")?.unwrap_or_else(|| "empty".into());
         let incoming = if target == "empty" {
             None
         } else {
@@ -737,6 +799,7 @@ impl Store {
             0,
             Some(1),
         );
+        self.stopped()?;
         self.db.complete(&record.id)?;
         if !record.empty {
             let _ = self

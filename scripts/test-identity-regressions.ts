@@ -16,7 +16,7 @@ const engine=process.env.CCBAGA_TEST_ENGINE??resolve('browser-runtime/Browser.ap
 const browser=await chromium.launch({executablePath:engine,headless:true,env:{...process.env,HOME:temporary}});
 let failures=0;
 try {
- for(const name of ['policy','selection','status-labels','browser-only']) {
+ for(const name of ['policy','selection','status-labels','browser-only','client-materials','controlled-login','single-client']) {
   const context=await browser.newContext();
   await context.route('**/*',route=>route.request().url().startsWith(base+'/')?route.continue():route.abort());
   const page=await context.newPage();
@@ -24,12 +24,88 @@ try {
   try {
    await page.goto(base+'/tests/identities.html');
    await page.getByText('fixture@example.invalid',{exact:true}).waitFor();
-   if(name==='policy') {
-    await page.getByText('保留在工作区',{exact:true}).click();
+   if(name==='single-client') {
+    await page.evaluate(()=>{const f=(window as any).identityFixture;f.state.browser.current_id=f.state.records[0].id;});
+    await page.getByRole('button',{name:'刷新',exact:true}).click();
+    await page.getByRole('button',{name:'保存 App 备份',exact:true}).click();
+    const dialog=page.getByRole('alertdialog');
+    assert.match(await dialog.innerText(),/Identity 1/);
+    assert.match(await dialog.innerText(),/需要你本人核对/);
+    const submit=dialog.getByRole('button',{name:'确认保存备份',exact:true});
+    assert.equal(await submit.isDisabled(),true);
+    await dialog.getByRole('checkbox',{name:'账号和组织已核对，App 与 CLI 已退出'}).check();
+    await page.evaluate(()=>(window as any).identityFixture.setFailure('identities_associate'));
+    await submit.click();await dialog.getByRole('alert').waitFor();assert.match(await dialog.innerText(),/fixture operation failed/);
+    await dialog.getByRole('checkbox',{name:'账号和组织已核对，App 与 CLI 已退出'}).check();
+    await submit.click();await dialog.waitFor({state:'hidden'});
+    const commands=await page.evaluate(()=>(window as any).identityFixture.commands);
+    const call=commands.filter((r:any)=>r.command==='identities_associate').at(-1);
+    assert.equal(call.args.id,'00000000000000000000000000000001');assert.equal(call.args.client,'desktop');assert.equal(call.args.confirmed,true);
+    assert.equal(commands.filter((r:any)=>/identities_(stop|save|switch)$/.test(r.command)).length,0,'single-client update does not invoke full save or stop');
+   } else if(name==='controlled-login') {
+    await page.getByRole('button',{name:'登录 CLI'}).click();
+    const dialog=page.getByRole('dialog');
+    const start=dialog.getByRole('button',{name:'打开浏览器登录',exact:true});
+    assert.match(await dialog.innerText(),/Pro.*Max.*Team.*Enterprise/);
+    assert.match(await dialog.innerText(),/免费账号/);
+    assert.match(await dialog.innerText(),/Console.*API/);
+    await dialog.getByText('查看运行程序（1）',{exact:true}).click();
+    assert.match(await dialog.innerText(),/PID 4201/);
+    assert.match(await dialog.innerText(),/VS Code/);
+    await page.evaluate(()=>{const f=(window as any).identityFixture;f.state.processes=null;});
+    await dialog.getByRole('button',{name:'刷新进程',exact:true}).click();
+    assert.match(await dialog.innerText(),/进程状态未知/);
+    await page.evaluate(()=>{const f=(window as any).identityFixture;f.state.processes=[];f.state.running=false;});
+    await dialog.getByRole('button',{name:'刷新进程',exact:true}).click();
+    assert.match(await dialog.innerText(),/未检测到 Claude 进程/);
+    assert.equal(await start.isDisabled(),true);
+    await dialog.getByRole('textbox',{name:'目标账号邮箱'}).fill('fixture@example.invalid');
+    assert.equal(await start.isDisabled(),true);
+    await dialog.getByRole('checkbox',{name:'B 浏览器和邮箱已核对，允许 CLI 保存登录信息'}).check();
+    await page.evaluate(()=>(window as any).identityFixture.defer('identities_login'));
+    await start.click();
+    assert.equal(await start.isDisabled(),true);
+    await dialog.getByRole('button',{name:'取消登录',exact:true}).click();
+    await page.evaluate(()=>(window as any).identityFixture.release('identities_login','fixture login cancelled; credentials may have changed'));
+    await dialog.getByRole('alert').waitFor();
+    assert.match(await dialog.innerText(),/fixture login cancelled/);
+    assert.equal(await page.evaluate(()=>(window as any).identityFixture.commands.filter((r:any)=>r.command==='identities_login_cancel').length),1);
+    await dialog.getByRole('checkbox',{name:'B 浏览器和邮箱已核对，允许 CLI 保存登录信息'}).check();
+    await start.click();
+    await dialog.getByText('登录结果',{exact:true}).waitFor();
+    assert.match(await dialog.innerText(),/再保存 CLI 备份/);
+    assert.equal(await page.evaluate(()=>(window as any).identityFixture.commands.filter((r:any)=>/identities_(save|switch|stop)/.test(r.command)).length),0);
+   } else if(name==='client-materials') {
+    const panel=page.locator('.identity-client-status');
+    await panel.getByText('查看本机数据',{exact:true}).click();
+    assert.match(await panel.innerText(),/尚未确认/,'old IPC metadata remains unknown');
+    assert.match(await panel.innerText(),/发现数据不代表已经登录/);
+    await page.evaluate(()=>{const s=(window as any).identityFixture.state;s.current.clients={cli:'present',desktop:'absent'};s.browser_profile_present=true;});
+    await page.getByRole('button',{name:'刷新',exact:true}).click();
+    assert.match(await panel.innerText(),/CLI.*发现本地数据/s);
+    assert.match(await panel.innerText(),/App.*未发现本地数据/s);
+    assert.match(await panel.innerText(),/发现浏览器数据/);
+    await panel.getByRole('button',{name:'登录 CLI'}).click();
+    let dialog=page.getByRole('dialog');
+    assert.match(await dialog.innerText(),/B 浏览器/);
+    assert.match(await dialog.innerText(),/登录后请保存备份/);
+    await dialog.getByRole('button',{name:'关闭',exact:true}).click();
+    assert.equal(await page.evaluate(()=>(window as any).identityFixture.commands.filter((r:any)=>/login|switch|save/.test(r.command)).length),0,'reading guidance cannot launch login or save data');
+    await page.locator('.identity-card').filter({has:page.getByRole('heading',{name:'Identity 2',exact:true})}).getByRole('button',{name:'切换',exact:true}).click();
+    dialog=page.getByRole('dialog');
+    assert.match(await dialog.innerText(),/操作完成前，请勿启动/);
+    assert.match(await dialog.innerText(),/目标档案内资料/);
+    assert.match(await dialog.innerText(),/尚未确认/,'legacy archive must not infer CLI/App data from account title');
+    await dialog.getByRole('button',{name:'取消',exact:true}).click();
+    await page.evaluate(()=>(window as any).identityFixture.language('en'));
+    await page.getByText('Sign in and back up',{exact:true}).waitFor();
+    assert.match(await panel.innerText(),/Data does not confirm sign-in/);
+   } else if(name==='policy') {
+    await page.getByText('切换账号时保持不变的内容',{exact:true}).click();
     await page.getByRole('checkbox',{name:'会话历史',exact:true}).check();
     await page.reload();
     await page.getByText('fixture@example.invalid',{exact:true}).waitFor();
-    await page.getByText('保留在工作区',{exact:true}).click();
+    await page.getByText('切换账号时保持不变的内容',{exact:true}).click();
     assert.equal(await page.getByRole('checkbox',{name:'会话历史',exact:true}).isChecked(),true,'history retention must survive reopening');
     for(const label of ['Skills 与命令','插件'])assert.equal(await page.getByRole('checkbox',{name:label,exact:true}).isChecked(),true);
     await page.locator('.identity-card.current').getByRole('button',{name:'更新备份',exact:true}).click();

@@ -1,5 +1,5 @@
 // [INPUT]: 身份保险库与临时文件系统样本。
-// [OUTPUT]: 策略/认证/回滚回归，Unix 链接往返、链接父路径与根路径拒绝、特殊文件路径诊断和 Windows 超长路径；不读取真实凭据。
+// [OUTPUT]: 策略/认证/回滚及短暂外部启动冲突保留恢复记录回归、B 目标占用与同槽位重选兼容；人工维护窗口之外的检查/写入空窗边界演示，Unix 链接往返、链接父路径与根路径拒绝、特殊文件路径诊断和 Windows 超长路径；不读取真实凭据。
 // [POS]: 身份管理的离线验证入口；平台真实登入需用户验收。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use super::*;
@@ -729,4 +729,140 @@ fn existing_directories_keep_their_permissions() {
     private::directory(&folder.join("child")).unwrap();
     assert_eq!(permissions(&folder), before);
     std::fs::remove_dir_all(folder).unwrap();
+}
+
+#[test]
+fn transient_restart_after_clear_preserves_recovery_and_new_client_data() {
+    let f = optimization_tests::Fixture::new();
+    f.login("A", "one", "original-token");
+    let mut store = store::Store::open(&f.vault, &f.home).unwrap();
+    let credentials = f.home.join(".claude/.credentials.json");
+    let restarted = std::rc::Rc::new(std::cell::Cell::new(false));
+    let observed = restarted.clone();
+    store.process_probe = Some(Box::new(move || {
+        let has_token = std::fs::read(&credentials).ok()
+            .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+            .is_some_and(|value| value["claudeAiOauth"]["accessToken"].is_string());
+        if !has_token && !observed.replace(true) {
+            private::write(&credentials, br#"{"claudeAiOauth":{"accessToken":"new-client-token"}}"#).unwrap();
+            return Err("fixture client restarted".into());
+        }
+        Ok(())
+    }));
+    let result = store.switch("empty", "A", &Policy::default(), &Reporter::channel(None));
+    assert!(result.is_err(), "restart before commit must not report success");
+    assert!(restarted.get(), "the post-clear boundary must be checked");
+    assert!(store.db.get("recovery").unwrap().is_some(), "a transient conflict must not be cleared by automatic rollback");
+    assert_eq!(f.token(), "new-client-token", "do not overwrite the restarted client's data");
+    drop(store);
+    let mut reopened = store::Store::open(&f.vault, &f.home).unwrap();
+    assert!(reopened.db.get("recovery").unwrap().is_some());
+    assert!(reopened.switch("empty", "blocked", &Policy::default(), &Reporter::channel(None)).is_err());
+    assert_eq!(f.token(), "new-client-token");
+    reopened.recover("conflict checkpoint", &Reporter::channel(None)).unwrap();
+    assert_eq!(f.token(), "original-token");
+    assert!(reopened.db.get("recovery").unwrap().is_none());
+}
+
+#[test]
+fn process_query_failure_before_save_keeps_previous_generation_and_workspace() {
+    let f = optimization_tests::Fixture::new();
+    f.login("A", "one", "original-token");
+    let mut store = store::Store::open(&f.vault, &f.home).unwrap();
+    let reporter = Reporter::channel(None);
+    store.save_current("A", &Policy::default(), &reporter).unwrap();
+    let original = store.records()[0].archive.clone();
+    f.login("A", "one", "refreshed-token");
+    store.process_probe = Some(Box::new(|| Err("fixture process query unavailable".into())));
+    assert!(store.save_current("A", &Policy::default(), &reporter).is_err());
+    assert_eq!(store.records()[0].archive, original);
+    assert_eq!(f.token(), "refreshed-token");
+    assert!(store.db.get("recovery").unwrap().is_none());
+}
+
+#[test]
+fn occupied_target_browser_profile_blocks_switch_but_disabled_link_still_works() {
+    let f = optimization_tests::Fixture::new();
+    let browser = f.root.join("browser");
+    private::directory(&browser.join("profile/Default")).unwrap();
+    private::write(&browser.join("profile/Default/Cookies"), b"fixture-browser-A").unwrap();
+    f.login("A", "one", "A-token");
+    let p = Policy::default();
+    let r = Reporter::channel(None);
+    let mut store = store::Store::open(&f.vault, &f.home).unwrap();
+    store.save_current("A", &p, &r).unwrap();
+    let a = store.records().into_iter().find(|row| row.name == "A").unwrap().id;
+    store.switch("empty", "A", &p, &r).unwrap();
+    f.login("B", "one", "B-token");
+    let occupied = browser.join("profile");
+    store.browser_probe = Some(Box::new(move |path| Ok(path == occupied)));
+    assert!(store.switch(&a, "B", &p, &r).is_err(), "target browser occupancy must be checked before switching");
+    assert_eq!(f.token(), "B-token");
+    assert!(store.db.get("recovery").unwrap().is_none());
+    drop(store);
+    let mut store = store::Store::open(&f.vault, &f.home).unwrap();
+    store.db.configure_browser(false, false, None).unwrap();
+    store.browser_probe = Some(Box::new(|_| panic!("disabled link must not acquire a browser restriction")));
+    store.switch(&a, "B", &p, &r).unwrap();
+    assert_eq!(f.token(), "A-token");
+}
+
+#[test]
+fn unchanged_same_slot_reselection_does_not_require_cli_exit() {
+    let f = optimization_tests::Fixture::new();
+    f.login("A", "one", "refreshed-token");
+    let mut store = store::Store::open(&f.vault, &f.home).unwrap();
+    store.db.configure_browser(false, false, None).unwrap();
+    let r = Reporter::channel(None);
+    store.save_current("A", &Policy::default(), &r).unwrap();
+    let id = store.records()[0].id.clone();
+    store.process_probe = Some(Box::new(|| Err("fixture CLI still active".into())));
+    store.switch(&id, "A", &Policy::default(), &r).unwrap();
+    assert_eq!(f.token(), "refreshed-token");
+}
+
+// 2026-10-28 用户批准人工维护窗口。保留原反例为边界演示：
+// 两次检查间完成的外部写入不受保证；本测试通过不代表外部启动被拦截。
+// 这是独立进程的文件竞争，不读取真实 HOME、账号、钥匙串或网络。
+#[cfg(unix)]
+#[test]
+fn manual_window_does_not_intercept_unobserved_external_writes() {
+    let f = optimization_tests::Fixture::new();
+    f.login("A", "one", "A-token");
+    let source = f.root.join("foreign_writer.c");
+    let executable = f.root.join("foreign_writer");
+    std::fs::write(&source, r#"#include <stdio.h>
+#include <unistd.h>
+int main(int argc,char **argv) {
+    FILE *out=fopen(argv[1],"w");
+    if(!out){unlink(argv[2]);return 42;}
+    fputs("{\"claudeAiOauth\":{\"accessToken\":\"foreign-token\"}}",out);
+    int result=fclose(out);unlink(argv[2]);return result?43:0;
+}"#).unwrap();
+    let compiled = std::process::Command::new("cc").arg(&source).arg("-o").arg(&executable).output().unwrap();
+    assert!(compiled.status.success(), "isolated writer must compile");
+    let marker = f.root.join("foreign-client-running");
+    let observed_marker = marker.clone();
+    let credentials = f.home.join(".claude/.credentials.json");
+    let invoked = std::rc::Rc::new(std::cell::Cell::new(false));
+    let invoked_at_write = invoked.clone();
+    let wrote = std::rc::Rc::new(std::cell::Cell::new(false));
+    let wrote_at_write = wrote.clone();
+    let mut store = store::Store::open(&f.vault, &f.home).unwrap();
+    store.process_probe = Some(Box::new(move || {
+        if observed_marker.exists() { Err("fixture foreign client active".into()) } else { Ok(()) }
+    }));
+    store.before_write = Some(Box::new(move |_| {
+        if !invoked_at_write.replace(true) {
+            std::fs::write(&marker, b"running").unwrap();
+            let status = std::process::Command::new(&executable).arg(&credentials).arg(&marker).status().unwrap();
+            assert!(status.success() || status.code() == Some(42), "foreign writer must finish or be denied access");
+            wrote_at_write.set(status.success());
+        }
+    }));
+    let result = store.switch("empty", "A", &Policy::default(), &Reporter::channel(None));
+    assert!(invoked.get(), "must exercise the check/write gap");
+    assert!(wrote.get(), "must retain the independent external writer counterexample");
+    assert!(result.is_ok(), "boundary demonstration: polling does not intercept a completed external write");
+    assert!(store.db.get("recovery").unwrap().is_none(), "unobserved external write does not trigger conflict recovery");
 }

@@ -1,5 +1,5 @@
 // [INPUT]: 身份 SQLite 绑定、独立浏览器根目录、受限配置和用户确认后的切换事务。
-// [OUTPUT]: 独占资料选择、安全退出/重开与恢复阻断；迁移只读绑定配置或创建全新配置/seed.owner，不改变选择、不复制浏览器会话。
+// [OUTPUT]: 独占资料选择、安全退出/重开与恢复阻断、当前及目标身份资料核对范围；迁移只读绑定配置或创建全新配置/seed.owner，不改变选择、不复制浏览器会话。
 // [POS]: 身份与浏览器的协调边界；资料不压缩、不复制、不合并 Cookie，失败状态如实返回。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use super::*;
@@ -27,6 +27,21 @@ pub(super) fn slot_path(root: &Path, slot: &str) -> Result<PathBuf, String> {
 }
 pub(super) fn scope(root: &Path) -> Result<PathBuf, String> {
     slot_path(root, &database(root)?.browser_slot()?)
+}
+pub(crate) fn identity_profiles(vault: &Path, db: &Database, targets: &[&str]) -> Result<Vec<PathBuf>, String> {
+    if !db.browser_link()?.enabled {
+        return Ok(Vec::new());
+    }
+    let root = vault.parent().ok_or("应用目录不可用。")?.join("browser");
+    let mut slots = vec![db.browser_slot()?];
+    for target in targets {
+        if *target != "empty" {
+            if let Some(slot) = db.browser_for(target)? {
+                if !slots.contains(&slot) { slots.push(slot); }
+            }
+        }
+    }
+    slots.iter().map(|slot| Ok(slot_path(&root, slot)?.join("profile"))).collect()
 }
 pub(super) fn ready(root: &Path) -> Result<(), String> {
     if database(root)?.get("recovery")?.is_some() {

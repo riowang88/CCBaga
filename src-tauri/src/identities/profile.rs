@@ -1,5 +1,5 @@
-// [INPUT]: 默认 .claude.json 的 oauthAccount 显示字段、本地凭据的订阅/过期元数据、已认证暂存归档和精确进程查询结果。
-// [OUTPUT]: 当前身份与已保存摘要的显示白名单、按读取时间计算的本地凭据状态，以及至多 32 个进程预览；查询失败明确未知。
+// [INPUT]: 默认 .claude.json 的 oauthAccount 显示字段、本地凭据的订阅/过期元数据、已认证暂存归档、分端资料元数据和精确进程查询结果。
+// [OUTPUT]: 当前身份与已保存摘要的显示白名单、按读取时间计算的本地凭据状态，以及至多 32 个进程预览；查询失败明确未知，原生路径和生命周期不进入预览。
 // [POS]: 身份卡片的只读展示边界；不读取钥匙串、Cookie 正文或任意项目文件。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use serde::{Deserialize, Serialize};
@@ -20,8 +20,18 @@ struct Config {
     #[serde(rename = "primaryApiKey")]
     api_key: Option<serde::de::IgnoredAny>,
 }
+// Presence describes supported local material, never an authenticated session.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Material { Present, Absent, Unknown }
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClientMaterials { pub cli: Material, pub desktop: Material }
+impl Default for ClientMaterials {
+    fn default() -> Self { Self { cli: Material::Unknown, desktop: Material::Unknown } }
+}
 #[derive(Clone, Default, Serialize)]
 pub struct Current {
+    pub clients: ClientMaterials,
     pub present: bool,
     pub display_name: Option<String>,
     pub email: Option<String>,
@@ -36,6 +46,10 @@ pub struct Current {
 }
 #[derive(Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Summary {
+    #[serde(default)]
+    pub client_checks: std::collections::BTreeMap<String, super::association::ClientCheck>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub clients: Option<ClientMaterials>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub display_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -279,11 +293,20 @@ pub fn read(home: &Path) -> Current {
         current.auth_status = Some(auth.status_at(now_ms()).into());
         current.expires_at = auth.expiry();
     }
-    current.present |= crate::cleaner::identity::desktop_present(home);
+    current.clients = ClientMaterials {
+        cli: if current.unavailable { Material::Unknown } else if current.present { Material::Present } else if cfg!(target_os = "macos") {
+            // A missing file cannot establish absence of macOS Keychain credentials.
+            Material::Unknown
+        } else { Material::Absent },
+        desktop: match crate::cleaner::identity::desktop_material(home) {
+            Ok(true) => Material::Present, Ok(false) => Material::Absent, Err(_) => Material::Unknown,
+        },
+    };
+    current.present |= current.clients.desktop == Material::Present;
     current
 }
 pub(super) fn summarize_stage(stage: &super::archive::Stage) -> SavedSummary {
-    let mut summary = Summary::default();
+    let mut summary = Summary { client_checks: stage.manifest.client_checks.clone(), ..Summary::default() };
     let mut auth = AuthMetadata::default();
     let mut billing_type = None;
     let mut sub = None;
@@ -339,6 +362,17 @@ pub(super) fn summarize_stage(stage: &super::archive::Stage) -> SavedSummary {
             }
         }
     }
+    summary.clients = Some(ClientMaterials {
+        cli: if summary.email.is_some() || auth.access || auth.refresh || has_api_key
+            || stage.manifest.sources.iter().any(|s| s.category == "account")
+            || stage.manifest.credentials.iter().any(|v| matches!(v.get("service").and_then(Value::as_str), Some("Claude Code-credentials" | "Claude Code"))) {
+            Material::Present
+        } else { Material::Absent },
+        desktop: if stage.manifest.sources.iter().any(|s| s.category == "desktop")
+            || stage.manifest.credentials.iter().any(|v| v.get("service").and_then(Value::as_str) == Some("Claude Safe Storage")) {
+            Material::Present
+        } else { Material::Absent },
+    });
     summary.plan = format_plan(sub.as_deref(), tier.as_deref(), billing_type.as_deref());
     auth.api_key = has_api_key;
     SavedSummary {
@@ -366,6 +400,44 @@ pub fn process_previews(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn client_materials_are_separate_from_login_and_legacy_stays_unknown() {
+        let f = crate::identities::optimization_tests::Fixture::new();
+        f.login("A", "org", "private-token");
+        #[cfg(target_os = "macos")]
+        f.write("Library/Application Support/Claude/Local Storage/leveldb/fixture", b"desktop-session");
+        let live = serde_json::to_value(read(&f.home)).unwrap();
+        assert_eq!(live["clients"]["cli"], "present");
+        #[cfg(target_os = "macos")]
+        assert_eq!(live["clients"]["desktop"], "present");
+        assert!(!live.to_string().contains("private-token"));
+        let mut store = super::super::store::Store::open(&f.vault, &f.home).unwrap();
+        store.save_current("A", &super::super::Policy::default(), &crate::progress::Reporter::channel(None)).unwrap();
+        let saved = serde_json::to_value(store.db.summaries().unwrap()).unwrap();
+        let summary = &saved[&store.records()[0].id];
+        assert_eq!(summary["clients"]["cli"], "present");
+        #[cfg(target_os = "macos")]
+        assert_eq!(summary["clients"]["desktop"], "present");
+        let legacy: SavedSummary = serde_json::from_str("{}").unwrap();
+        assert!(serde_json::to_value(legacy.public_at(0)).unwrap()["clients"].is_null());
+        let empty = crate::identities::optimization_tests::Fixture::new();
+        let store = super::super::store::Store::open(&empty.vault, &empty.home).unwrap();
+        let (_, stage) = store.save("empty", &super::super::Policy::default(), &crate::progress::Reporter::channel(None)).unwrap();
+        let summary = serde_json::to_value(summarize_stage(&stage).public_at(0)).unwrap();
+        assert_eq!(summary["clients"]["cli"], "absent");
+        assert_eq!(summary["clients"]["desktop"], "absent");
+    }
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn missing_keychain_observation_and_unsafe_desktop_metadata_remain_unknown() {
+        let f = crate::identities::optimization_tests::Fixture::new();
+        assert_eq!(read(&f.home).clients.cli, Material::Unknown);
+        assert_eq!(read(&f.home).clients.desktop, Material::Absent);
+        let parent = f.home.join("Library/Application Support/Claude");
+        super::super::private::directory(&parent).unwrap();
+        std::os::unix::fs::symlink(&f.root, parent.join("Local Storage")).unwrap();
+        assert_eq!(read(&f.home).clients.desktop, Material::Unknown);
+    }
     #[test]
     fn only_explicit_display_fields_reach_the_card() {
         let current=parse(br#"{"oauthAccount":{"displayName":" Person ","emailAddress":"fixture@example.invalid","organizationName":"Team","accessToken":"private"},"primaryApiKey":"private"}"#).unwrap();
@@ -458,7 +530,7 @@ mod tests {
                 pid: n + 10,
                 name: "Claude Desktop".into(),
                 executable: "private-command-token".into(),
-                #[cfg(windows)]
+                #[cfg(any(windows, target_os = "macos"))]
                 created: 1,
             })
             .collect();

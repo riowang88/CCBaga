@@ -13,7 +13,8 @@
 static char *reply(NSDictionary *value){NSData *data=[NSJSONSerialization dataWithJSONObject:value options:0 error:nil];return strdup([[NSString alloc]initWithData:data encoding:NSUTF8StringEncoding].UTF8String);}
 static BOOL managed(NSString *service){return [service isEqualToString:@"Claude Code-credentials"]||[service isEqualToString:@"Claude Code"]||[service isEqualToString:@"Claude Safe Storage"];}
 static char *failure(OSStatus status){return reply(@{@"error":[NSString stringWithFormat:@"身份钥匙串操作未完成（OSStatus %d）。",(int)status]});}
-char *rf_identity_snapshot(void){
+char *rf_identity_snapshot_for(int scope){
+    if(scope<0||scope>2)return failure(errSecParam);
     SecKeychainRef keychain=NULL;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
@@ -23,6 +24,8 @@ char *rf_identity_snapshot(void){
     id search=CFBridgingRelease(keychain);
     NSMutableArray *saved=[NSMutableArray array];
     for(NSString *service in @[@"Claude Code-credentials",@"Claude Code",@"Claude Safe Storage"]){
+        BOOL desktop=[service isEqualToString:@"Claude Safe Storage"];
+        if((scope==1&&desktop)||(scope==2&&!desktop))continue;
         CFTypeRef raw=NULL;
         OSStatus status=SecItemCopyMatching((__bridge CFDictionaryRef)@{(__bridge id)kSecClass:(__bridge id)kSecClassGenericPassword,(__bridge id)kSecAttrService:service,(__bridge id)kSecMatchLimit:(__bridge id)kSecMatchLimitAll,(__bridge id)kSecReturnAttributes:@YES,(__bridge id)kSecReturnPersistentRef:@YES,(__bridge id)kSecMatchSearchList:@[search]},&raw);
         if(status==errSecItemNotFound)continue;if(status!=errSecSuccess)return failure(status);
@@ -36,6 +39,7 @@ char *rf_identity_snapshot(void){
     }
     return reply(@{@"items":saved});
 }
+char *rf_identity_snapshot(void){return rf_identity_snapshot_for(0);}
 char *rf_identity_remove(const char *json){
     NSArray *items=[NSJSONSerialization JSONObjectWithData:[[NSString stringWithUTF8String:json] dataUsingEncoding:NSUTF8StringEncoding] options:0 error:nil];
     if(![items isKindOfClass:NSArray.class])return failure(errSecParam);

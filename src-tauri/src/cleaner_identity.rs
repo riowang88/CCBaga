@@ -130,8 +130,17 @@ fn definitions(root: &Path, policy: &Policy) -> Vec<Source> {
     result
 }
 pub(crate) fn sources(root: &Path, policy: &Policy) -> Result<Vec<Source>, String> {
+    sources_matching(root, policy, |_| true)
+}
+pub(crate) fn source_is_cli(root: &Path, source: &Source) -> bool {
+    source.path.starts_with(root.join(".claude")) || source.path.parent() == Some(root) && source.path.file_name().is_some_and(|name| name.to_string_lossy().starts_with(".claude.json"))
+}
+pub(crate) fn sources_for_client(root: &Path, policy: &Policy, desktop: bool) -> Result<Vec<Source>, String> {
+    sources_matching(root, policy, |source| source_is_cli(root, source) != desktop)
+}
+fn sources_matching(root: &Path, policy: &Policy, selected: impl Fn(&Source) -> bool) -> Result<Vec<Source>, String> {
     let mut result = Vec::new();
-    for mut source in definitions(root, policy) {
+    for mut source in definitions(root, policy).into_iter().filter(selected) {
         let meta = match fs::symlink_metadata(&source.path) {
             Ok(m) => m,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
@@ -326,12 +335,19 @@ pub(crate) fn account_key(key: &str) -> bool {
 }
 
 // ----- 只检查桌面身份路径元数据，不读取 Cookie 或数据库正文 -----
-pub(crate) fn desktop_present(root: &Path) -> bool {
-    definitions(root, &Policy::default())
-        .into_iter()
-        .filter(|s| s.category == "desktop")
-        .any(|s| {
-            crate::identities::private::parents(s.path.parent().unwrap()).is_ok()
-                && crate::identities::private::safe(&s.path).is_ok()
-        })
+// Missing material is distinct from unreadable/unsafe material. Never read Desktop databases.
+pub(crate) fn desktop_material(root: &Path) -> Result<bool, String> {
+    let mut present = false;
+    for source in definitions(root, &Policy::default()).into_iter().filter(|s| s.category == "desktop") {
+        match std::fs::symlink_metadata(&source.path) {
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(_) => return Err("桌面资料状态未知。".into()),
+            Ok(_) => {
+                crate::identities::private::parents(source.path.parent().unwrap())?;
+                crate::identities::private::safe(&source.path)?;
+                present = true;
+            }
+        }
+    }
+    Ok(present)
 }

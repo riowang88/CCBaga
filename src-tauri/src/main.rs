@@ -97,6 +97,7 @@ fn main() {
             startup_trace("host setup");
             app.manage(ui_language::UiLanguage::load(app.handle()));
             app.manage(cleaner::Cleaner::default());
+            app.manage(identities::login::Login::default());
             app.manage(browser::Browser::default());
             app.manage(identities::portable::Transfers::default());
             #[cfg(target_os = "macos")]
@@ -141,9 +142,12 @@ fn main() {
             cleaner::residue::claude_residue_scan,
             cleaner::residue::claude_residue_clean,
             identities::identities_read,
+            identities::login::identities_login,
+            identities::login::identities_login_cancel,
             identities::identities_browser,
             identities::identities_stop,
             identities::identities_save,
+            identities::association::identities_associate,
             identities::identities_switch,
             identities::identities_rename,
             identities::identities_delete,

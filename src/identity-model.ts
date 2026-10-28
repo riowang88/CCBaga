@@ -6,10 +6,11 @@
  */
 export type IdentityPolicy={skills:boolean;plugins:boolean;mcp:boolean;settings:boolean;projects:boolean;history:boolean;cache:boolean};
 export type Identity={id:string;name:string;saved_at:number;bytes:number;policy:IdentityPolicy};
-export type IdentitySummary={display_name?:string|null;email:string|null;organization:string|null;plan:string|null;auth_status:string|null;expires_at?:number|null};
+export type ClientMaterials={cli:'present'|'absent'|'unknown';desktop:'present'|'absent'|'unknown'};
+export type IdentitySummary={client_checks?:Record<string,{source:string;checked_at:number}>;clients?:ClientMaterials|null;display_name?:string|null;email:string|null;organization:string|null;plan:string|null;auth_status:string|null;expires_at?:number|null};
 export type ProcessPreview={pid:number;entrypoint:string;workspace:string|null};
-export type CurrentIdentity={present:boolean;display_name:string|null;email:string|null;organization:string|null;plan:string|null;auth_status:string|null;expires_at?:number|null;unavailable:boolean};
-export type BrowserLink={enabled:boolean;bound_ids:string[]};
+export type CurrentIdentity={clients?:ClientMaterials;present:boolean;display_name:string|null;email:string|null;organization:string|null;plan:string|null;auth_status:string|null;expires_at?:number|null;unavailable:boolean};
+export type BrowserLink={enabled:boolean;bound_ids:string[];current_id?:string|null};
 export type IdentityState={browser:BrowserLink;browser_warning:string|null;records:Identity[];summaries:Record<string,IdentitySummary>;active:string;last_selected?:string|null;workspace_id?:string|null;browser_profile_present?:boolean;recovery:string|null;running:boolean;processes:ProcessPreview[]|null;processes_truncated:boolean;current:CurrentIdentity};
 export const defaultPolicy:IdentityPolicy={skills:true,plugins:true,mcp:true,settings:true,projects:true,history:false,cache:false};
 export const identityPolicyKey='ccbaga.identity-policy.v1';

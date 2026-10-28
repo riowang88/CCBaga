@@ -76,6 +76,9 @@ function execute(command:string,args:any){
  }
  if(command==='identities_browser'){state.browser.enabled=args.enabled;if(args.enabled&&!state.browser.bound_ids.includes(state.active))state.browser.bound_ids.push(state.active);return structuredClone(state);}
  if(command==='browser_launch'){state.browser_warning=null;return {};}
+ if(command==='identities_associate'){state.summaries[args.id].client_checks={...state.summaries[args.id].client_checks,[args.client]:{source:args.client==='cli'?'local_metadata':'user_confirmed',checked_at:Date.now()}};return structuredClone(state);}
+ if(command==='identities_login')return {email:args.email,organization:'Fixture team',subscription:'pro'};
+ if(command==='identities_login_cancel')return;
  if(command==='identities_read'){identityReads++;return structuredClone(state);}
  if(command==='claude_residue_scan'){
   residue.scans++;

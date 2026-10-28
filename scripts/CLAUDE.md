@@ -12,7 +12,7 @@ package-browser.ps1: Windows 固定引擎前置核验，不打包用户资料或
 test-skill-install.ts: Agent Skills metadata/完整公开文件与 npm skills 1.7.2 的四项真实安装；临时 HOME 和缓存，关闭统计，验证共享目录、完整文件与无 symlink。
 test-network-diagnostics.ts: 共用隔离引擎验证真实网络页的 Claude 出口四态、逐域 403 原因、命令异常/空返回拒绝、重测清旧结果和双语；不访问真实网络。
 test-browser-verification.ts: 顶部身份卡顺序、双语与不匹配/空身份/未联动 DOM 回归； 复用隔离 Playwright 引擎，真实 browser.html 的三态背景/波纹、原因、图片实际解码、紧凑布局、重测和双语 DOM 回归；虚构本机 HTTP 回报，无截图/真实账号。
-test-identities-ui.ts: 默认勾选、关闭确认/取消与恢复联动； Node.js 标准管道 + 固定引擎 + playwright-core 的隔离 DOM 模拟；40 个虚构账号验证当前槽位去重/无最近使用卡片、竖式工牌、弹簧/视差、Alert 安全默认、双语、保留选择与切换/删除/失败/恢复，临时 HOME/XDG，不调用真实 IPC、不截图或外连。
+test-identities-ui.ts: 默认勾选、关闭确认/取消与恢复联动； Node.js 标准管道 + 固定引擎 + playwright-core 的隔离 DOM 模拟；40 个虚构账号验证当前槽位去重/无最近使用卡片、竖式工牌、弹簧/视差、Alert 安全默认、双语、保留选择与切换/删除/失败/恢复，临时 HOME/XDG，不调用真实 IPC、不截图或外连。 允许 CCBAGA_TEST_ENGINE 指定已知本机测试引擎；严格断言保留，当前旧的 Identity 1 数量断言与本地槽位显示行为冲突，单独报告。
 test-claude-residue.ts: 复用身份页内存 IPC 验证显式扫描、仅精确缓存默认选择、不完整项禁选、JSON 键提示、不可逆确认默认取消、精确 ID 提交、部分失败和停止失败后的重扫读回、旧计划失效与英文确认；不触碰本机文件或钥匙串。
 test-identity-transfer.ts: 临时身份迁移 DOM 回归，选择取消、密码边界/清空、真实进度与失败后重选票据/重选和取消清除可信确认/提交后状态失败读回、导入不切换、双语和本地期限到期/进程未知显示；无真实文件。
 test-identity-operation.ts: 通过延期 IPC 和官方 Channel 回调验证工牌下方共享进度；未知总量不制造百分比，实际 1/4 事件显示且停留 25%，空身份/暂存身份/清理复查走同一进度，失败与回滚保留真实状态；不截图或触碰本机资料。
@@ -64,3 +64,9 @@ test-browser-doh.ts：隔离内存配置覆盖 zh-Hans-SG、两模式、服务�
 test-identity-regressions.ts 追加 browser-only 保存入口、命名提交、当前卡与空模板高亮回归；test-local-identity-sessions.mjs 同时执行无账号元数据与纯浏览器身份的真实 HttpOnly 会话往返，临时 HOME/XDG、合成 Cookie、本机 HTTP 样本，不读真实资料。
 
 本仓库更新产物：release-macos.py 从 tauri.conf.json 的更新地址派生下载仓库；sign-windows-update.py 与 assemble-release.py 固定 riowang88/CCBaga，装配回归覆盖新地址接受与旧地址拒绝。所有既有摘要、签名、公证和跨平台交付检查保留。
+
+test-identity-regressions.ts: 隔离虚构 IPC 验证保留策略、本地槽位、运行标签、仅浏览器保存与分端资料、旧档案未知、维护窗口、双语及查看引导不触发登录/保存；可用 CCBAGA_TEST_ENGINE 指定已知引擎。
+
+test-identity-regressions.ts 新增受控登录的显式确认/取消/结果与单端关联的目标、失败重试、无全端保存/停止调用回归，全部使用虚构 IPC。
+
+test-identity-regressions.ts 覆盖CLI/App名称、CLI订阅说明、登录前进程列表/未知/刷新为空，保留显式授权、取消和单端备份范围。

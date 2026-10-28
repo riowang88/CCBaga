@@ -1,5 +1,5 @@
 // [INPUT]: 宿主独立资料目录、原生进程核验与已验证配置。
-// [OUTPUT]: 浏览资料占用保护、偏好更新与当前资料严格 DoH/原值恢复、缓存/站点清理及用户显式确认的完整资料重置；全量预检后按实际删除项目报告 n/N。
+// [OUTPUT]: 浏览资料占用保护（原生状态缺字段拒绝，不按未运行处理）、偏好更新与当前资料严格 DoH/原值恢复、缓存/站点清理及用户显式确认的完整资料重置；全量预检后按实际删除项目报告 n/N。
 // [POS]: 当前绑定 user-data-dir 的文件边界；完整重置含所有子 Profile 与密码密钥，仅允许 unlink 当前用户的根级 Chromium 崩溃锁，拒绝其他链接/外部所有者，不访问系统钥匙串或其他身份。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 #[cfg(target_os = "linux")]
@@ -25,8 +25,10 @@ extern "C" {
 }
 pub fn running(profile: &Path) -> Result<bool, String> {
     let path = CString::new(profile.to_string_lossy().as_bytes()).map_err(|_| "资料路径无效。")?;
-    let state: Value = decode(unsafe { rf_browser_running(path.as_ptr()) })?;
-    Ok(state["running"].as_bool().unwrap_or(false))
+    #[derive(serde::Deserialize)]
+    struct Running { running: bool }
+    let state: Running = decode(unsafe { rf_browser_running(path.as_ptr()) })?;
+    Ok(state.running)
 }
 pub fn quit(profile: &Path) -> Result<(), String> {
     let path = CString::new(profile.to_string_lossy().as_bytes()).map_err(|_| "资料路径无效。")?;

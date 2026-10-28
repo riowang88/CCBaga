@@ -13,6 +13,7 @@ use serde::Serialize;
 pub struct BrowserLink {
     pub enabled: bool,
     pub bound_ids: Vec<String>,
+    pub current_id: Option<String>,
 }
 #[derive(Clone, Serialize)]
 pub struct BrowserIdentity {
@@ -263,7 +264,9 @@ impl Database {
             .map_err(error)?
             .collect::<Result<Vec<String>, _>>()
             .map_err(error)?;
+        let current_id = self.connection.query_row("SELECT identity FROM browser_bindings WHERE slot=?1 AND identity IN (SELECT id FROM identities)",[self.browser_slot()?], |r| r.get(0)).optional().map_err(error)?;
         Ok(BrowserLink {
+            current_id,
             enabled: self.get("browser.enabled")?.as_deref() == Some("1"),
             bound_ids: ids,
         })

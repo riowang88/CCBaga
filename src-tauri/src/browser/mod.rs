@@ -1,5 +1,5 @@
 // [INPUT]: 本机指纹引擎（优先 /Applications/CCBaga-B.app，回退 ~/Applications）、配置/资料边界、真实浏览器观测、宿主界面语言与共享操作日志。
-// [OUTPUT]: 有界绑定身份上下文与浏览器设置/启动/缓存清理、显式完整资料重置和环境核验；完整重置只处理当前绑定 user-data-dir，按真实项目计数；launch.args 与 SQLite 共用资料/指纹参数，恢复期间阻断启动。
+// [OUTPUT]: 有界绑定身份上下文与浏览器设置/启动/缓存清理、显式完整资料重置和环境核验；完整重置只处理当前绑定 user-data-dir，按真实项目计数；launch.args 与 SQLite 共用资料/指纹参数，恢复期间阻断启动；向身份事务提供当前/目标资料占用核对。
 // [POS]: 独立浏览器模块的唯一编排入口；改变资料前必须退出浏览器；不自行改系统默认浏览器，只发起系统确认。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 pub(crate) mod config;
@@ -11,7 +11,8 @@ mod profile;
 mod workspaces;
 use launch::launch_locked;
 pub(crate) use workspaces::delete_saved;
-pub(crate) use workspaces::identity_action;
+pub(crate) use workspaces::{identity_action, identity_profiles};
+pub(crate) use profile::running as profile_running;
 pub(crate) use workspaces::{portable_config, portable_prepare};
 pub(crate) fn configure_identity(
     app: &tauri::AppHandle,
@@ -773,4 +774,26 @@ pub async fn browser_rotate(app: tauri::AppHandle, region: String) -> Result<Sna
 #[cfg(target_os = "macos")]
 fn binary(engine: &Path) -> PathBuf {
     engine.join("Contents/MacOS/Chromium")
+}
+
+// 受控登录只使用已存在且正在运行的资料；不准备引擎、不改配置/指纹或默认浏览器。
+#[cfg(target_os = "macos")]
+pub(crate) fn login_target(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let state=app.state::<Browser>(); let _gate=state.gate.lock().unwrap();
+    workspaces::ready(&root(app)?)?;
+    let profile=workspaces::scope(&root(app)?)?.join("profile");
+    profile::check_path(&root(app)?,&profile)?;
+    if !profile::running(&profile)? {return Err("请先打开目标 B 资料，再发起受控登录。".into());}
+    Ok(profile)
+}
+#[cfg(target_os = "macos")]
+pub(crate) fn login_open(app: &tauri::AppHandle, target: &Path, url: &str) -> Result<(), String> {
+    let state=app.state::<Browser>(); let _gate=state.gate.lock().unwrap();
+    workspaces::ready(&root(app)?)?;
+    let profile=workspaces::scope(&root(app)?)?.join("profile");
+    if profile!=target || !profile::running(&profile)? {return Err("目标 B 资料已变化或退出；未交付授权链接。".into());}
+    profile::check_path(&root(app)?,&profile)?;
+    let engine=engine(app)?;let config=config::load(&workspaces::scope(&root(app)?)?)?;let machine=config::machine()?;config.validate(&machine)?;
+    let mut child=Command::new(binary(&engine)).args(config::arguments(&config,&machine,&profile,url,&version(&engine))).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn().map_err(|_|"无法向目标 B 资料交付授权链接。")?;
+    std::thread::spawn(move || {let _=child.wait();});Ok(())
 }

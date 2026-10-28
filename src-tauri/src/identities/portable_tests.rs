@@ -253,3 +253,10 @@ fn oversized_declared_members_and_gnu_extension_are_rejected_before_payload_read
         assert_eq!(error, expected);
     }
 }
+
+#[test]
+fn single_client_local_attestation_is_not_exported_as_destination_evidence() {
+    let fixture=Fixture::new();fixture.login("A","org","cli-fixture");let mut store=Store::open(&fixture.vault,&fixture.home).unwrap();store.db.configure_browser(false,false,None).unwrap();let reporter=Reporter::channel(None);store.save_current("A",&Policy::default(),&reporter).unwrap();let id=store.records()[0].id.clone();store.associate_client(&id,super::super::association::Client::Cli,true,&reporter).unwrap();
+    assert!(!store.load(&store.record(&id).unwrap()).unwrap().manifest.client_checks.is_empty());
+    let path=fixture.root.join("associated.bagapack");store.export_pack(&path,PASSWORD,&id,None,&reporter).unwrap();let imported=read_pack(&fs::read(path).unwrap(),PASSWORD,&fixture.root).unwrap();assert!(imported.stage.manifest.client_checks.is_empty());
+}

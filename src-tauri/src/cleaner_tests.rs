@@ -1,5 +1,5 @@
 // [INPUT]: 隔离临时目录/Windows 子进程 AppData、脱敏配置、清理事务与当前用户官方原生 CLI 版本路径。
-// [OUTPUT]: 白名单、文件夹范围、配置保留、组织检索、直接删除、大目录完整统计、读失败拒绝快照、快照保护、真实日志次序与原生版本/可丢弃 Node CLI 进程的识别/终止/隔离验证。
+// [OUTPUT]: 白名单、文件夹范围、配置保留、组织检索、直接删除、大目录完整统计、读失败拒绝快照、快照保护、真实日志次序与原生版本/可丢弃 Node CLI 进程的识别/终止/隔离验证，以及 macOS 同路径不同创建时间拒绝终止。
 // [POS]: 仅操作测试数据，进程样本由本机编译并握手确认启动，避免重用 Apple 平台二进制，不访问现有 Claude 数据。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use super::*;
@@ -243,11 +243,19 @@ fn ends_only_the_captured_disposable_process() {
         pid: child.id() as i32,
         name: "claude".into(),
         executable: executable.to_string_lossy().into_owned(),
+        #[cfg(target_os = "macos")]
+        created: native::process_created(child.id() as i32).unwrap(),
     };
     let mismatched = ClaudeProcess {
         executable: "/wrong/claude".into(),
         ..target.clone()
     };
+    #[cfg(target_os = "macos")]
+    {
+        let reused = ClaudeProcess { created: target.created + 1, ..target.clone() };
+        signal_same_process(&reused, 9).unwrap();
+        assert!(child.try_wait().unwrap().is_none(), "same path with a different birth time must not be signaled");
+    }
     signal_same_process(&mismatched, 9).unwrap();
     assert!(child.try_wait().unwrap().is_none());
     signal_same_process(&target, 9).unwrap();

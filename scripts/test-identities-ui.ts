@@ -11,7 +11,7 @@ import {tmpdir} from 'node:os';
 import {createServer} from 'vite';
 import {chromium} from 'playwright-core';
 import {testBrowserVerification} from './test-browser-verification.ts';
-import {testBrowserDoh} from './test-browser-doh';
+import {testBrowserDoh} from './test-browser-doh.ts';
 import {testBrowserDns} from './test-browser-dns.ts';
 import {testBrowserProfiles} from './test-browser-profiles.ts';
 import {testBrowserCleanup} from './test-browser-cleanup.ts';
@@ -30,7 +30,7 @@ const temporary=await mkdtemp(join(tmpdir(),'ccbaga-ui-'));
 for(const name of ['config','cache'])await mkdir(join(temporary,name));
 Object.assign(env,{HOME:temporary,XDG_CONFIG_HOME:join(temporary,'config'),XDG_CACHE_HOME:join(temporary,'cache')});
 let browser;
-try{browser=await chromium.launch({executablePath:resolve('browser-runtime',engine),headless:true,env});}
+try{browser=await chromium.launch({executablePath:process.env.CCBAGA_TEST_ENGINE||resolve('browser-runtime',engine),headless:true,env});}
 catch(error){await server.close();await rm(temporary,{recursive:true,force:true});throw error;}
 let checks=0;
 try{
@@ -39,6 +39,9 @@ try{
  const page=await context.newPage();page.setDefaultTimeout(10000);
  const errors:string[]=[];page.on('console',message=>{if(message.type()==='error')console.error(message.text());});page.on('pageerror',error=>{errors.push(error.message);console.error(error.message);});
  await page.goto(base+'/tests/identities.html');
+ await page.getByText('登录与备份').waitFor();
+ await page.getByText('查看本机数据',{exact:true}).click();
+ assert.match(await page.locator('.identity-client-status').innerText(),/发现数据不代表已经登录/);
  const cards=page.locator('.identity-card');
  await page.getByText('fixture@example.invalid',{exact:true}).waitFor();
  assert.equal(await cards.count(),41);assert.equal(await cards.first().getByRole('heading').innerText(),'空身份');
@@ -86,13 +89,15 @@ try{
  assert.match(await savedSecond.innerText(),/user2@example\.invalid/);assert.match(await savedSecond.innerText(),/Org 2/);
  await current.getByRole('button',{name:'更新备份',exact:true}).click();
  dialog=page.getByRole('dialog');await dialog.waitFor();
+ assert.match(await dialog.innerText(),/操作完成前，请勿启动/);
+ assert.match(await dialog.innerText(),/也不要修改相关文件/);
  assert.match(await dialog.innerText(),/PID 4201/);assert.match(await dialog.innerText(),/VS Code/);
  assert.equal(await dialog.locator('.identity-confirm-keep').filter({hasText:'纳入加密备份'}).getByText('登录与身份数据 · 会话历史 · 缓存与日志',{exact:true}).count(),1);
  assert.match(await dialog.locator('.identity-confirm-keep').filter({hasText:'留在工作区'}).innerText(),/Skills 与命令/);
  await dialog.getByRole('button',{name:'确认保存备份',exact:true}).click();
  await page.waitForFunction(()=>((window as any).identityFixture.commands as any[]).some(row=>row.command==='identities_save'));
  assert.equal(await page.evaluate(()=>(window as any).identityFixture.state.current.present),true);checks++;
- await page.getByText('保留在工作区',{exact:true}).click();
+ await page.getByText('切换账号时保持不变的内容',{exact:true}).click();
  await page.getByRole('checkbox',{name:'Skills 与命令'}).uncheck();
  await cards.first().getByRole('button',{name:'使用空身份'}).click();
  dialog=page.getByRole('dialog');await dialog.waitFor();await dialog.getByLabel('当前身份保存为').fill('First archive');

@@ -415,6 +415,8 @@ h3 { margin: 0; font-size: 13px; font-weight: 500; }
 .identity-section-head h2 { font-size:14px; font-weight:550; margin:0; }
 .identity-count,.identity-caption { font-size:11px; color:var(--muted-foreground); }
 .identity-cli .identity-caption { display:block; margin-top:6px; }
+.identity-client-status > .identity-confirm,.identity-client-status > p { margin-inline:28px; }
+.identity-client-status > p:last-child { margin-bottom:20px; }
 .identity-policy { border-bottom:1px solid var(--landing-line); }
 .identity-policy summary { padding:16px 28px; cursor:pointer; font-size:12px; }
 .identity-policy summary strong { font-weight:500; margin-left:8px; }
@@ -483,7 +485,7 @@ h3 { margin: 0; font-size: 13px; font-weight: 500; }
 .identity-confirm > label { font-size:12px; }
 .identity-recovery { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px 28px; background:#fff5df; border-bottom:1px solid #e6d4ab; }
 .identity-recovery strong { font-size:12px; font-weight:500; }
-@media(max-width:850px) { .identity-section-head,.identity-policy summary,.identity-recovery { padding-inline:22px; } .identity-card-rail,.identity-policy-grid { padding-inline:22px; } .identity-card-rail { scroll-padding-inline:22px; } }
+@media(max-width:850px) { .identity-section-head,.identity-policy summary,.identity-recovery { padding-inline:22px; } .identity-client-status > .identity-confirm,.identity-client-status > p { margin-inline:22px; } .identity-card-rail,.identity-policy-grid { padding-inline:22px; } .identity-card-rail { scroll-padding-inline:22px; } }
 
 @media(prefers-reduced-motion:reduce) { .identity-card { transition:none; } }
 
@@ -592,3 +594,11 @@ h3 { margin: 0; font-size: 13px; font-weight: 500; }
 .browser-dns-settings details { font-size: 11px; line-height: 1.6; margin-top: 10px; }
 .browser-dns-settings summary { cursor: pointer; }
 .browser-doh-endpoint { overflow-wrap: anywhere; user-select: text; }
+
+.identity-backup-actions { flex-wrap:wrap; }
+.identity-backup-actions > div { display:flex; flex-wrap:wrap; gap:8px; }
+.identity-client-details { margin:16px 28px 20px; }
+.identity-client-details > summary { cursor:pointer; font-size:12px; color:var(--muted-foreground); }
+.identity-client-details > summary:focus-visible { outline:2px solid var(--foreground); outline-offset:4px; }
+.identity-client-details > .identity-confirm { margin-top:12px; }
+@media(max-width:850px) { .identity-client-details { margin-inline:22px; } }

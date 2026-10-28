@@ -31,6 +31,8 @@ pub(super) struct Manifest {
     pub(super) fingerprints: Vec<Vec<u8>>,
     #[serde(default)]
     pub(super) account_key: Option<String>,
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub(super) client_checks: std::collections::BTreeMap<String, super::association::ClientCheck>,
 }
 pub(super) struct Stage {
     pub(super) path: PathBuf,
@@ -221,7 +223,7 @@ impl Store {
         policy: &Policy,
         reporter: &Reporter,
     ) -> Result<(Record, Stage), String> {
-        self.save_inner(name, policy, reporter, true)
+        self.save_inner(name, policy, reporter, true, None)
     }
     pub(super) fn save_checkpoint(
         &self,
@@ -229,7 +231,10 @@ impl Store {
         policy: &Policy,
         reporter: &Reporter,
     ) -> Result<(Record, Stage), String> {
-        self.save_inner(name, policy, reporter, false)
+        self.save_inner(name, policy, reporter, false, None)
+    }
+    pub(super) fn save_client_snapshot(&self, name: &str, policy: &Policy, reporter: &Reporter, desktop: bool) -> Result<(Record, Stage), String> {
+        self.save_inner(name, policy, reporter, false, Some(desktop))
     }
     fn save_inner(
         &self,
@@ -237,10 +242,11 @@ impl Store {
         policy: &Policy,
         reporter: &Reporter,
         reuse: bool,
+        client: Option<bool>,
     ) -> Result<(Record, Stage), String> {
         self.stopped()?;
         reporter.log("validate", "running", "正在检查当前身份文件。", 0, None);
-        let sources = identity::sources(&self.home, policy)?
+        let sources = match client { Some(desktop) => identity::sources_for_client(&self.home, policy, desktop)?, None => identity::sources(&self.home, policy)? }
             .into_iter()
             .filter(|s| !identity::transient_lock(&self.home, &s.path, &s.path))
             .collect::<Vec<_>>();
@@ -269,7 +275,7 @@ impl Store {
             0,
             None,
         );
-        let credentials = self.snapshot_keys()?;
+        let credentials = match client { Some(desktop) => self.snapshot_client_keys(desktop)?, None => self.snapshot_keys()? };
         super::credentials::clear(&credentials, policy)?;
         reporter.log(
             "credentials",
@@ -311,6 +317,7 @@ impl Store {
             credentials,
             fingerprints,
             account_key: account_key.clone(),
+            client_checks: Default::default(),
         };
         let pending = self.vault.join(format!(".pending-{generation}"));
         let destination = self.vault.join(format!("{generation}.baga"));

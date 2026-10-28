@@ -165,3 +165,28 @@ fn retained_history_is_not_rewound_when_reselecting_with_a_keep_policy() {
     assert_eq!(fs::read(f.home.join(".claude/history.jsonl")).unwrap(), b"shared live history");
     assert_eq!(s.records().len(), 1);
 }
+
+#[cfg(target_os="macos")]
+#[test]
+fn manual_window_full_identity_to_browser_only_and_back_preserves_each_client() {
+    let f=Fixture::new(); let mut s=store::Store::open(&f.vault,&f.home).unwrap();
+    let p=Policy::default(); let r=Reporter::channel(None);
+    let desktop="Library/Application Support/Claude/Local Storage/leveldb/fixture";
+    f.login("B","org","B-token"); f.write(desktop,b"B-desktop");
+    let b_profile=audit_browser(&f,&s,b"B-web");
+    s.switch("empty","B",&p,&r).unwrap(); let b=s.records()[0].id.clone();
+    let a_profile=audit_browser(&f,&s,b"A-web");
+    s.save_current("A-browser-only",&p,&r).unwrap();
+    let a=s.records().into_iter().find(|x|x.name=="A-browser-only").unwrap().id;
+    s.switch(&b,"A-browser-only",&p,&r).unwrap();
+    assert_eq!(f.token(),"B-token"); assert_eq!(fs::read(f.home.join(desktop)).unwrap(),b"B-desktop");
+    s.switch(&a,"B",&p,&r).unwrap();
+    assert!(!profile::read(&f.home).present);
+    assert!(!f.home.join(desktop).exists());
+    let credentials:serde_json::Value=serde_json::from_slice(&fs::read(f.home.join(".claude/.credentials.json")).unwrap()).unwrap();
+    assert!(credentials.get("claudeAiOauth").is_none());
+    s.switch(&b,"A-browser-only",&p,&r).unwrap();
+    assert_eq!(f.token(),"B-token"); assert_eq!(fs::read(f.home.join(desktop)).unwrap(),b"B-desktop");
+    assert_eq!(fs::read(a_profile.join("Default/Cookies")).unwrap(),b"A-web");
+    assert_eq!(fs::read(b_profile.join("Default/Cookies")).unwrap(),b"B-web");
+}

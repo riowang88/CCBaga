@@ -315,9 +315,8 @@ h3 { margin: 0; font-size: 13px; font-weight: 500; }
 /* ----- 网络：三步共用一个细线网格，安装区只保留选择、提示词和主按钮 ----- */
 .network-page { padding: 0 0 32px; }
 .network-page > .cleanup-title { margin-inline: 0; margin-bottom: var(--landing-band); }
-.network-steps { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); list-style: none; padding: 0; margin: 0; }
+.network-steps { display: grid; grid-template-columns: minmax(0,1fr); list-style: none; padding: 0; margin: 0; }
 .network-step { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; gap: 26px; padding: 30px 24px; }
-.network-step + .network-step { border-left: 1px solid var(--landing-line); }
 .network-step-heading { display: flex; align-items: center; gap: 12px; }
 .network-step h2 { font-size: 15px; font-weight: 500; }
 .network-step-number { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--foreground); font: 12px ui-monospace,monospace; }
@@ -374,11 +373,6 @@ h3 { margin: 0; font-size: 13px; font-weight: 500; }
   .coding-agent { gap: 5px; font-size: 11px; }
 }
 
-.resource-specs { margin: 0; }
-.resource-specs > div { display: grid; grid-template-columns: 86px minmax(0,1fr); gap: 16px; padding: 13px 0; border-bottom: 1px solid var(--landing-line); font-size: 12px; line-height: 1.7; }
-.resource-specs > div:last-child { border-bottom: 0; }
-.resource-specs dt { color: var(--muted-foreground); }
-.resource-specs dd { margin: 0; overflow-wrap: anywhere; }
 
 /* ----- 使用说明：短句编号行与原生折叠区，共用 Landing 线条和留白 ----- */
 .help-page { padding: 0 0 28px; }
@@ -576,7 +570,6 @@ h3 { margin: 0; font-size: 13px; font-weight: 500; }
 .verification-identity-state.attention { color:#f5ce8f;border-color:#f5ce8f55; }
 @media(max-width:520px) { .verification-identity { margin:12px 16px;padding:20px 16px 14px;gap:12px;flex-wrap:wrap; } .verification-identity-avatar { width:44px;height:44px; } .verification-identity-account h2 { font-size:18px; } .verification-identity-state { margin-left:56px; } }
 
-.resource-stock-note { margin:16px 0 0; font-size:12px; line-height:1.7; color:var(--muted-foreground); }
 
 .identity-card-head .identity-export { min-width:0; height:25px; padding:2px 4px; font-size:10px; color:var(--muted-foreground); }
 .identity-transfer-file { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid var(--landing-line); }

@@ -13,8 +13,10 @@ import '../src/index.css';
 import '../src/style.css';
 let mode='success';
 let release=()=>{};
-Object.assign(window,{networkFixture:{setMode:(value:string)=>{mode=value;},finish:()=>release(),language:setLocale}});
-mockIPC(command=>{
+const commands:{command:string;args:unknown}[]=[];
+Object.assign(window,{networkFixture:{commands,setMode:(value:string)=>{mode=value;},finish:()=>release(),language:setLocale}});
+mockIPC((command,args)=>{
+ if(command==='network_open_resource'||command==='copy_result'){commands.push({command,args});return;}
  if(command!=='network_diagnose_domains')throw Error(`Unexpected fixture command: ${command}`);
  return new Promise((resolve,reject)=>{release=()=>{
   if(mode==='error')return reject('fixture connection interrupted');

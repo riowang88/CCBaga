@@ -1,15 +1,14 @@
 /**
- * [INPUT]: 固定资源入口、服务规格、Claude 核心域名分流诊断、Cromma Tabs/Textarea、双语提示词与原生剪贴板。
- * [OUTPUT]: Laper 满宽细线三步入口与斜纹分隔、Claude 出口四态检测、汇总成功/失败和逐域原因（连接对端不等于出口）、五项 AI 图标分段与双语提示词一键复制。
+ * [INPUT]: Skill 安装入口、Claude 核心域名分流诊断、Cromma Tabs/Textarea、双语提示词与原生剪贴板。
+ * [OUTPUT]: Laper 满宽细线 Skill 入口与斜纹分隔、Claude 出口四态检测、汇总成功/失败和逐域原因（连接对端不等于出口）、五项 AI 图标分段与双语提示词一键复制。
  * [POS]: 网络资源与分流诊断；应用不收集密钥或执行远端部署，诊断仅进行只读网络连通性探测。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 import {Button,Tabs,Textarea} from 'cromma-ui';
-import {Server as ServerIcon,HomeDefault as HomeIcon,Refresh} from 'cromma-ui/pika';
+import {Refresh} from 'cromma-ui/pika';
 import {useState} from 'react';
 import {invoke} from '@tauri-apps/api/core';
 import {useI18n} from './i18n';
-import {AppDialog} from './dialog';
 import {agents,installationPrompt} from './network-skill';
 
 export type DomainDiagnosis = {
@@ -25,7 +24,6 @@ const claudeDomains=['claude.ai','api.anthropic.com','platform.claude.com','down
 export function VpsPanel() {
     const {t,locale}=useI18n();
     const [selected,setSelected]=useState('generic'), [copied,setCopied]=useState(''), [error,setError]=useState('');
-    const [guide,setGuide]=useState<'dmit'|'webshare'|null>(null);
     const [diagnosing,setDiagnosing]=useState(false);
     const [diagnostics,setDiagnostics]=useState<DomainDiagnosis[]|null>(null);
     const [diagnosticsError,setDiagnosticsError]=useState('');
@@ -35,9 +33,9 @@ export function VpsPanel() {
     const statusText=phase==='checking'?'检测中':phase==='passed'?'检测成功':phase==='failed'?'检测失败':'待检测';
     const prompt=installationPrompt(selected,locale);
 
-    async function open(provider:'dmit'|'webshare'|'skill') {
+    async function openSkill() {
         setError('');
-        try { await invoke('network_open_resource',{provider}); }
+        try { await invoke('network_open_resource',{provider:'skill'}); }
         catch (e) { setError(String(e)); }
     }
 
@@ -66,12 +64,10 @@ export function VpsPanel() {
     }
 
     return <section className="system-page network-page"><div className="cleanup-title"><h1>{t('网络环境')}</h1></div>
-        <ol className="network-steps">{([
-            ['dmit','DMIT','获取 VPS'],['webshare','Webshare','获取家宽'],['skill','Skill','安装 Skill']
-        ] as const).map(([provider,name,label],index)=><li className="network-step" key={provider}>
-            <div className="network-step-heading"><span className="network-step-number" aria-hidden="true">{String(index+1).padStart(2,'0')}</span><h2>{name}</h2></div>
-            <div className="network-step-actions"><Button variant={provider==='dmit'?'info':provider==='webshare'?'success':'secondary'} size="small" leftIcon={provider==='dmit'?<ServerIcon size={15} aria-hidden="true"/>:provider==='webshare'?<HomeIcon size={15} aria-hidden="true"/>:undefined} onClick={()=>void open(provider)}>{t(label)}</Button>{provider!=='skill'&&<Button variant="secondary" size="small" round aria-label={t(provider==='dmit'?'VPS 帮助':'家宽帮助')} onClick={()=>setGuide(provider)}>?</Button>}</div>
-        </li>)}</ol>
+        <ol className="network-steps"><li className="network-step">
+            <div className="network-step-heading"><span className="network-step-number" aria-hidden="true">01</span><h2>Skill</h2></div>
+            <div className="network-step-actions"><Button variant="secondary" size="small" onClick={()=>void openSkill()}>{t('安装 Skill')}</Button></div>
+        </li></ol>
         <div className="landing-section-band" aria-hidden="true"/>
         <section className="domain-diagnostics" aria-labelledby="diagnostics-title" data-status={phase} aria-busy={diagnosing}>
             <div className="domain-diagnostics-header">
@@ -102,13 +98,6 @@ export function VpsPanel() {
                 <div className="skill-prompt-actions"><Button variant="ink" onClick={()=>void copy()}>{copied===prompt?t('已复制'):t('复制提示词')}</Button></div>
             </div>
         </section>
-        <AppDialog open={guide!==null} onOpenChange={value=>{if(!value)setGuide(null);}} title={guide==='dmit'?'DMIT':'Webshare'} width={440} footer={<Button variant="ink" onClick={()=>setGuide(null)}>{t('关闭')}</Button>}>
-            <dl className="resource-specs">{(guide==='dmit'?[
-                ['系统','Debian 12 / 13'],['地址','IPv4'],['登录','SSH Key · root:22'],['文件','PEM · PPK · PUB'],['密钥选项','Generate SSH Key after order']
-            ]:[
-                ['类型','Static Residential (ISP)'],['连接','Direct Connection'],['认证','Username / Password'],['协议','SOCKS5'],['端口','以面板为准']
-            ]).map(([label,value])=><div key={label}><dt>{t(label)}</dt><dd>{t(value)}</dd></div>)}</dl><p className="resource-stock-note">{t('缺货时可在原站点选择其他地区的同类套餐，或等待补货；购买前核对所需规格。')}</p>
-        </AppDialog>
         {error&&<p role="alert" className="system-feedback error">{t(error)}</p>}
     </section>;
 }

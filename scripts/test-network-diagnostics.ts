@@ -13,6 +13,14 @@ export async function testNetworkDiagnostics(browser:Browser,base:string) {
  try{
   await page.goto(base+'/tests/network.html');
   await page.getByRole('heading',{name:'Claude 出口',exact:true}).waitFor();
+  assert.equal(await page.getByRole('heading',{name:/^(DMIT|Webshare)$/}).count(),0);
+  assert.equal(await page.getByRole('button',{name:/^(获取 VPS|获取家宽|VPS 帮助|家宽帮助)$/}).count(),0);
+  assert.equal(await page.locator('.network-step').count(),1);
+  await page.getByRole('button',{name:'安装 Skill',exact:true}).click();
+  await page.getByRole('button',{name:'复制提示词',exact:true}).click();
+  const commands=await page.evaluate(()=>(window as any).networkFixture.commands);
+  assert.deepEqual(commands[0],{command:'network_open_resource',args:{provider:'skill'}});
+  assert.equal(commands[1].command,'copy_result');assert.match(commands[1].args.text,/npx --yes skills add/);
   const panel=page.locator('.domain-diagnostics'),rows=panel.locator('.domain-diagnostics-item');
   assert.equal(await panel.getAttribute('data-status'),'idle');assert.equal(await rows.count(),4);
   assert.deepEqual(await panel.locator('.domain-name').allInnerTexts(),['claude.ai','api.anthropic.com','platform.claude.com','downloads.claude.ai']);
@@ -41,6 +49,8 @@ export async function testNetworkDiagnostics(browser:Browser,base:string) {
   await page.getByRole('heading',{name:'Claude Egress',exact:true}).waitFor();
   assert.match(await panel.locator('.domain-outcome').innerText(),/Check failed/);
   await panel.getByRole('button',{name:'Check again',exact:true}).waitFor();
-  return 7;
+  assert.equal(await page.getByRole('heading',{name:/^(DMIT|Webshare)$/}).count(),0);
+  await page.getByRole('button',{name:'Install Skill',exact:true}).waitFor();
+  return 8;
  } finally {await context.close();}
 }

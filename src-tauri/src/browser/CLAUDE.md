@@ -13,7 +13,7 @@ launch.rs: 已持有浏览器互斥锁时复用的同步启动核心；身份联
 workspace_tests.rs: 临时数据库清理前明确释放句柄以兼容 Windows；Cookie/缓存/种子隔离、手动换指纹持久化、旧资料保留及恢复阻断；迁移配置保留手动种子、全新目录只含配置/owner、拒绝覆盖且当前 Cookie/选择不变。
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 
-dns.rs: A 不触发测试域名；固定 Net.Coffee 结果/归属地接口，复用显式代理或当前系统代理、不回退直连，不伪造 Origin/Referer/Cookie。每会话独立随机轮次、两分钟过期、最多三次取数与一次在途、16 个解析器/32 KiB 上限。server.rs 的 dns/start 与 dns/result 仍需当前回环令牌并在回传前复核轮次；旧身份结果不外送。
+dns.rs: A 不触发测试域名；固定 Net.Coffee 结果/归属地接口，复用显式代理或当前系统代理、不回退直连，不伪造 Origin/Referer/Cookie。每会话独立随机轮次、两分钟过期、最多三次取数与一次在途、16 个解析器/32 KiB 上限。server.rs 的 dns/start 与 dns/result 仍需当前回环令牌并在回传前复核轮次；旧身份结果不外送。测试服务器显式清除 Windows accept 继承的非阻塞模式，延迟请求头回归保留读取超时。
 
 doh.rs：旧配置默认沿用，不触碰原有 Local State；指定模式在当前资料写 secure 和单个模板，CCBaga-DNS.json 只记录首次接管前两项，切回恢复并清除记录。仅已有关闭 B 的偏好应用路径调用，损坏/链接拒绝覆盖。不修改系统或代理上游；代理侧解析、启动解析及策略覆盖不承诺受控。
 

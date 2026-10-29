@@ -1,6 +1,7 @@
 // [INPUT]: 会话独立随机 token、B 触发的 Net.Coffee DNS 记录、配置/系统代理。
 // [OUTPUT]: 有界解析器 IP/归属地与真实失败；每轮最多三次取数、一次在途、两分钟过期。
 // [POS]: A 只读固定 HTTPS 结果服务，不触发 DNS 测试，不伪造来源/携带 Cookie，不回退直连。
+// 测试服务器显式清除 Windows 继承的非阻塞模式，覆盖延迟请求头读取。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use serde::Serialize;
 use serde_json::Value;
@@ -159,6 +160,8 @@ mod tests {
             let mut requests=Vec::new();let deadline=Instant::now()+Duration::from_secs(10);
             while requests.len()<count && Instant::now()<deadline {
                 let (mut stream,_)=match listener.accept(){Ok(s)=>s,Err(e) if e.kind()==std::io::ErrorKind::WouldBlock=>{std::thread::sleep(Duration::from_millis(5));continue;},Err(e)=>panic!("{e}")};
+                // Windows accept 继承监听 socket 的非阻塞属性；读取超时不会切换该模式。
+                stream.set_nonblocking(false).unwrap();
                 stream.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
                 let mut raw=Vec::new();while !raw.ends_with(b"\r\n\r\n"){let mut b=[0u8];stream.read_exact(&mut b).unwrap();raw.push(b[0]);}
                 let request=String::from_utf8(raw).unwrap();
@@ -171,6 +174,23 @@ mod tests {
             assert_eq!(requests.len(),count);requests
         });
         (base,handle)
+    }
+    #[test]
+    fn mock_server_waits_for_delayed_request_headers() {
+        use std::io::{Read,Write};
+        let (base,server)=mock_server(1,|_|(200,"ok".into(),vec![]));
+        let mut client=std::net::TcpStream::connect(base.trim_start_matches("http://")).unwrap();
+        client.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+        std::thread::sleep(Duration::from_millis(100));
+        let request="GET /delayed HTTP/1.1\r\nHost: localhost\r\n\r\n";
+        let sent=client.write_all(request.as_bytes());
+        let mut response=String::new();
+        let read=client.read_to_string(&mut response);
+        let requests=server.join().expect("mock server must wait for request bytes");
+        sent.unwrap();read.unwrap();
+        assert_eq!(requests,vec![request.to_string()]);
+        assert!(response.starts_with("HTTP/1.1 200 "));
+        assert!(response.ends_with("ok"));
     }
     #[test]
     fn native_reader_uses_only_result_and_geo_endpoints_and_keeps_partial_geo_failures() {

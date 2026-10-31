@@ -1,6 +1,6 @@
 // [INPUT]: macOS 默认 Claude 桌面索引、正文消息标识/时间及原生回退记录。
 // [OUTPUT]: 自动跟进明确后继；分叉返回有版本校验的选择，保存旧索引与正文，不复制授权/任务。
-// [POS]: 显式可选共享；调用方持锁并检查客户端停止，关闭后不撤销已复制入口。
+// [POS]: 显式可选共享；调用方持锁并检查客户端停止，临时文件落盘关闭后提交，关闭共享不撤销已复制入口。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use super::private;
 use serde::{Deserialize, Serialize};
@@ -366,6 +366,7 @@ fn sync_at_selected(home: &Path, root: &Path, choices: &[Selection], check: impl
             let result = (|| {
                 let mut file = private::create(&temp)?;
                 file.write_all(&bytes).and_then(|_|file.sync_all()).map_err(|_| invalid())?;
+                drop(file); // Windows private handles exclude FILE_SHARE_DELETE; close before rename.
                 check()?;
                 if let Some(expected)=expected {
                     if read(&path)?!=expected { return Err(invalid()); }

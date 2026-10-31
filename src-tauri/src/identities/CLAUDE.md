@@ -42,4 +42,4 @@ login.rs 登录进程检查保留既有 CLI/App 退出条件，错误列明最�
 login.rs 官方授权地址按域名/路径组合校验，补充本机2.1.307使用的 https://claude.com/cai/oauth/authorize；保留历史官方地址、HTTPS、PKCE、本机回调和重复参数拒绝，测试使用真实地址结构与合成state/challenge。
 
 desktop_sessions.rs: macOS 默认 Claude 的可选本地会话同步；共享默认关闭，补齐入口和层级。不同正文版本读取消息 UUID/时间，完整消息后继或明确回退且旧分支未再写入时自动跟进；真正分叉/无法确认前后继时先返回选择，不改身份。选择绑定索引与正文摘要，资料变化须重新选择。同步 cliSessionId、priorCliSessionIds、rewindEdges、transcriptCuts 等窄续聊字段，保留目标权限、标题、已脱离关系；不复制登录、定时任务或会话授权。替换前把完整旧索引保存在对应账号目录的私有 .baga-history，正文不改。停止检查、源/目标复核和部分成功计数保持；大于 128 MiB 或无法读取的待比较正文不自动裁决。
-desktop_sessions_tests.rs: 隔离验证正常回退与严格消息后继、双向分叉/取消/过期选择、旧索引和正文保留、选择后真实 Store 切换、权限/层级/链接/进程及部分失败重试。replay_desktop_metadata_fixture 是显式指定无正文元数据样本的忽略测试，仅读指定样本并写入隔离 Fixture，不操作真实账号。
+desktop_sessions_tests.rs: 夹具项目路径来自平台原生临时目录；隔离验证正常回退与严格消息后继、双向分叉/取消/过期选择、旧索引和正文保留、选择后真实 Store 切换、权限/层级/链接/进程及部分失败重试。replay_desktop_metadata_fixture 是显式指定无正文元数据样本的忽略测试，仅读指定样本并写入隔离 Fixture，不操作真实账号。

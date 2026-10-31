@@ -1,4 +1,4 @@
-// [INPUT]: 隔离账号目录、合成索引/消息和显式元数据回放样本。
+// [INPUT]: 隔离账号目录、平台原生绝对项目路径、合成索引/消息和显式元数据回放样本。
 // [OUTPUT]: 共享默认关闭、白名单、既有字段保留/IPC taskId 补齐、正常后继自动跟进、分叉选择及过期拒绝、冲突/脱离/链接/进程拒绝与切换保留回归。
 // [POS]: 不读取真实资料，不运行或终止真实客户端。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -13,7 +13,8 @@ fn setup() -> (Fixture,PathBuf,PathBuf,PathBuf) {
     let f=Fixture::new(); let root=f.home.join("Library/Application Support/Claude/claude-code-sessions");
     let a=root.join(A).join(A); let b=root.join(B).join(B);
     private::directory(&a).unwrap();private::directory(&b).unwrap();
-    let data=serde_json::json!({"sessionId":ID,"cliSessionId":CLI,"cwd":"/fixture/project","originCwd":"/fixture/project","createdAt":100,"lastActivityAt":200,"title":"Test","permissionMode":"bypassPermissions","sessionPermissionUpdates":[{"type":"addRules"}],"remoteMcpServersConfig":{"secret":"do-not-copy"},"alwaysAllowedReasons":["unsafe"],"envScopeId":"old-account","bridgeSessionId":"old-bridge","armedWorkAtQuit":true});
+    let project=f.home.join("project");assert!(project.is_absolute());
+    let data=serde_json::json!({"sessionId":ID,"cliSessionId":CLI,"cwd":project,"originCwd":project,"createdAt":100,"lastActivityAt":200,"title":"Test","permissionMode":"bypassPermissions","sessionPermissionUpdates":[{"type":"addRules"}],"remoteMcpServersConfig":{"secret":"do-not-copy"},"alwaysAllowedReasons":["unsafe"],"envScopeId":"old-account","bridgeSessionId":"old-bridge","armedWorkAtQuit":true});
     private::write(&a.join(format!("{ID}.json")),&serde_json::to_vec(&data).unwrap()).unwrap();
     private::write(&a.join("scheduled-tasks.json"),b"[]").unwrap();
     private::write(&b.join("scheduled-tasks.json"),b"[1]").unwrap();
@@ -40,8 +41,9 @@ fn setup() -> (Fixture,PathBuf,PathBuf,PathBuf) {
 }
 #[test] fn conflicts_and_running_clients_do_not_write() {
     let(f,root,a,b)=setup();assert!(sync_at(&f.home,&root,||Err("running".into())).is_err());assert!(!b.join(format!("{ID}.json")).exists());
-    let mut v=read(&a.join(format!("{ID}.json"))).unwrap();v["cwd"]="/other".into();private::write(&b.join(format!("{ID}.json")),&serde_json::to_vec(&v).unwrap()).unwrap();
-    assert!(sync_at(&f.home,&root,||Ok(())).is_err());assert_eq!(read(&b.join(format!("{ID}.json"))).unwrap()["cwd"],"/other");
+    let other=serde_json::json!(f.home.join("other-project"));
+    let mut v=read(&a.join(format!("{ID}.json"))).unwrap();v["cwd"]=other.clone();private::write(&b.join(format!("{ID}.json")),&serde_json::to_vec(&v).unwrap()).unwrap();
+    let error=sync_at(&f.home,&root,||Ok(())).unwrap_err();assert!(error.contains("项目路径不同"));assert_eq!(read(&b.join(format!("{ID}.json"))).unwrap()["cwd"],other);
 }
 #[cfg(unix)]
 #[test] fn linked_destination_is_rejected() {

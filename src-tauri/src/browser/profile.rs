@@ -1,5 +1,5 @@
 // [INPUT]: 宿主独立资料目录、原生进程核验与已验证配置。
-// [OUTPUT]: 浏览资料占用保护（原生状态缺字段拒绝，不按未运行处理）、偏好更新与当前资料严格 DoH/原值恢复、缓存/站点清理及用户显式确认的完整资料重置；全量预检后按实际删除项目报告 n/N。
+// [OUTPUT]: 浏览资料占用保护（退出时有界等待、连续确认空闲，未知不当作已退出）、偏好更新与当前资料严格 DoH/原值恢复、缓存/站点清理及用户显式确认的完整资料重置；全量预检后按实际删除项目报告 n/N。
 // [POS]: 当前绑定 user-data-dir 的文件边界；完整重置含所有子 Profile 与密码密钥，仅允许 unlink 当前用户的根级 Chromium 崩溃锁，拒绝其他链接/外部所有者，不访问系统钥匙串或其他身份。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 #[cfg(target_os = "linux")]
@@ -33,13 +33,57 @@ pub fn running(profile: &Path) -> Result<bool, String> {
 pub fn quit(profile: &Path) -> Result<(), String> {
     let path = CString::new(profile.to_string_lossy().as_bytes()).map_err(|_| "资料路径无效。")?;
     let _: Value = decode(unsafe { rf_browser_quit(path.as_ptr()) })?;
-    for _ in 0..100 {
-        if !running(profile)? {
-            return Ok(());
-        }
+    wait_for_exit(|| running(profile), || {
         std::thread::sleep(std::time::Duration::from_millis(50));
+    })
+}
+fn wait_for_exit(
+    mut probe: impl FnMut() -> Result<bool, String>,
+    mut pause: impl FnMut(),
+) -> Result<(), String> {
+    let mut idle = 0;
+    let mut last_error = None;
+    for _ in 0..100 {
+        match probe() {
+            Ok(false) => {
+                idle += 1;
+                if idle >= 3 {
+                    return Ok(());
+                }
+            }
+            Ok(true) => { idle = 0; last_error = None; }
+            Err(error) => { idle = 0; last_error = Some(error); }
+        }
+        pause();
     }
-    Err("浏览器仍在运行，请保存任务并关闭浏览器窗口。".into())
+    Err(last_error.unwrap_or_else(|| "浏览器仍在运行或退出尚未确认，请保存任务并关闭浏览器窗口。".into()))
+}
+
+#[cfg(test)]
+mod exit_tests {
+    use super::wait_for_exit;
+
+    #[test]
+    fn shutdown_waits_through_orphan_helpers_and_a_transient_empty_scan() {
+        let mut states = [Ok(true), Ok(false), Err("orphan helper".into()), Ok(true),
+            Ok(false), Ok(false), Ok(false)].into_iter();
+        let mut reads = 0;
+        assert!(wait_for_exit(|| { reads += 1; states.next().unwrap() }, || {}).is_ok());
+        assert_eq!(reads, 7, "must not report exit during a temporary empty scan");
+    }
+
+    #[test]
+    fn shutdown_unknown_or_busy_never_becomes_success() {
+        assert_eq!(wait_for_exit(|| Err("unknown profile".into()), || {}).unwrap_err(), "unknown profile");
+        assert!(wait_for_exit(|| Ok(true), || {}).is_err());
+        let mut reads = 0;
+        assert!(wait_for_exit(|| { reads += 1; Ok(reads <= 99) }, || {}).is_err());
+    }
+
+    #[test]
+    fn shutdown_already_stopped_still_succeeds() {
+        assert!(wait_for_exit(|| Ok(false), || {}).is_ok());
+    }
 }
 pub fn check_path(root: &Path, path: &Path) -> Result<(), String> {
     if !path.starts_with(root) {

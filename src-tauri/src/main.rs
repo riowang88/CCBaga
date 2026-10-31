@@ -1,5 +1,5 @@
 // [INPUT]: 跨平台原生边界、Tauri 生命周期/custom-protocol、身份/清理/浏览器/系统命令与官方签名更新、重启、Rust 原生文件选择插件。
-// [OUTPUT]: CCBaga-A 窗口/托盘、身份与一次性文件选择迁移命令；文件路径留在原生状态，不开放通用 WebView 文件能力。
+// [OUTPUT]: CCBaga-A 窗口/托盘、身份、显式桌面会话共享与一次性文件选择迁移命令；文件路径留在原生状态，不开放通用 WebView 文件能力。
 // [POS]: 应用编排层；不注册翻译快捷键，不读取翻译设置或 API 密钥。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
@@ -149,6 +149,7 @@ fn main() {
             identities::identities_save,
             identities::association::identities_associate,
             identities::identities_switch,
+            identities::identities_sync_desktop_sessions,
             identities::identities_rename,
             identities::identities_delete,
             identities::portable::identities_transfer_pick,

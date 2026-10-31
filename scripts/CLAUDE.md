@@ -70,3 +70,5 @@ test-identity-regressions.ts: 隔离虚构 IPC 验证保留策略、本地槽位
 test-identity-regressions.ts 新增受控登录的显式确认/取消/结果与单端关联的目标、失败重试、无全端保存/停止调用回归，全部使用虚构 IPC。
 
 test-identity-regressions.ts 覆盖CLI/App名称、CLI订阅说明、登录前进程列表/未知/刷新为空，保留显式授权、取消和单端备份范围。
+
+test-desktop-sessions.ts: 虚构 IPC 验证默认关闭、开启保留历史/持久化、显式同步数量、失败与关闭后保留历史、英文显示；由 test-identities-ui.ts 调用。

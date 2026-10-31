@@ -1,6 +1,6 @@
 /**
  * [INPUT]: Node.js 标准管道、已锁定 playwright-core、固定引擎、Vite 与 tests/ 的虚构 Tauri IPC。
- * [OUTPUT]: 工牌、浏览器/网络与全清理确认、残留清理与真实 Channel 阶段动画的 DOM 验收，覆盖双语、默认取消及失败重扫。
+ * [OUTPUT]: 桌面会话共享开关/同步、工牌、浏览器/网络与全清理确认、残留清理与真实 Channel 阶段动画的 DOM 验收，覆盖双语、默认取消及失败重扫。
  * [POS]: 发布前无头行为回归；无截图、无真实账号/文件修改，不加载原生宿主，不允许外网请求。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -10,6 +10,7 @@ import {mkdtemp,mkdir,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {createServer} from 'vite';
 import {chromium} from 'playwright-core';
+import {testDesktopSessions} from './test-desktop-sessions.ts';
 import {testBrowserVerification} from './test-browser-verification.ts';
 import {testBrowserDoh} from './test-browser-doh.ts';
 import {testBrowserDns} from './test-browser-dns.ts';
@@ -34,6 +35,7 @@ try{browser=await chromium.launch({executablePath:process.env.CCBAGA_TEST_ENGINE
 catch(error){await server.close();await rm(temporary,{recursive:true,force:true});throw error;}
 let checks=0;
 try{
+ checks+=await testDesktopSessions(browser,base);
  const context=await browser.newContext({viewport:{width:1040,height:820},reducedMotion:'no-preference'});
  await context.route('**/*',route=>route.request().url().startsWith(base+'/')?route.continue():route.abort());
  const page=await context.newPage();page.setDefaultTimeout(10000);

@@ -1,5 +1,5 @@
 // [INPUT]: Cleaner 白名单、共享 Code 登录键常量、完整目录快照、用户保留策略与 JSON 配置。
-// [OUTPUT]: 受限身份目标、缺失历史备份的稳定路径验收、窄配置操作、保留策略与桌面身份元数据、进程结果和瞬态锁分类；不自动删除锁。
+// [OUTPUT]: 受限身份目标、桌面 OAuth 缓存的窄字段保存恢复、缺失历史备份的稳定路径验收、共享开启时保留历史的策略与桌面身份元数据、进程结果和瞬态锁分类；不自动删除锁。
 // [POS]: 身份保险库复用原有路径边界；不扫描项目源码、Shell 或系统代理配置。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use super::*;
@@ -48,7 +48,7 @@ fn definitions(root: &Path, policy: &Policy) -> Vec<Source> {
                         || t.path.file_name().is_some_and(|n| {
                             n.to_string_lossy().starts_with(".claude.json.backup")
                         }))))
-                && !(t.group == "history" && policy.history)
+                && !(t.group == "history" && policy.keeps("history"))
                 && !(t.group == "cache" && policy.cache)
         })
         .map(|t| Source {
@@ -79,15 +79,22 @@ fn definitions(root: &Path, policy: &Policy) -> Vec<Source> {
     {
         source.keys = credential_keys(policy);
     }
-    if !policy.mcp {
-        let roots: std::collections::BTreeSet<_> = result
+    let desktop_roots: std::collections::BTreeSet<_> = result
             .iter()
             .filter(|s| {
                 s.category == "desktop" && s.path.file_name().is_some_and(|n| n == "Local Storage")
             })
             .filter_map(|s| s.path.parent().map(Path::to_path_buf))
             .collect();
-        for desktop in roots {
+    for desktop in desktop_roots {
+        // The app's Code OAuth cache is encrypted by Electron safeStorage.
+        // Preserve it with the existing Desktop login/keychain snapshot, not personal settings.
+        result.push(Source {
+            path: desktop.join("config.json"),
+            category: "desktop".into(),
+            keys: vec!["oauth:tokenCache".into()],
+        });
+        if !policy.mcp {
             result.push(Source {
                 path: desktop.join("claude_desktop_config.json"),
                 category: "mcp".into(),
@@ -201,6 +208,7 @@ pub(crate) fn allowed(root: &Path, source: &Source) -> bool {
     let known = all.iter().any(|t| {
         t.path == source.path
             && t.category == source.category
+            && !(t.category == "desktop" && !t.keys.is_empty() && source.keys.is_empty())
             && ((source.path == root.join(".claude.json")
                 && source.category == "account"
                 && !source.keys.is_empty()
@@ -338,7 +346,7 @@ pub(crate) fn account_key(key: &str) -> bool {
 // Missing material is distinct from unreadable/unsafe material. Never read Desktop databases.
 pub(crate) fn desktop_material(root: &Path) -> Result<bool, String> {
     let mut present = false;
-    for source in definitions(root, &Policy::default()).into_iter().filter(|s| s.category == "desktop") {
+    for source in definitions(root, &Policy::default()).into_iter().filter(|s| s.category == "desktop" && s.keys.is_empty()) {
         match std::fs::symlink_metadata(&source.path) {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
             Err(_) => return Err("桌面资料状态未知。".into()),

@@ -1,6 +1,6 @@
 /**
  * [INPUT]: Tauri 官方 mockIPC、真实身份/浏览器组件与虚构的内存状态。
- * [OUTPUT]: 40 个虚构身份、残留清单、可显式释放的 IPC 与官方 Channel 事件，供无头浏览器验证真实进度/失败；browser 模式检查仅缓存与全清理确认，不触碰磁盘资料。
+ * [OUTPUT]: 桌面会话共享计数与 40 个虚构身份、残留清单、可显式释放的 IPC 与官方 Channel 事件，供无头浏览器验证真实进度/失败；browser 模式检查仅缓存与全清理确认，不触碰磁盘资料。
  * [POS]: 独立测试入口；没有原生命令、真实目录、账号或网络，生产 rollup 不包含此入口。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -19,7 +19,7 @@ import '../src/style.css';
 const id=(number:number)=>number.toString(16).padStart(32,'0');
 const user={present:true,display_name:'Fixture user',email:'fixture@example.invalid',organization:'Fixture team',plan:'Pro',auth_status:'local_unexpired',expires_at:Date.now()+3600000,unavailable:false};
 const summaries=Object.fromEntries(Array.from({length:40},(_,n)=>[id(n+1),{email:`user${n+1}@example.invalid`,organization:`Org ${n+1}`,plan:n%2===0?'Max 20x':'Pro',auth_status:'local_unexpired',expires_at:Date.now()+3600000}]));
-const state:IdentityState={browser:{enabled:true,bound_ids:[]},browser_warning:null,active:id(1),recovery:null,running:true,processes:[{pid:4201,workspace:null,entrypoint:'VS Code'}],processes_truncated:false,current:{...user},summaries,records:Array.from({length:40},(_,n)=>({id:id(n+1),name:`Identity ${n+1}`,saved_at:1780000000000+n,bytes:2048,policy:{...defaultPolicy}}))};
+const state:IdentityState={desktop_sessions_supported:true,browser:{enabled:true,bound_ids:[]},browser_warning:null,active:id(1),recovery:null,running:true,processes:[{pid:4201,workspace:null,entrypoint:'VS Code'}],processes_truncated:false,current:{...user},summaries,records:Array.from({length:40},(_,n)=>({id:id(n+1),name:`Identity ${n+1}`,saved_at:1780000000000+n,bytes:2048,policy:{...defaultPolicy}}))};
 const browserMode=new URLSearchParams(location.search).get('panel')==='browser';
 const browserState:BrowserState={ui_language:'zh',exit_services:[],region:null,config:{seed:123,proxy:'',follow_machine:true,language:'en-US',timezone:'America/New_York',native_graphics:true},machine:{platform:'macos',version:'fixture',cores:8,timezone:'America/New_York',languages:['en-US'],locale:'en_US',locale_country:'US',location_enabled:false,timezones:['America/New_York']},engine_version:'fixture',engine_ready:true,running:false,profile:'/fixture/profiles/current',identity_linked:true,cache:[],cache_error:'',report:null,report_received_at:null,machine_exit:null,checks:[]};
 const commands:{command:string;args:any}[]=[];
@@ -35,7 +35,7 @@ const residueItems:Scan['items']=[
 type Pending={command:string;args:any;resolve:(value:unknown)=>void;reject:(error:Error)=>void;index:number};
 const deferred=new Set<string>(),pending:Pending[]=[];
 const transfer={cancel:false,failPick:false,failAfterImport:false};
-const fixture={commands,state,residue,transfer,browser:browserState,browserBusy:false,get identityReads(){return identityReads;},get pending(){return pending.map(row=>row.command);},language:setLocale,setFailure:(command:string)=>{fail=command;},recover:()=>{state.recovery=id(1);},
+const fixture={commands,state,residue,transfer,sessionConflict:false,browser:browserState,browserBusy:false,get identityReads(){return identityReads;},get pending(){return pending.map(row=>row.command);},language:setLocale,setFailure:(command:string)=>{fail=command;},recover:()=>{state.recovery=id(1);},
  defer:(...names:string[])=>{for(const name of names)deferred.add(name);},
  emitProgress:(command:string,event:Progress)=>{
   const entry=pending.find(row=>row.command===command);if(!entry)throw Error(`No pending command: ${command}`);
@@ -79,6 +79,11 @@ function execute(command:string,args:any){
  if(command==='identities_associate'){state.summaries[args.id].client_checks={...state.summaries[args.id].client_checks,[args.client]:{source:args.client==='cli'?'local_metadata':'user_confirmed',checked_at:Date.now()}};return structuredClone(state);}
  if(command==='identities_login')return {email:args.email,organization:'Fixture team',subscription:'pro'};
  if(command==='identities_login_cancel')return;
+ if(fixture.sessionConflict&&['identities_sync_desktop_sessions','identities_switch'].includes(command)) {
+  if(args.sessionChoices?.some((c:any)=>c.session==='local_fixture.json'&&c.revision==='fixture-revision'&&c.cli_id==='branch-b'))fixture.sessionConflict=false;
+  else throw Error('DESKTOP_SESSION_CHOICE:'+JSON.stringify({session:'local_fixture.json',revision:'fixture-revision',title:'Fixture conversation',options:[{cli_id:'branch-a',messages:12,last_message_at:'2026-10-30T00:00:00.000Z'},{cli_id:'branch-b',messages:15,last_message_at:'2026-10-31T00:00:00.000Z'}]}));
+ }
+ if(command==='identities_sync_desktop_sessions')return {accounts:2,added:3,repaired:2,skipped:1};
  if(command==='identities_read'){identityReads++;return structuredClone(state);}
  if(command==='claude_residue_scan'){
   residue.scans++;

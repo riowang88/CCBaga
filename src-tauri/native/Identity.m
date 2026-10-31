@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 用户主动确认身份暂存/恢复、Security 与默认 Claude Code/Desktop 凭据服务。
- * [OUTPUT]: 仅原生内部的凭据快照与恢复；正文不传 UI、不经命令列或网络。
+ * [OUTPUT]: 仅原生内部的凭据快照与恢复；相同正文不重写，避免重置签名分区；正文不传 UI/argv/网络。
  * [POS]: 身份保险库的 macOS 凭据适配，独立于清理器的只读属性扫描；保留系统授权。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -52,6 +52,9 @@ char *rf_identity_remove(const char *json){
         if(![row[(__bridge id)kSecAttrService] isEqual:saved[@"service"]]||![row[(__bridge id)kSecAttrAccount] isEqual:saved[@"account"]]||![row[(__bridge id)kSecValueData] isEqual:expected])return failure(errSecParam);
         if(saved[@"remaining"]){
             NSData *remaining=[[NSData alloc]initWithBase64EncodedString:saved[@"remaining"] options:0];if(!remaining)return failure(errSecParam);
+            // Even writing identical bytes resets modern keychain partition grants.
+            // The exact live value was checked above; retain the item without a write.
+            if([remaining isEqual:expected])continue;
             status=SecItemUpdate((__bridge CFDictionaryRef)@{(__bridge id)kSecValuePersistentRef:ref},(__bridge CFDictionaryRef)@{(__bridge id)kSecValueData:remaining});
             if(status!=errSecSuccess)return failure(status);continue;
         }

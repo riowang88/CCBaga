@@ -8,3 +8,5 @@ identities-fixture.tsx: 真实 IdentityPanel 或 query panel=browser 的 Browser
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 
 身份夹具新增受控登录/取消和单端更新的虚构返回值，延续可延迟/失败 IPC；不调用真实认证或钥匙串。
+
+identities-fixture.tsx 同时模拟 macOS 会话共享能力及合成同步计数，原生文件与真实客户端不参与。

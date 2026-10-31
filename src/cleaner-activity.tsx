@@ -1,6 +1,6 @@
 /**
  * [INPUT]: Tauri 单次调用的有序进度流和清理、CLI 安装、系统和浏览器页面的操作结果与共享 YAML 文案。
- * [OUTPUT]: 本次活动状态、真实阶段/数量与身份卡片下的事件驱动动画、默认收起的日志；未知总量无百分比，原始消息在呈现时翻译。
+ * [OUTPUT]: 本次活动状态、桌面会话共享等真实阶段/数量与身份卡片下的事件驱动动画、默认收起的日志；未知总量无百分比，原始消息在呈现时翻译。
  * [POS]: 本地操作的观察层；调用通道隔离不同操作，不制造进度或改变清理范围。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -28,7 +28,7 @@ export type Activity = {
     warning?: boolean;
 };
 const labels: Record<string, string> = { delete:'直接删除',archive:'身份暂存',switch:'身份切换',identity:'身份管理',validate: '检查', clean: '逐项清理', verify: '复查', scan: '深度扫描', stop: '进程检查', system: '应用设置', browser: '浏览器操作', cli: 'CLI 安装', done: '结果' };
-const phaseLabels:Record<string,string>={...labels,login:'CLI 官方登录',transfer_validate:'验收迁移包',transfer_archive:'写入迁移包',transfer_auth:'认证迁移包',transfer_commit:'保存导入身份',identity:'准备身份操作',stop:'结束 Claude 进程',archive:'压缩暂存',compress:'写入加密归档',verify_archive:'验证身份归档',clear:'清空当前工作区',credentials:'处理登录凭据',restore:'恢复目标身份',commit:'保存身份状态',rollback:'恢复原有状态'};
+const phaseLabels:Record<string,string>={...labels,login:'CLI 官方登录',transfer_validate:'验收迁移包',transfer_archive:'写入迁移包',transfer_auth:'认证迁移包',transfer_commit:'保存导入身份',share_sessions:'共享桌面会话',identity:'准备身份操作',stop:'结束 Claude 进程',archive:'压缩暂存',compress:'写入加密归档',verify_archive:'验证身份归档',clear:'清空当前工作区',credentials:'处理登录凭据',restore:'恢复目标身份',commit:'保存身份状态',rollback:'恢复原有状态'};
 export function useCleanupActivity() {
     const [state, setState] = useState<Activity | null>(null);
     const sequence = useRef(0);

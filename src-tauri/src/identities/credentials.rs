@@ -1,5 +1,5 @@
 // [INPUT]: 原生默认凭据快照、用户 MCP/插件保留策略与 base64/JSON。
-// [OUTPUT]: 仅身份字段变换的钥匙串写入协议；保留当前共享 MCP/插件秘密。
+// [OUTPUT]: 仅身份字段变换的钥匙串写入协议；保留当前共享 MCP/插件秘密；有对应目标的 Desktop 条目原地替换以保留本机既有授权。
 // [POS]: 保险库和 macOS Security 桥之间的秘密边界，不进入 GUI 或日志。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use super::Policy;
@@ -37,6 +37,21 @@ pub fn clear(items: &[Value], policy: &Policy) -> Result<Vec<Value>, String> {
         })
         .collect()
 }
+pub fn clear_for_restore(items: &[Value], target: &[Value], policy: &Policy) -> Result<Vec<Value>, String> {
+    let mut cleared = clear(items, policy)?;
+    for item in &mut cleared {
+        if item["service"] == "Claude Safe Storage"
+            && item["account"].is_string()
+            && target.iter().any(|next| next["service"] == item["service"] && next["account"] == item["account"])
+        {
+            // Keep the verified live item until restore performs its conditional data update.
+            // Deleting/recreating it discards the user's existing application ACL. No ACL is
+            // imported from the archive, and empty identities still use ordinary deletion.
+            item["remaining"] = item["data"].clone();
+        }
+    }
+    Ok(cleared)
+}
 pub fn restore(items: &[Value], live: &[Value], policy: &Policy) -> Result<Vec<Value>, String> {
     items
         .iter()
@@ -70,6 +85,32 @@ pub fn restore(items: &[Value], live: &[Value], policy: &Policy) -> Result<Vec<V
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn desktop_transition_preserves_only_matching_live_item_until_restore() {
+        let row = |account: &str, secret: &str| serde_json::json!({
+            "service":"Claude Safe Storage", "account":account, "data":STANDARD.encode(secret), "reference":"live-ref"
+        });
+        let a = row("Claude", "A-key");
+        let b = row("Claude", "B-key");
+        let p = Policy::default();
+        let plan = clear_for_restore(&[a.clone()], &[b.clone()], &p).unwrap();
+        assert_eq!(plan[0]["remaining"], a["data"]);
+        assert_eq!(plan[0]["reference"], a["reference"]);
+        let restore = restore(&[b.clone()], &[a.clone()], &p).unwrap();
+        assert_eq!(restore[0]["data"], b["data"]);
+        assert_eq!(restore[0]["expected"], a["data"]);
+        for target in [vec![], vec![row("other", "B-key")]] {
+            assert!(clear_for_restore(&[a.clone()], &target, &p).unwrap()[0].get("remaining").is_none());
+        }
+        assert!(clear(&[a], &p).unwrap()[0].get("remaining").is_none());
+    }
+
+    #[test]
+    fn desktop_transition_does_not_change_cli_clearing() {
+        let code = serde_json::json!({"service":"Claude Code", "account":"Claude", "data":STANDARD.encode("api-key")});
+        let p = Policy::default();
+        assert_eq!(clear_for_restore(&[code.clone()], &[code.clone()], &p).unwrap(), clear(&[code], &p).unwrap());
+    }
     #[test]
     fn changing_identity_preserves_current_mcp_and_plugin_secrets() {
         let row = |oauth: &str, mcp: &str| serde_json::json!({"service":"Claude Code-credentials","account":"fixture","data":encoded(&serde_json::json!({"claudeAiOauth":{"accessToken":oauth},"mcpOAuth":mcp,"pluginSecrets":"keep-plugin"}))});

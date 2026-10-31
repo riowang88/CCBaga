@@ -87,6 +87,7 @@ jobs:
           bun run test:identities
           identity_test="$RUNNER_TEMP/ccbaga-identity-test"
           clang -fobjc-arc -framework Foundation -framework Security src-tauri/native/IdentityTests.m -o "$identity_test"
+          codesign --force --sign - "$identity_test"
           "$identity_test"
           rm -f "$identity_test"
           bun scripts/test-skill-install.ts

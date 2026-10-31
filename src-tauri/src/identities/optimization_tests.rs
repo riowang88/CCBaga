@@ -1,5 +1,5 @@
 // [INPUT]: 虚构 UUID/组织/凭据、隔离文件系统和归档格式。
-// [OUTPUT]: A/B 往返去重、已清除历史备份恢复与路径边界、刷新凭据覆盖、跨组织隔离、旧版迁移与覆盖故障、跨平台账号隔离、个人设置和共享代理保留回归。
+// [OUTPUT]: A/B 往返去重、桌面 OAuth 缓存窄字段往返/回滚/旧档案兼容、已清除历史备份恢复与路径边界、刷新凭据覆盖、跨组织隔离、旧版迁移与覆盖故障、跨平台账号隔离、个人设置和共享代理保留回归。
 // [POS]: 账号匹配与不可变归档代次的离线证明，不读取真实用户数据。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use super::*;
@@ -60,6 +60,74 @@ impl Drop for Fixture {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.root);
     }
+}
+#[cfg(target_os = "macos")]
+#[test]
+fn desktop_oauth_cache_follows_identity_without_replacing_personal_config() {
+    let f = Fixture::new();
+    let path = "Library/Application Support/Claude/config.json";
+    let r = Reporter::channel(None);
+    let p = Policy::default();
+    let mut s = store::Store::open(&f.vault, &f.home).unwrap();
+    let read = || -> serde_json::Value {
+        serde_json::from_slice(&fs::read(f.home.join(path)).unwrap()).unwrap()
+    };
+    f.login("A", "org", "a");
+    f.write(path, br#"{"oauth:tokenCache":"encrypted-A","theme":"dark","otherSecret":"keep"}"#);
+    s.switch("empty", "A", &p, &r).unwrap();
+    let a = s.records()[0].id.clone();
+    assert!(read().get("oauth:tokenCache").is_none());
+    assert_eq!(read()["otherSecret"], "keep");
+    f.login("B", "org", "b");
+    f.write(path, br#"{"oauth:tokenCache":"encrypted-B","theme":"light","otherSecret":"keep-new"}"#);
+    s.switch(&a, "B", &p, &r).unwrap();
+    assert_eq!(read()["oauth:tokenCache"], "encrypted-A");
+    assert_eq!(read()["theme"], "light");
+    assert_eq!(read()["otherSecret"], "keep-new");
+    let b = s.records().into_iter().find(|v| v.id != a).unwrap().id;
+    s.fail_after_clear = true;
+    assert!(s.switch(&b, "A", &p, &r).is_err());
+    assert_eq!(read()["oauth:tokenCache"], "encrypted-A");
+    s.fail_after_clear = false;
+    s.switch(&b, "A", &p, &r).unwrap();
+    assert_eq!(read()["oauth:tokenCache"], "encrypted-B");
+    assert_eq!(read()["theme"], "light");
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn desktop_oauth_cache_allowlist_rejects_whole_config_and_other_keys() {
+    let f = Fixture::new();
+    let source = cleaner::identity::Source {
+        path: f.home.join("Library/Application Support/Claude/config.json"),
+        category: "desktop".into(), keys: vec!["oauth:tokenCache".into()],
+    };
+    assert!(cleaner::identity::allowed(&f.home, &source));
+    for keys in [vec![], vec!["theme".into()], vec!["oauth:tokenCache".into(), "theme".into()]] {
+        assert!(!cleaner::identity::allowed(&f.home, &cleaner::identity::Source { keys, ..source.clone() }));
+    }
+    f.write("Library/Application Support/Claude/config.json", b"{}");
+    assert!(cleaner::identity::sources_for_client(&f.home, &Policy::default(), true).unwrap().is_empty());
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn desktop_oauth_cache_missing_in_old_archive_does_not_keep_other_accounts_cache() {
+    let f = Fixture::new();
+    let path = "Library/Application Support/Claude/config.json";
+    let p = Policy::default();
+    let r = Reporter::channel(None);
+    let mut s = store::Store::open(&f.vault, &f.home).unwrap();
+    f.login("A", "org", "a");
+    f.write(path, br#"{"theme":"dark"}"#);
+    s.switch("empty", "old-A", &p, &r).unwrap();
+    let a = s.records()[0].id.clone();
+    f.login("B", "org", "b");
+    f.write(path, br#"{"oauth:tokenCache":"encrypted-B","theme":"light"}"#);
+    s.switch(&a, "B", &p, &r).unwrap();
+    let value: serde_json::Value = serde_json::from_slice(&fs::read(f.home.join(path)).unwrap()).unwrap();
+    assert_eq!(value, serde_json::json!({"theme":"light"}));
+    assert_eq!(f.token(), "a");
 }
 #[test]
 fn home_config_backups_restore_after_switch_removed_the_originals() {

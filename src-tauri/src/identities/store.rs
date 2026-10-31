@@ -1,5 +1,5 @@
 // [INPUT]: SQLite 目录、用户策略、白名单源、已验收归档代次、认证加密与平台凭据桥。
-// [OUTPUT]: 原地备份、稳定本地档案往返、同档案重选不回灌旧凭据或所选本地资料、回滚与真实进度；切换/恢复复查当前及目标 B 资料；已观察到的进程冲突锁存到本次操作结束，保留恢复记录；目录内链接按链接恢复，旧归档瞬态锁不恢复。
+// [OUTPUT]: 可选桌面会话共享、原地备份、本地档案往返及同档案重选保护、回滚与真实进度；同 service/account 的桌面钥匙串条目原地更新以保留本机授权；切换/恢复复查 B 资料、锁存进程冲突并保留恢复记录；目录内链接按链接恢复，旧归档瞬态锁不恢复。
 // [POS]: 身份的文件事务；SQLite 与文件系统由恢复日志协调，不能假装是同一原子事务。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use super::{
@@ -201,6 +201,20 @@ impl Store {
             super::credentials::clear(items, policy)?
         };
         native::identity_keys(&transformed, restore)
+    }
+    fn clear_keys_for_restore(
+        &self,
+        items: &[serde_json::Value],
+        target: &[serde_json::Value],
+        policy: &Policy,
+    ) -> Result<(), String> {
+        self.stopped()?;
+        #[cfg(test)]
+        if identity::root().ok().as_ref() != Some(&self.home) {
+            return Ok(());
+        }
+        let transformed = super::credentials::clear_for_restore(items, target, policy)?;
+        native::identity_keys(&transformed, false)
     }
     #[cfg(test)]
     pub(super) fn records(&self) -> Vec<Record> {
@@ -516,10 +530,22 @@ impl Store {
         policy: &Policy,
         reporter: &Reporter,
     ) -> Result<(), String> {
+        self.switch_with_sessions(target,name,policy,reporter,&[])
+    }
+    pub fn switch_with_sessions(
+        &mut self, target: &str, name: &str, policy: &Policy, reporter: &Reporter,
+        choices: &[super::desktop_sessions::Selection],
+    ) -> Result<(), String> {
         if self.db.get("recovery")?.is_some() {
             return Err("请先恢复未完成的身份切换。".into());
         }
         self.watch_browsers(&[target])?;
+        if policy.desktop_sessions {
+            let shared = super::desktop_sessions::sync_selected(&self.home, choices, || self.stopped())?;
+            let completed = shared.added + shared.repaired;
+            reporter.log("share_sessions", "ok", &format!("桌面会话共享：{} 个账号目录，新增 {} 个入口，更新 {} 个会话，跳过 {} 条不支持的记录。", shared.accounts, shared.added, shared.repaired, shared.skipped), completed, Some(completed));
+        }
+
         reporter.log("validate", "running", "正在核对当前身份。", 0, None);
         let live_key = super::catalog::live_key(&self.home, &self.key)?;
         reporter.log("validate", "ok", "当前本地身份已核对。", 1, Some(1));
@@ -616,12 +642,16 @@ impl Store {
             reporter.log(
                 "credentials",
                 "running",
-                "正在清除当前本地登录凭据。",
+                "正在准备切换本地登录凭据。",
                 0,
                 None,
             );
-            self.keys(&outgoing.manifest.credentials, false, policy)?;
-            reporter.log("credentials", "ok", "当前本地登录凭据已清除。", 1, Some(1));
+            self.clear_keys_for_restore(
+                &outgoing.manifest.credentials,
+                incoming.as_ref().map(|stage| stage.manifest.credentials.as_slice()).unwrap_or(&[]),
+                policy,
+            )?;
+            reporter.log("credentials", "ok", "本地登录凭据已准备切换。", 1, Some(1));
             if let Some(stage) = incoming.as_ref() {
                 self.restore(stage, &next, policy, reporter, "restore")?;
             }
@@ -666,7 +696,7 @@ impl Store {
                     self.clear(&current, reporter, "rollback")?;
                     self.clear(&next, reporter, "rollback")?;
                     let live = self.snapshot_keys()?;
-                    self.keys(&live, false, &outgoing.manifest.policy)?;
+                    self.clear_keys_for_restore(&live, &outgoing.manifest.credentials, &outgoing.manifest.policy)?;
                     self.restore(
                         &outgoing,
                         &current,
@@ -773,15 +803,15 @@ impl Store {
         reporter.log(
             "credentials",
             "running",
-            "正在清除待恢复工作区的登录凭据。",
+            "正在准备恢复本地登录凭据。",
             0,
             None,
         );
-        self.keys(&live, false, &outgoing.manifest.policy)?;
+        self.clear_keys_for_restore(&live, &outgoing.manifest.credentials, &outgoing.manifest.policy)?;
         reporter.log(
             "credentials",
             "ok",
-            "待恢复工作区的登录凭据已清除。",
+            "本地登录凭据已准备恢复。",
             1,
             Some(1),
         );

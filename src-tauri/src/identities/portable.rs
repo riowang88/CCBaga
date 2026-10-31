@@ -1,5 +1,5 @@
 // [INPUT]: 已认证本机身份归档、原生一次性文件选择、ring PBKDF2 与现有 AES-GCM/tar/Zstd 流。
-// [OUTPUT]: 密码保护的单身份 bagapack；同 OS 验收后重定位并重封存；拒绝本机 v2 链接归档且不跟随链接导出目标内容。
+// [OUTPUT]: 密码保护的单身份 bagapack；兼容默认关闭的桌面共享策略字段，同 OS 验收后重定位并重封存；拒绝本机 v2 链接归档且不跟随链接导出目标内容。
 // [POS]: 保险库的显式跨设备边界；不导出主密钥/SQLite，不切换身份或操作钥匙串，不迁移浏览器登录资料。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use super::{archive::{self, Manifest, Stage}, codec, compression, database::Record, private, store::{problem, Store}};
@@ -321,7 +321,7 @@ fn unpack(mut file: fs::File, password: &str, parent: &Path, reporter: &Reporter
                     let known = ["version", "id", "home", "platform", "policy", "sources", "credentials", "fingerprints", "account_key"];
                     if !value["manifest"].as_object().is_some_and(|m| m.keys().all(|key| known.contains(&key.as_str()))) { return Err(invalid()); }
                     if !value["manifest"]["sources"].as_array().is_some_and(|rows| rows.iter().all(|row| row.as_object().is_some_and(|row| row.keys().all(|key| ["path", "category", "keys"].contains(&key.as_str()))))) { return Err(invalid()); }
-                    if !value["manifest"]["policy"].as_object().is_some_and(|row| row.keys().all(|key| ["skills", "plugins", "mcp", "settings", "projects", "history", "cache"].contains(&key.as_str()))) { return Err(invalid()); }
+                    if !value["manifest"]["policy"].as_object().is_some_and(|row| row.keys().all(|key| ["skills", "plugins", "mcp", "settings", "projects", "history", "cache", "desktop_sessions"].contains(&key.as_str()))) { return Err(invalid()); }
                     let parsed: Metadata = serde_json::from_value(value).map_err(|_| invalid())?;
                     validate_metadata(&parsed)?;
                     metadata = Some(parsed);

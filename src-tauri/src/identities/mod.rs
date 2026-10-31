@@ -1,5 +1,5 @@
 // [INPUT]: SQLite 身份目录与脱敏认证元数据、加密压缩保险库、精确进程查询、Cleaner 事务锁和 Tauri 进度通道。
-// [OUTPUT]: 只读账号摘要、与账号匹配分离的本地选择、保存完整性回归、有界进程预览、保留选项和带真实进度的身份操作命令。
+// [OUTPUT]: 只读账号摘要、与账号匹配分离的本地选择、保存完整性回归、有界进程预览、可选桌面会话共享、保留选项和带真实进度的身份操作命令。
 // [POS]: GUI 身份管理的原生入口；刷新只读工作区、不回收暂存文件；不提供凭据读取、任意文件或网络接口。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 mod archive;
@@ -13,6 +13,7 @@ mod catalog;
 mod codec;
 mod compression;
 mod credentials;
+mod desktop_sessions;
 pub(crate) mod login;
 pub(crate) mod database;
 #[cfg(test)]
@@ -40,6 +41,7 @@ pub struct Policy {
     pub projects: bool,
     pub history: bool,
     pub cache: bool,
+    pub desktop_sessions: bool,
 }
 impl Default for Policy {
     fn default() -> Self {
@@ -51,6 +53,7 @@ impl Default for Policy {
             projects: true,
             history: false,
             cache: false,
+            desktop_sessions: false,
         }
     }
 }
@@ -64,6 +67,7 @@ impl Policy {
             projects: false,
             history: false,
             cache: false,
+            desktop_sessions: false,
         }
     }
     pub fn keeps(&self, category: &str) -> bool {
@@ -72,7 +76,7 @@ impl Policy {
             "plugins" => self.plugins,
             "mcp" => self.mcp,
             "settings" => self.settings,
-            "history" => self.history,
+            "history" => self.history || self.desktop_sessions,
             "cache" => self.cache,
             _ => false,
         }
@@ -80,6 +84,7 @@ impl Policy {
 }
 #[derive(Serialize)]
 pub struct State {
+    pub desktop_sessions_supported: bool,
     pub browser: browser_link::BrowserLink,
     pub browser_warning: Option<String>,
     pub records: Vec<database::Record>,
@@ -139,6 +144,7 @@ fn state(app: &tauri::AppHandle) -> Result<State, String> {
     let browser_profile_present = catalog::browser_profile_present(&vault_path, &db)?;
     let workspace_id = workspace_id.filter(|_| (current.present || browser_profile_present) && !current.unavailable);
     Ok(State {
+        desktop_sessions_supported: cfg!(target_os="macos"),
         browser: db.browser_link()?,
         browser_warning: app
             .state::<crate::browser::Browser>()
@@ -229,6 +235,7 @@ pub async fn identities_switch(
     current_name: String,
     policy: Policy,
     recover: bool,
+    session_choices: Option<Vec<desktop_sessions::Selection>>,
     on_progress: Channel<Progress>,
 ) -> Result<State, String> {
     let current_name = name(&current_name)?;
@@ -246,13 +253,13 @@ pub async fn identities_switch(
             if recover {
                 store.recover(&current_name, &reporter)?;
             } else {
-                store.switch(&target_id, &current_name, &policy, &reporter)?;
+                store.switch_with_sessions(&target_id, &current_name, &policy, &reporter,session_choices.as_deref().unwrap_or(&[]))?;
             }
             Ok(())
         })
         .and_then(|_| state(&worker));
         if let Err(e) = &result {
-            reporter.fail(e);
+            reporter.fail(if e.starts_with("DESKTOP_SESSION_CHOICE:") { "会话存在不同版本，请选择继续使用的版本；身份尚未切换。" } else { e });
         }
         result
     })
@@ -352,6 +359,20 @@ pub async fn identities_browser(
     .await
     .map_err(|_| "浏览器联动设置被中断，请刷新。".to_string())
     .and_then(|r| r);
+    cleaner.leave();
+    result
+}
+
+#[tauri::command]
+pub async fn identities_sync_desktop_sessions(app: tauri::AppHandle, session_choices: Option<Vec<desktop_sessions::Selection>>) -> Result<desktop_sessions::Report, String> {
+    let cleaner = app.state::<crate::cleaner::Cleaner>();
+    cleaner.enter()?;
+    let worker = app.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let db = database::Database::open(&vault(&worker)?)?;
+        if db.get("recovery")?.is_some() { return Err("请先恢复未完成的身份切换。".into()); }
+        desktop_sessions::sync_selected(&crate::cleaner::identity::root()?,session_choices.as_deref().unwrap_or(&[]), crate::cleaner::identity::ensure_stopped)
+    }).await.map_err(|_| "桌面会话共享中断，请检查后重试。".to_string()).and_then(|r|r);
     cleaner.leave();
     result
 }

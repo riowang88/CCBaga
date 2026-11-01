@@ -69,15 +69,18 @@ fn browser_binding_switches_atomically_reuses_slots_and_restores_previous_select
     }
     assert_eq!(db.browser_link().unwrap().bound_ids.len(), 2);
     db.configure_browser(true, false, None).unwrap();
+    let kept = db.browser_slot().unwrap();
+    assert_ne!(kept, slot_a);
     db.complete(&a.id).unwrap();
-    assert_eq!(db.browser_slot().unwrap(), slot_a);
+    assert_eq!(db.browser_slot().unwrap(), kept);
+    assert_eq!(db.browser_for(&a.id).unwrap().as_deref(), Some(slot_a.as_str()));
     db.pending(&a, &b.id).unwrap();
     drop(db);
     let mut db = f.db();
-    assert_eq!(db.browser_slot().unwrap(), slot_a);
+    assert_eq!(db.browser_slot().unwrap(), kept);
     assert!(db.configure_browser(false, false, None).is_err());
     db.complete(&a.id).unwrap();
-    assert_eq!(db.browser_slot().unwrap(), slot_a);
+    assert_eq!(db.browser_slot().unwrap(), kept);
     db.configure_browser(false, false, None).unwrap();
     assert_eq!(db.browser_slot().unwrap(), "legacy");
     db.configure_browser(true, false, Some(&a.id)).unwrap();

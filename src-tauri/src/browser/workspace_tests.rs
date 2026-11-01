@@ -1,5 +1,5 @@
 // [INPUT]: 临时应用数据目录、虚构浏览器资料与身份绑定配置。
-// [OUTPUT]: SQLite 句柄释放后的三平台临时目录清理、Cookie/缓存/种子隔离、手动换指纹持久化、旧资料保留与路径逃逸拒绝回归。
+// [OUTPUT]: SQLite 句柄释放后的三平台临时目录清理、Cookie/缓存/种子隔离、升级/重启后同一 browser.active 与 Cookie 路径、资料不一致时不新建槽位、手动换指纹持久化、旧资料保留与路径逃逸拒绝回归。
 // [POS]: 浏览器存储边界的离线证明，不启动真实用户的浏览器或访问钥匙串。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use super::*;
@@ -110,6 +110,38 @@ fn portable_browser_config_preserves_custom_seed_without_touching_active_data() 
             .unwrap()
             .is_none()
     );
+    drop(db);
+    fs::remove_dir_all(fixture).unwrap();
+}
+#[test]
+fn upgrade_and_restart_keep_the_same_browser_slot_and_cookie_path() {
+    let fixture = tests::sample();
+    let root = fixture.join("browser");
+    let mut db = workspaces::database(&root).unwrap();
+    let identity = crate::identities::new_id().unwrap();
+    db.configure_browser(true, false, Some(&identity)).unwrap();
+    let slot = db.browser_slot().unwrap();
+    let scope = workspaces::ensure(&root).unwrap();
+    let cookie = scope.join("profile/Default/Cookies");
+    crate::identities::private::directory(cookie.parent().unwrap()).unwrap();
+    crate::identities::private::write(&cookie, b"signed-in-cookie").unwrap();
+    let contexts_before = fs::read_dir(root.join("contexts")).unwrap().count();
+    drop(db);
+    // Reopen stands in for an upgrade or host restart: the catalog migration must not allocate a slot.
+    let db = workspaces::database(&root).unwrap();
+    assert_eq!(db.browser_slot().unwrap(), slot);
+    let restarted = workspaces::prepare_active_profile(&root, &[]).unwrap();
+    assert_eq!(restarted.slot, slot);
+    assert_eq!(restarted.profile, scope.join("profile"));
+    assert_eq!(fs::read(&cookie).unwrap(), b"signed-in-cookie");
+    assert_eq!(fs::read_dir(root.join("contexts")).unwrap().count(), contexts_before);
+    let other = root.join("contexts").join(crate::identities::new_id().unwrap()).join("profile");
+    let mismatch = workspaces::accept_running(&root, &slot, &restarted.profile, &[other.clone()]);
+    assert!(mismatch.unwrap_err().contains("不一致"));
+    assert!(!other.exists());
+    assert_eq!(db.browser_slot().unwrap(), slot);
+    assert_eq!(fs::read(&cookie).unwrap(), b"signed-in-cookie");
+    workspaces::accept_running(&root, &slot, &restarted.profile, &[restarted.profile.clone()]).unwrap();
     drop(db);
     fs::remove_dir_all(fixture).unwrap();
 }

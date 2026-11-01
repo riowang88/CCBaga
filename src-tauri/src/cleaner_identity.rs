@@ -1,5 +1,5 @@
 // [INPUT]: Cleaner 白名单、共享 Code 登录键常量、完整目录快照、用户保留策略与 JSON 配置。
-// [OUTPUT]: 受限身份目标、桌面 OAuth 缓存的窄字段保存恢复、缺失历史备份的稳定路径验收、共享开启时保留历史的策略与桌面身份元数据、进程结果和瞬态锁分类；不自动删除锁。
+// [OUTPUT]: 受限身份目标、桌面 OAuth 缓存的窄字段保存恢复、缺失历史备份的稳定路径验收、共享开启时保留历史的策略与桌面身份元数据、进程结果和瞬态锁分类；检查点发现仍在运行的 Claude 时再结束一次，不自动删除锁。
 // [POS]: 身份保险库复用原有路径边界；不扫描项目源码、Shell 或系统代理配置。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use super::*;
@@ -322,6 +322,11 @@ pub(crate) fn root() -> Result<PathBuf, String> {
     home()
 }
 pub(crate) fn ensure_stopped() -> Result<(), String> {
+    if !running()? {
+        return Ok(());
+    }
+    // 界面里的结束发生在归档之前。插件若在这段时间重新拉起 CLI，在这个检查点再结束一次。
+    super::stop_processes()?;
     if running()? {
         Err("请先结束 Claude 进程，再切换身份。".into())
     } else {

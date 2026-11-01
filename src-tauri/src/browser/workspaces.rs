@@ -1,5 +1,5 @@
 // [INPUT]: 身份 SQLite 绑定、独立浏览器根目录、受限配置和用户确认后的切换事务。
-// [OUTPUT]: 独占资料选择、安全退出/重开与恢复阻断、当前及目标身份资料核对范围；迁移只读绑定配置或创建全新配置/seed.owner，不改变选择、不复制浏览器会话。
+// [OUTPUT]: 独占资料选择、启动时只解析已提交的 browser.active 并在实际资料不一致时停止、安全退出/重开与恢复阻断、当前及目标身份资料核对范围；迁移只读绑定配置或创建全新配置/seed.owner，不改变选择、不复制浏览器会话。
 // [POS]: 身份与浏览器的协调边界；资料不压缩、不复制、不合并 Cookie，失败状态如实返回。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use super::*;
@@ -48,6 +48,71 @@ pub(super) fn ready(root: &Path) -> Result<(), String> {
         return Err("浏览器保持关闭，请先恢复身份切换。".into());
     }
     Ok(())
+}
+pub(super) struct ActiveLaunch {
+    pub slot: String,
+    pub scope: PathBuf,
+    pub profile: PathBuf,
+}
+pub(super) fn same_profile(left: &Path, right: &Path) -> bool {
+    match (left.canonicalize(), right.canonicalize()) {
+        (Ok(left), Ok(right)) => left == right,
+        _ => left == right,
+    }
+}
+/// 启动只读取已提交的 browser.active。调用方传入的占用列表含其他槽位时直接拒绝，不分配新槽位。
+pub(super) fn prepare_active_profile(root: &Path, running: &[PathBuf]) -> Result<ActiveLaunch, String> {
+    if database(root)?.get("recovery")?.is_some() {
+        return Err("浏览器保持关闭，请先恢复身份切换。".into());
+    }
+    let slot = database(root)?.browser_slot()?;
+    let profile = slot_path(root, &slot)?.join("profile");
+    profile::check_path(root, &profile)?;
+    if running.iter().any(|path| !same_profile(path, &profile)) {
+        return Err("浏览器正在使用其他资料槽位，已停止启动，未新建资料。".into());
+    }
+    let scope = ensure(root)?;
+    if database(root)?.browser_slot()? != slot || scope.join("profile") != profile {
+        return Err("启动解析到了其他浏览器资料，已停止，未改用空白资料。".into());
+    }
+    Ok(ActiveLaunch { slot, scope, profile })
+}
+pub(super) fn accept_running(root: &Path, slot: &str, profile: &Path, running: &[PathBuf]) -> Result<(), String> {
+    if database(root)?.browser_slot()? != slot {
+        return Err("启动改写了浏览器资料槽位，已停止，未新建或切换资料。".into());
+    }
+    if running.is_empty() || running.iter().any(|path| !same_profile(path, profile)) {
+        return Err("浏览器实际资料与身份库当前槽位不一致，已停止启动，未改用空白资料。".into());
+    }
+    Ok(())
+}
+pub(super) fn running_profiles(root: &Path) -> Result<Vec<PathBuf>, String> {
+    let db = database(root)?;
+    let mut slots = db.browser_slots()?;
+    let active = db.browser_slot()?;
+    if !slots.contains(&active) {
+        slots.push(active);
+    }
+    if let Ok(entries) = fs::read_dir(root.join("contexts")) {
+        for entry in entries.flatten() {
+            if let Some(name) = entry.file_name().to_str() {
+                if browser_link::valid_slot(name) && !slots.iter().any(|slot| slot == name) {
+                    slots.push(name.to_string());
+                }
+            }
+        }
+    }
+    if root.join("profile").is_dir() && !slots.iter().any(|slot| slot == "legacy") {
+        slots.push("legacy".into());
+    }
+    let mut running = Vec::new();
+    for slot in slots {
+        let profile = slot_path(root, &slot)?.join("profile");
+        if profile.is_dir() && profile::running(&profile)? {
+            running.push(profile);
+        }
+    }
+    Ok(running)
 }
 pub(super) fn ensure(root: &Path) -> Result<PathBuf, String> {
     let db = database(root)?;

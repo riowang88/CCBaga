@@ -79,8 +79,11 @@ fn start_linux_companion(app: &tauri::AppHandle, urls: &[String]) -> Result<(), 
     let _guard = state.gate.lock().unwrap();
     let engine = prepare_engine(app)?;
     let root = root(app)?;
-    let settings = workspaces::ensure(&root)?;
-    let profile = settings.join("profile");
+    let running = workspaces::running_profiles(&root)?;
+    let target = workspaces::prepare_active_profile(&root, &running)?;
+    let settings = target.scope.clone();
+    let profile = target.profile.clone();
+    let slot = target.slot.clone();
     profile::check_path(&root, &profile)?;
     let config = config::load(&settings)?;
     let machine = config::machine()?;
@@ -111,10 +114,13 @@ fn start_linux_companion(app: &tauri::AppHandle, urls: &[String]) -> Result<(), 
             "Could not launch Linux Chromium. Check engine permissions and runtime libraries."
                 .to_string()
         })?;
+    let started = launch::confirm_started(&root, &slot, &profile, || {
+        Ok(child.try_wait().map_err(|_| "无法读取浏览器状态。".to_string())?.is_some())
+    });
     std::thread::spawn(move || {
         let _ = child.wait();
     });
-    Ok(())
+    started
 }
 const LINUX_DESKTOP_ID: &str = "ccbaga-browser.desktop";
 fn default_read() -> Result<DefaultBrowser, String> {

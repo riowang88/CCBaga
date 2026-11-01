@@ -120,8 +120,11 @@ fn start_windows_companion(app: &tauri::AppHandle, urls: &[String]) -> Result<()
     let engine = prepare_engine(app)?;
     crate::startup_trace("engine ready");
     let root = root(app)?;
-    let settings = workspaces::ensure(&root)?;
-    let profile = settings.join("profile");
+    let running = workspaces::running_profiles(&root)?;
+    let target = workspaces::prepare_active_profile(&root, &running)?;
+    let settings = target.scope.clone();
+    let profile = target.profile.clone();
+    let slot = target.slot.clone();
     profile::check_path(&root, &profile)?;
     let config = config::load(&settings)?;
     crate::startup_trace("config ready");
@@ -154,10 +157,13 @@ fn start_windows_companion(app: &tauri::AppHandle, urls: &[String]) -> Result<()
         .spawn()
         .map_err(|_| "无法启动 Windows Chromium 浏览器。请检查引擎文件与依赖。".to_string())?;
     crate::startup_trace("companion spawned");
+    let started = launch::confirm_started(&root, &slot, &profile, || {
+        Ok(child.try_wait().map_err(|_| "无法读取浏览器状态。".to_string())?.is_some())
+    });
     std::thread::spawn(move || {
         let _ = child.wait();
     });
-    Ok(())
+    started
 }
 
 fn default_read() -> Result<DefaultBrowser, String> {

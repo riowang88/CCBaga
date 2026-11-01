@@ -1,5 +1,5 @@
 // [INPUT]: 虚构 UUID/组织/凭据、隔离文件系统和归档格式。
-// [OUTPUT]: A/B 往返去重、桌面 OAuth 缓存窄字段往返/回滚/旧档案兼容、已清除历史备份恢复与路径边界、刷新凭据覆盖、跨组织隔离、旧版迁移与覆盖故障、跨平台账号隔离、个人设置和共享代理保留回归。
+// [OUTPUT]: A/B 往返去重、桌面 OAuth 缓存窄字段往返/回滚/旧档案兼容、已清除历史备份恢复与路径边界、刷新凭据覆盖、跨组织隔离、旧版迁移与覆盖故障、跨平台账号隔离、个人设置和共享代理保留回归、同卷恢复改名后临时项消失且内部链接仍是链接。
 // [POS]: 账号匹配与不可变归档代次的离线证明，不读取真实用户数据。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use super::*;
@@ -60,6 +60,49 @@ impl Drop for Fixture {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.root);
     }
+}
+#[test]
+fn same_volume_restore_renames_extracted_tree_and_keeps_inner_links() {
+    let f = Fixture::new();
+    f.login("A", "one", "rename-token");
+    f.write(".claude/debug/session.txt", b"rename-body");
+    f.write(".claude/history.jsonl", b"rename-history");
+    #[cfg(unix)]
+    std::os::unix::fs::symlink("session.txt", f.home.join(".claude/debug/latest")).unwrap();
+    let s = store::Store::open(&f.vault, &f.home).unwrap();
+    let policy = Policy::default();
+    let reporter = Reporter::channel(None);
+    let (_record, stage) = s.save("A", &policy, &reporter).unwrap();
+    let selected = store::Store::selected(&stage, &policy);
+    let mut moved = 0;
+    for (n, source) in &selected {
+        let name = source.path.file_name().and_then(|name| name.to_str());
+        if name != Some("debug") && name != Some("history.jsonl") {
+            continue;
+        }
+        let extracted = stage.path.join(format!("data/{n}"));
+        assert!(extracted.exists());
+        if source.path.is_dir() {
+            fs::remove_dir_all(&source.path).unwrap();
+        } else {
+            fs::remove_file(&source.path).unwrap();
+        }
+        s.restore(&stage, &[(*n, source.clone())], &policy, &reporter, "restore").unwrap();
+        assert!(!extracted.exists(), "same-volume restore must rename the extracted entry");
+        moved += 1;
+    }
+    assert_eq!(moved, 2);
+    assert_eq!(fs::read(f.home.join(".claude/debug/session.txt")).unwrap(), b"rename-body");
+    assert_eq!(fs::read(f.home.join(".claude/history.jsonl")).unwrap(), b"rename-history");
+    #[cfg(unix)]
+    {
+        let latest = f.home.join(".claude/debug/latest");
+        assert!(fs::symlink_metadata(&latest).unwrap().file_type().is_symlink());
+        assert_eq!(fs::read_link(&latest).unwrap(), std::path::Path::new("session.txt"));
+    }
+    let cross = std::io::Error::from_raw_os_error(if cfg!(windows) { 17 } else { 18 });
+    assert!(store::crosses_devices(&cross));
+    assert!(!store::crosses_devices(&std::io::Error::new(std::io::ErrorKind::AlreadyExists, "present")));
 }
 #[cfg(target_os = "macos")]
 #[test]

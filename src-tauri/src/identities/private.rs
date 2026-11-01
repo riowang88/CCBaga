@@ -1,5 +1,5 @@
 // [INPUT]: 标准库文件系统、当前用户身份与 Windows ACL API。
-// [OUTPUT]: 私有文件与目录、严格根路径检查、仅供归档目录成员使用的不跟随目标的 Unix 链接读写、所有权检查和同步原子写入。
+// [OUTPUT]: 私有文件与目录、严格根路径检查、仅供归档目录成员使用的不跟随目标的 Unix 链接读写、所有权检查、同卷改名和同步原子写入。
 // [POS]: 身份保险库的磁盘边界；创建时明确用户所有者/DACL，已有父目录仅校验而不覆写权限；Win32 调用统一使用长路径。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use std::{fs, io::Write, path::Path};
@@ -267,6 +267,24 @@ pub fn write(path: &Path, bytes: &[u8]) -> Result<(), String> {
         let _ = fs::remove_file(temp);
     }
     result
+}
+// 同卷把已存在的文件或目录改到空白目标。跨卷失败且不复制；Windows 使用长路径且不替换目标。
+pub fn relocate(from: &Path, to: &Path) -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        fs::rename(from, to)
+    }
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::Storage::FileSystem::MoveFileExW;
+        let source = crate::windows::wide_path(from);
+        let destination = crate::windows::wide_path(to);
+        if unsafe { MoveFileExW(source.as_ptr(), destination.as_ptr(), 0) } == 0 {
+            Err(std::io::Error::last_os_error())
+        } else {
+            Ok(())
+        }
+    }
 }
 pub fn sync_parent(path: &Path) {
     #[cfg(unix)]

@@ -1,5 +1,5 @@
 // [INPUT]: SQLite 目录、用户策略、白名单源、已验收归档代次、认证加密与平台凭据桥。
-// [OUTPUT]: 可选桌面会话共享、原地备份、本地档案往返及同档案重选保护、回滚与真实进度；同 service/account 的桌面钥匙串条目原地更新以保留本机授权；切换/恢复复查 B 资料、锁存进程冲突并保留恢复记录；目录内链接按链接恢复，旧归档瞬态锁不恢复。
+// [OUTPUT]: 可选桌面会话共享、原地备份、本地档案往返及同档案重选保护、回滚与真实进度；同卷把已解压目录或文件改名到清空目标，跨卷退回逐文件复制，JSON 键合并仍写回；同 service/account 的桌面钥匙串条目原地更新以保留本机授权；切换/恢复复查 B 资料、锁存进程冲突并保留恢复记录；目录内链接按链接恢复，旧归档瞬态锁不恢复。
 // [POS]: 身份的文件事务；SQLite 与文件系统由恢复日志协调，不能假装是同一原子事务。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use super::{
@@ -38,6 +38,15 @@ pub struct Store {
 }
 pub(super) fn problem(_: impl std::fmt::Display) -> String {
     "身份归档读写或验证失败；请保留暂存文件并重试。".into()
+}
+pub(super) fn crosses_devices(error: &io::Error) -> bool {
+    if error.kind() == io::ErrorKind::CrossesDevices {
+        return true;
+    }
+    #[cfg(unix)]
+    return error.raw_os_error() == Some(18);
+    #[cfg(windows)]
+    return error.raw_os_error() == Some(17);
 }
 impl Store {
     pub fn open(vault: &Path, home: &Path) -> Result<Self, String> {
@@ -339,6 +348,41 @@ impl Store {
         );
         Ok(())
     }
+    fn place_extracted(&self, data: &Path, destination: &Path) -> Result<(), String> {
+        match private::relocate(data, destination) {
+            Ok(()) => {
+                private::sync_parent(destination);
+                Ok(())
+            }
+            Err(error) if crosses_devices(&error) => self.copy_extracted(data, destination),
+            Err(error) => Err(problem(error)),
+        }
+    }
+    fn copy_extracted(&self, data: &Path, destination: &Path) -> Result<(), String> {
+        if data.is_dir() {
+            walk(data, data, &mut |path, relative, directory| {
+                self.during_io()?;
+                let target = destination.join(relative);
+                if let Some(link) = private::link_target(path)? {
+                    private::directory(target.parent().unwrap())?;
+                    private::create_link(&link, &target)
+                } else if directory {
+                    private::directory(&target)
+                } else {
+                    private::directory(target.parent().unwrap())?;
+                    let mut dest = private::create(&target)?;
+                    io::copy(&mut fs::File::open(path).map_err(problem)?, &mut dest)
+                        .map_err(problem)?;
+                    dest.sync_all().map_err(problem)
+                }
+            })
+        } else {
+            private::directory(destination.parent().unwrap())?;
+            let mut output = private::create(destination)?;
+            io::copy(&mut fs::File::open(data).map_err(problem)?, &mut output).map_err(problem)?;
+            output.sync_all().map_err(problem)
+        }
+    }
     pub(super) fn restore(
         &self,
         stage: &Stage,
@@ -370,33 +414,10 @@ impl Store {
                 };
                 identity::apply_config(source, &saved)?;
             } else {
-                if source.path.exists() {
+                if fs::symlink_metadata(&source.path).is_ok() {
                     return Err("身份恢复位置已有数据；请使用恢复操作。".into());
                 }
-                if data.is_dir() {
-                    walk(&data, &data, &mut |path, relative, directory| {
-                        self.during_io()?;
-                        let target = source.path.join(relative);
-                        if let Some(link) = private::link_target(path)? {
-                            private::directory(target.parent().unwrap())?;
-                            private::create_link(&link, &target)
-                        } else if directory {
-                            private::directory(&target)
-                        } else {
-                            private::directory(target.parent().unwrap())?;
-                            let mut dest = private::create(&target)?;
-                            io::copy(&mut fs::File::open(path).map_err(problem)?, &mut dest)
-                                .map_err(problem)?;
-                            dest.sync_all().map_err(problem)
-                        }
-                    })?;
-                } else {
-                    private::directory(source.path.parent().unwrap())?;
-                    let mut output = private::create(&source.path)?;
-                    io::copy(&mut fs::File::open(data).map_err(problem)?, &mut output)
-                        .map_err(problem)?;
-                    output.sync_all().map_err(problem)?;
-                }
+                self.place_extracted(&data, &source.path)?;
             }
             reporter.log(
                 phase,

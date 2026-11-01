@@ -151,10 +151,33 @@ pub(super) fn complete(tx: &Transaction<'_>, active: &str) -> Result<(), String>
         && get(tx, "recovery")?.is_none()
         && get(tx, "browser.enabled")?.as_deref() == Some("1")
     {
-        // 当前 Claude 已是目标账号时仍对齐其浏览器绑定，不回灌旧登录归档。
-        let previous = get(tx, "browser.active")?;
-        let slot = bind(tx, active, previous.as_deref())?;
-        set(tx, "browser.active", &slot)?;
+        // 没有进行中的切换标记时，不把当前槽位改到该身份的旧绑定。
+        let Some(current) = get(tx, "browser.active")? else {
+            return Ok(());
+        };
+        if !valid_slot(&current) {
+            return Err("浏览器资料选择无效。".into());
+        }
+        let bound = tx
+            .query_row(
+                "SELECT slot FROM browser_bindings WHERE identity=?1",
+                [active],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(error)?;
+        if bound.is_none() {
+            let occupied: i64 = tx
+                .query_row(
+                    "SELECT COUNT(*) FROM browser_bindings WHERE slot=?1",
+                    [&current],
+                    |row| row.get(0),
+                )
+                .map_err(error)?;
+            if occupied == 0 {
+                bind(tx, active, Some(&current))?;
+            }
+        }
     }
     Ok(())
 }
@@ -270,6 +293,16 @@ impl Database {
             enabled: self.get("browser.enabled")?.as_deref() == Some("1"),
             bound_ids: ids,
         })
+    }
+    pub fn browser_slots(&self) -> Result<Vec<String>, String> {
+        let mut query = self
+            .connection
+            .prepare("SELECT slot FROM browser_bindings")
+            .map_err(error)?;
+        let rows = query
+            .query_map([], |row| row.get(0))
+            .map_err(error)?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(error)
     }
     pub fn browser_slot(&self) -> Result<String, String> {
         if self.get("browser.enabled")?.as_deref() != Some("1") {

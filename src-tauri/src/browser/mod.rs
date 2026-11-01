@@ -270,15 +270,18 @@ pub fn companion(app: tauri::AppHandle) {
 }
 #[cfg(target_os = "macos")]
 fn start_companion(app: &tauri::AppHandle) -> Result<(), String> {
+    // 外部 CCBaga-B.app 缺失时先停止。不要为此安装另一份引擎或新建资料槽位。
     let browser = installed().ok_or("未安装 /Applications/CCBaga-B.app。")?;
     let state = app.state::<Browser>();
     let _guard = state.gate.lock().unwrap();
     let root = root(app)?;
-    workspaces::ensure(&root)?;
-    let settings = workspaces::scope(&root)?;
-    let profile = settings.join("profile");
+    let running = workspaces::running_profiles(&root)?;
+    let target = workspaces::prepare_active_profile(&root, &running)?;
+    let settings = target.scope.clone();
+    let profile = target.profile.clone();
+    let slot = target.slot.clone();
     profile::check_path(&root, &profile)?;
-    let config = config::load(&workspaces::scope(&root)?)?;
+    let config = config::load(&settings)?;
     let machine = config::machine()?;
     config.validate(&machine)?;
     // 先刷新参数：浏览器已由 CCBaga-B 入口先行启动时，下一次启动也能沿用指纹参数。
@@ -297,7 +300,7 @@ fn start_companion(app: &tauri::AppHandle) -> Result<(), String> {
         std::thread::spawn(move || {
             let _ = child.wait();
         });
-        return Ok(());
+        return launch::confirm_started(&root, &slot, &profile, || Ok(false));
     }
     profile::preferences(&profile, &config, &machine)?;
     register(&browser)?;
@@ -309,7 +312,7 @@ fn start_companion(app: &tauri::AppHandle) -> Result<(), String> {
     if !status.success() {
         return Err("LaunchServices 拒绝打开 CCBaga-B。".into());
     }
-    Ok(())
+    launch::confirm_started(&root, &slot, &profile, || Ok(false))
 }
 #[derive(Serialize, Deserialize)]
 pub struct DefaultBrowser {

@@ -142,6 +142,8 @@ fn main() {
             cleaner::residue::claude_residue_scan,
             cleaner::residue::claude_residue_clean,
             identities::identities_read,
+            identities::identities_usage,
+            identities::identities_usage_saved,
             identities::login::identities_login,
             identities::login::identities_login_cancel,
             identities::identities_browser,

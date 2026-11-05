@@ -1,6 +1,6 @@
 // [INPUT]: SQLite 身份目录与脱敏认证元数据、加密压缩保险库、精确进程查询、Cleaner 事务锁和 Tauri 进度通道。
 // [OUTPUT]: 只读账号摘要、与账号匹配分离的本地选择、保存完整性回归、有界进程预览、可选桌面会话共享、保留选项和带真实进度的身份操作命令。
-// [POS]: GUI 身份管理的原生入口；刷新只读工作区、不回收暂存文件；不提供凭据读取、任意文件或网络接口。
+// [POS]: GUI 身份管理的原生入口；刷新只读工作区、不回收暂存文件；不提供凭据读取或任意文件接口，唯一网络读取是用户点击的固定官方用量请求（usage.rs）。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 mod archive;
 pub(crate) mod association;
@@ -14,6 +14,7 @@ mod codec;
 mod compression;
 mod credentials;
 mod desktop_sessions;
+mod desktop_token;
 pub(crate) mod login;
 pub(crate) mod database;
 #[cfg(test)]
@@ -25,9 +26,13 @@ mod save_integrity_tests;
 pub(crate) mod portable;
 pub(crate) mod private;
 mod profile;
+mod sidecar;
+#[cfg(test)]
+mod sidecar_tests;
 mod store;
 #[cfg(test)]
 mod tests;
+mod usage;
 use crate::progress::{Progress, Reporter};
 use serde::{Deserialize, Serialize};
 use tauri::{ipc::Channel, Manager};
@@ -89,6 +94,7 @@ pub struct State {
     pub browser_warning: Option<String>,
     pub records: Vec<database::Record>,
     pub summaries: std::collections::BTreeMap<String, profile::Summary>,
+    pub usages: std::collections::BTreeMap<String, usage::Usage>,
     pub processes: Option<Vec<profile::ProcessPreview>>,
     pub processes_truncated: bool,
     pub active: String,
@@ -135,6 +141,7 @@ fn state(app: &tauri::AppHandle) -> Result<State, String> {
     let records: Vec<_> = db.records()?.into_iter().filter(|r| !r.empty).collect();
     let last_selected = db.get("active")?.filter(|id| records.iter().any(|r| &r.id == id));
     let summaries = db.summaries()?;
+    let usages = db.usages()?;
     let (processes, processes_truncated) =
         profile::process_previews(crate::cleaner::identity::running_processes());
     // 检查失败显示未知；不能把查询错误当作已确认停止。
@@ -154,6 +161,7 @@ fn state(app: &tauri::AppHandle) -> Result<State, String> {
             .clone(),
         records,
         summaries,
+        usages,
         processes,
         processes_truncated,
         active: account_id.unwrap_or_else(|| "current".into()),
@@ -170,6 +178,85 @@ pub async fn identities_read(app: tauri::AppHandle) -> Result<State, String> {
     tauri::async_runtime::spawn_blocking(move || state(&app))
         .await
         .map_err(|_| "身份列表读取被中断。".to_string())?
+}
+/// Explicit, user-triggered usage read for the live default Claude Code login. The token stays
+/// in native memory; the result is cached for the current saved card only (display data).
+#[tauri::command]
+pub async fn identities_usage(app: tauri::AppHandle) -> Result<usage::Usage, String> {
+    let root = crate::cleaner::identity::root()?;
+    let result = usage::fetch_current(root.clone()).await?;
+    let cached = result.clone();
+    let _ = tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
+        let vault_path = vault(&app)?;
+        let db = database::Database::open(&vault_path)?;
+        let current = profile::read(&root);
+        let (_, workspace_id) = catalog::current_ids(&vault_path, &root, &db)?;
+        if let Some(id) = workspace_id.filter(|_| current.present && !current.unavailable) {
+            db.set_usage(&id, &cached)?;
+        }
+        Ok(())
+    })
+    .await;
+    Ok(result)
+}
+/// Explicit usage read for a saved (inactive) identity. CCBaga renews its refresh token when
+/// needed and persists the rotation to the encrypted sidecar before using it. The global
+/// identity transaction lock is held throughout so a switch cannot read a stale sidecar.
+#[tauri::command]
+pub async fn identities_usage_saved(app: tauri::AppHandle, id: String) -> Result<usage::Usage, String> {
+    if !valid_id(&id) {
+        return Err("身份编号无效。".into());
+    }
+    let cleaner = app.state::<crate::cleaner::Cleaner>();
+    cleaner.enter()?;
+    let result = async {
+        let vault_path = vault(&app)?;
+        let root = crate::cleaner::identity::root()?;
+        let (vault_read, root_read, id_read) = (vault_path.clone(), root.clone(), id.clone());
+        let found = tauri::async_runtime::spawn_blocking(move || usage::saved_oauth(&vault_read, &root_read, &id_read))
+            .await
+            .map_err(|_| "读取身份凭据被中断。".to_string())??;
+        let usage = match found {
+            usage::Saved::Active => usage::fetch_current(root).await?,
+            usage::Saved::Found { record, cli, desktop } => {
+                // A Desktop token is read-only and long-lived: prefer it, so most refreshes
+                // never rotate the CLI refresh token. Fall back to CLI renewal if it fails.
+                let mut first = None;
+                if let Some((token, plan)) = desktop {
+                    let read = usage::read_with(&usage::Endpoints::default().usage, &token, plan, profile::now_ms()).await;
+                    if read.status == "ok" || cli.is_none() {
+                        first = Some(read);
+                    }
+                }
+                match (first, cli) {
+                    (Some(usage), _) => usage,
+                    (None, None) => usage::Usage { status: "no_token".into(), fetched_at: profile::now_ms(), ..Default::default() },
+                    (None, Some(oauth)) => {
+                        let (vault_write, root_write) = (vault_path.clone(), root.clone());
+                        usage::fetch_saved(oauth, &usage::Endpoints::default(), move |next| {
+                            let store = store::Store::open_for_transfer(&vault_write, &root_write)?;
+                            // The lock is held, so the generation cannot have changed; check anyway.
+                            if store.record(&record.id)?.archive != record.archive {
+                                return Err("身份归档已更新。".into());
+                            }
+                            sidecar::write(&vault_write, &store.key, &record, &next)
+                        })
+                        .await
+                    }
+                }
+            }
+        };
+        let cached = usage.clone();
+        let id_cache = id.clone();
+        let _ = tauri::async_runtime::spawn_blocking(move || {
+            database::Database::open(&vault_path).and_then(|db| db.set_usage(&id_cache, &cached))
+        })
+        .await;
+        Ok::<_, String>(usage)
+    }
+    .await;
+    cleaner.leave();
+    result
 }
 #[tauri::command]
 pub async fn identities_stop(

@@ -16,7 +16,8 @@ import {formatBytes} from './cleaner-model';
 import {IdentityTransfer} from './identity-transfer';
 import {ClaudeCliPanel} from './claude-cli-panel';
 import {ClaudeResiduePanel} from './claude-residue-panel';
-import {credentialStatus, identityPolicyKey, readIdentityPolicy, policyRows, type ClientMaterials, type Identity, type IdentityState} from './identity-model';
+import {CardUsage} from './identity-usage';
+import {credentialStatus, identityPolicyKey, readIdentityPolicy, policyRows, type ClientMaterials, type Identity, type IdentityState, type IdentityUsage} from './identity-model';
 type Target = Identity | 'empty' | 'recovery' | 'save';
 type SessionChoice={session:string;revision:string;cli_id:string};
 type SessionConflict={session:string;title:string|null;revision:string;options:{cli_id:string;messages:number;last_message_at:string|null}[]};
@@ -55,7 +56,8 @@ export function IdentityPanel({onBusy, initialEmpty=false}: {onBusy?: (busy:bool
  const reduceMotion=useIdentityReducedMotion();
  const scrollSpring=useSpring(0,{stiffness:170,damping:25,mass:.8});
  const scrollTarget=useRef(0);
- const locked=busy||!!sessionConflict||loginBusy||cliBusy||residueBusy||transferBusy||transfer!==null||loginGuide||!!association||!!review||!!rename||!!deletion||browserReview!==null;
+ const [usageBusy,setUsageBusy]=useState<Set<string>>(new Set()),[liveUsage,setLiveUsage]=useState<Record<string,IdentityUsage>>({});
+ const locked=usageBusy.size>0||busy||!!sessionConflict||loginBusy||cliBusy||residueBusy||transferBusy||transfer!==null||loginGuide||!!association||!!review||!!rename||!!deletion||browserReview!==null;
  const current=state?.current;
  const active=state?.records.find(row=>row.id===(state.workspace_id===undefined?state.active:state.workspace_id));
  const associationTarget=state?.records.find(row=>row.id===(state.browser.enabled?state.browser.current_id:active?.id??state.last_selected));
@@ -108,6 +110,22 @@ export function IdentityPanel({onBusy, initialEmpty=false}: {onBusy?: (busy:bool
    return true;
   }
   catch(e) {setError(String(e));return false;} finally {setLoading(false);}
+ }
+ // 页面唯一的刷新：先读本地状态，再逐个读取每个账号的官方用量（当前账号不续期，已存账号由原生层代为续期）。
+ async function refreshAll() {
+  if(!await read())return;
+  const next=await invoke<IdentityState>('identities_read').catch(()=>null);
+  if(!next)return;
+  const activeId=next.workspace_id===undefined?next.active:next.workspace_id;
+  const targets:[string,()=>Promise<IdentityUsage>][]=[];
+  if(next.current.present||next.current.email)targets.push([activeId&&next.records.some(r=>r.id===activeId)?activeId:'current',()=>invoke<IdentityUsage>('identities_usage')]);
+  for(const record of next.records)if(record.id!==activeId)targets.push([record.id,()=>invoke<IdentityUsage>('identities_usage_saved',{id:record.id})]);
+  setUsageBusy(new Set(targets.map(([key])=>key)));
+  for(const [key,load] of targets){
+   try {const usage=await load();setLiveUsage(value=>({...value,[key]:usage}));}
+   catch(e) {setLiveUsage(value=>({...value,[key]:{status:'failed',fetched_at:Date.now(),message:String(e)}}));}
+   finally {setUsageBusy(value=>{const rest=new Set(value);rest.delete(key);return rest;});}
+  }
  }
  async function refreshAfterError() {
   setResidueRevision(value=>value+1);
@@ -225,10 +243,11 @@ export function IdentityPanel({onBusy, initialEmpty=false}: {onBusy?: (busy:bool
       {authLabel(credentialStatus(current,now))&&<span title={t('仅依据本地元数据，不代表服务端认证结果。')} className={`identity-status-badge auth-${credentialStatus(current,now)}`}>{t(authLabel(credentialStatus(current,now))!)}</span>}
       {state?.browser.enabled&&<span className="identity-browser-badge">{t('浏览器资料随身份切换')}</span>}
      </div>
+     <CardUsage usage={liveUsage[active?.id??'current']??(active?state?.usages?.[active.id]:undefined)} loading={usageBusy.has(active?.id??'current')}/>
      <div className="identity-card-footer"><Button variant="secondary" size="small" disabled={blocked} onClick={()=>choose('save')}>{browserOnly?t(active?'更新身份':'保存身份'):active?t('更新备份'):t('保存备份')}</Button>{active&&<Button variant="ghost" size="small" disabled={blocked} onClick={()=>{setRename(active);setRenameValue(active.name);setError('');}}>{t('重命名')}</Button>}<Button variant="ghost" size="small" disabled={blocked} onClick={()=>confirmDelete('current')}>{t('直接删除')}</Button></div>
     </IdentityCard>;
  return <section className="identity-page">
-  <header className="cleanup-title"><h1>{t('Claude 身份管理')}</h1><Button variant="secondary" size="small" disabled={locked||loading} leftIcon={<Refresh aria-hidden size={16} className={loading?'spin':''}/>} onClick={()=>void read()}>{t('刷新')}</Button></header>
+  <header className="cleanup-title"><h1>{t('Claude 身份管理')}</h1><Button variant="secondary" size="small" disabled={locked||loading} leftIcon={<Refresh aria-hidden size={16} className={loading||usageBusy.size>0?'spin':''}/>} onClick={()=>void refreshAll()}>{t('刷新')}</Button></header>
   {error&&<p role="alert" className="cleanup-feedback error">{t(error)}</p>}
   {state?.recovery&&<div className="identity-recovery" role="alert"><strong>{t('有一次身份切换尚未完成')}</strong><Button size="small" variant="ink" disabled={locked||loading} onClick={()=>choose('recovery')}>{t('恢复原身份')}</Button></div>}
     <section className="identity-library"><div className="identity-section-head"><h2>{t('身份')}</h2><div className="identity-library-controls"><span className="identity-count">{saved.length} {t('已保存身份')}</span><Button size="small" variant="secondary" disabled={blocked} onClick={()=>setTransfer('import')}>{t('导入')}</Button><Checkbox label={t('联动浏览器')} checked={state?.browser.enabled??false} disabled={blocked} onCheckedChange={value=>{setUseExisting(false);setBrowserReview(value===true);setError('');}}/></div></div>
@@ -248,6 +267,7 @@ export function IdentityPanel({onBusy, initialEmpty=false}: {onBusy?: (busy:bool
       {authLabel(credentialStatus(summary,now))&&<span title={t('仅依据本地元数据，不代表服务端认证结果。')} className={`identity-status-badge auth-${credentialStatus(summary,now)}`}>{t(authLabel(credentialStatus(summary,now))!)}</span>}
       {state?.browser.bound_ids.includes(row.id)&&<span className="identity-browser-badge">{t('已关联浏览器资料')}</span>}
      </div>
+     <CardUsage usage={liveUsage[row.id]??state?.usages?.[row.id]} loading={usageBusy.has(row.id)}/>
      <time>{new Date(row.saved_at).toLocaleString(locale==='zh'?'zh-CN':'en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</time>
      <div className="identity-card-footer"><Button variant="secondary" size="small" disabled={blocked} onClick={()=>choose(row)}>{t('切换')}</Button><Button variant="ghost" size="small" disabled={blocked} onClick={()=>{setRename(row);setRenameValue(row.name);setError('');}}>{t('重命名')}</Button><Button variant="ghost" size="small" disabled={blocked} onClick={()=>confirmDelete(row)}>{t('删除')}</Button></div>
     </IdentityCard>;})}

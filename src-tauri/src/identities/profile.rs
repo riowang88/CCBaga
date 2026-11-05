@@ -8,6 +8,7 @@ use std::{fs, io::Read, path::Path};
 #[derive(Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Account {
+    account_uuid: Option<String>,
     display_name: Option<String>,
     email_address: Option<String>,
     organization_name: Option<String>,
@@ -43,6 +44,9 @@ pub struct Current {
     pub auth_status: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expires_at: Option<i64>,
+    /// Masked account UUID (first/last three characters) for visual comparison only.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account_hint: Option<String>,
 }
 #[derive(Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Summary {
@@ -128,7 +132,14 @@ fn display(value: Option<String>, limit: usize) -> Option<String> {
         .filter(|v| !v.is_empty() && !v.chars().any(char::is_control))
         .map(|v| v.chars().take(limit).collect())
 }
-fn format_plan(sub: Option<&str>, tier: Option<&str>, billing: Option<&str>) -> Option<String> {
+pub(super) fn mask_id(value: Option<&str>) -> Option<String> {
+    let id = value?.trim();
+    if id.len() < 8 || !id.bytes().all(|b| b.is_ascii_hexdigit() || b == b'-') {
+        return None;
+    }
+    Some(format!("{}***{}", &id[..3], &id[id.len() - 3..]))
+}
+pub(super) fn format_plan(sub: Option<&str>, tier: Option<&str>, billing: Option<&str>) -> Option<String> {
     let tier_lower = tier.unwrap_or("").to_ascii_lowercase();
     if tier_lower.contains("20x") {
         return Some("Max 20x".into());
@@ -219,6 +230,7 @@ fn parse(bytes: &[u8]) -> Result<Current, serde_json::Error> {
             display_name: display(account.display_name, 80),
             email: display(account.email_address, 254),
             organization: display(account.organization_name, 120),
+            account_hint: mask_id(account.account_uuid.as_deref()),
             unavailable: false,
             plan: format_plan(None, None, account.billing_type.as_deref()),
             ..Current::default()

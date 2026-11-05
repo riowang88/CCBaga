@@ -506,6 +506,8 @@ impl Store {
                 let _ = fs::rename(&trash, &path);
                 return Err(e);
             }
+            // The renewable CLI credential copy leaves with the identity.
+            super::sidecar::collect(&self.vault, &self.db.records()?);
             // 数据库提交后，这个仅由自身命名的加密文件可安全回收；失败留待下次回收。
             fs::remove_file(&trash)
                 .map_err(|_| "身份已从目录移除，但暂存文件回收失败；请重新打开面板。")?;

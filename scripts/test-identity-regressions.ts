@@ -23,7 +23,7 @@ try {
   page.setDefaultTimeout(3000);
   try {
    await page.goto(base+'/tests/identities.html');
-   await page.getByText('fixture@example.invalid',{exact:true}).waitFor();
+   await page.locator('.identity-card-rail').getByText('fixture@example.invalid',{exact:true}).waitFor();
    if(name==='single-client') {
     await page.evaluate(()=>{const f=(window as any).identityFixture;f.state.browser.current_id=f.state.records[0].id;});
     await page.getByRole('button',{name:'刷新',exact:true}).click();
@@ -104,7 +104,7 @@ try {
     await page.getByText('切换账号时保持不变的内容',{exact:true}).click();
     await page.getByRole('checkbox',{name:'会话历史',exact:true}).check();
     await page.reload();
-    await page.getByText('fixture@example.invalid',{exact:true}).waitFor();
+    await page.locator('.identity-card-rail').getByText('fixture@example.invalid',{exact:true}).waitFor();
     await page.getByText('切换账号时保持不变的内容',{exact:true}).click();
     assert.equal(await page.getByRole('checkbox',{name:'会话历史',exact:true}).isChecked(),true,'history retention must survive reopening');
     for(const label of ['Skills 与命令','插件'])assert.equal(await page.getByRole('checkbox',{name:label,exact:true}).isChecked(),true);

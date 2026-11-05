@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 原生 SQLite 身份目录与用户的数据保留选择。
- * [OUTPUT]: 账号匹配与本地选择的独立状态、浏览器资料存在性、账号摘要、有界进程、默认关闭桌面共享且兼容旧值的持久保留选项及浏览器绑定。
+ * [OUTPUT]: 显式读取的官方用量显示缓存、脱敏账号 ID、账号匹配与本地选择的独立状态、浏览器资料存在性、账号摘要、有界进程、默认关闭桌面共享且兼容旧值的持久保留选项及浏览器绑定。
  * [POS]: 身份管理的脱敏契约；只有明确允许的账号显示字段，不含凭据、原始文件正文或任意路径。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -9,9 +9,12 @@ export type Identity={id:string;name:string;saved_at:number;bytes:number;policy:
 export type ClientMaterials={cli:'present'|'absent'|'unknown';desktop:'present'|'absent'|'unknown'};
 export type IdentitySummary={client_checks?:Record<string,{source:string;checked_at:number}>;clients?:ClientMaterials|null;display_name?:string|null;email:string|null;organization:string|null;plan:string|null;auth_status:string|null;expires_at?:number|null};
 export type ProcessPreview={pid:number;entrypoint:string;workspace:string|null};
-export type CurrentIdentity={clients?:ClientMaterials;present:boolean;display_name:string|null;email:string|null;organization:string|null;plan:string|null;auth_status:string|null;expires_at?:number|null;unavailable:boolean};
+export type CurrentIdentity={clients?:ClientMaterials;present:boolean;display_name:string|null;email:string|null;organization:string|null;plan:string|null;auth_status:string|null;expires_at?:number|null;account_hint?:string|null;unavailable:boolean};
+// 官方 OAuth 用量的显示缓存；令牌不进入 WebView。
+export type UsageWindow={percent:number;resets_at?:string|null};
+export type IdentityUsage={status:'ok'|'expired'|'no_token'|'rejected'|'failed'|'active'|'relogin'|'rotation_unsaved';fetched_at:number;plan?:string|null;session?:UsageWindow|null;week?:UsageWindow|null;week_opus?:UsageWindow|null;week_sonnet?:UsageWindow|null;message?:string|null;source?:'cli'|'desktop'|null};
 export type BrowserLink={enabled:boolean;bound_ids:string[];current_id?:string|null};
-export type IdentityState={desktop_sessions_supported?:boolean;browser:BrowserLink;browser_warning:string|null;records:Identity[];summaries:Record<string,IdentitySummary>;active:string;last_selected?:string|null;workspace_id?:string|null;browser_profile_present?:boolean;recovery:string|null;running:boolean;processes:ProcessPreview[]|null;processes_truncated:boolean;current:CurrentIdentity};
+export type IdentityState={desktop_sessions_supported?:boolean;browser:BrowserLink;browser_warning:string|null;records:Identity[];summaries:Record<string,IdentitySummary>;usages?:Record<string,IdentityUsage>;active:string;last_selected?:string|null;workspace_id?:string|null;browser_profile_present?:boolean;recovery:string|null;running:boolean;processes:ProcessPreview[]|null;processes_truncated:boolean;current:CurrentIdentity};
 export const defaultPolicy:IdentityPolicy={skills:true,plugins:true,mcp:true,settings:true,projects:true,history:false,cache:false,desktop_sessions:false};
 export const identityPolicyKey='ccbaga.identity-policy.v1';
 export function readIdentityPolicy():IdentityPolicy {

@@ -79,6 +79,8 @@ function execute(command:string,args:any){
  if(command==='identities_associate'){state.summaries[args.id].client_checks={...state.summaries[args.id].client_checks,[args.client]:{source:args.client==='cli'?'local_metadata':'user_confirmed',checked_at:Date.now()}};return structuredClone(state);}
  if(command==='identities_login')return {email:args.email,organization:'Fixture team',subscription:'pro'};
  if(command==='identities_login_cancel')return;
+ if(command==='identities_usage')return {status:'ok',fetched_at:Date.now(),plan:'Pro',session:{percent:39,resets_at:new Date(Date.now()+3*3600e3).toISOString()},week:{percent:6,resets_at:new Date(Date.now()+6*86400e3).toISOString()}};
+ if(command==='identities_usage_saved')return {status:'ok',fetched_at:Date.now(),plan:'Max 5x',session:{percent:72,resets_at:new Date(Date.now()-3600e3).toISOString()},week:{percent:41,resets_at:new Date(Date.now()+2*86400e3).toISOString()}};
  if(fixture.sessionConflict&&['identities_sync_desktop_sessions','identities_switch'].includes(command)) {
   if(args.sessionChoices?.some((c:any)=>c.session==='local_fixture.json'&&c.revision==='fixture-revision'&&c.cli_id==='branch-b'))fixture.sessionConflict=false;
   else throw Error('DESKTOP_SESSION_CHOICE:'+JSON.stringify({session:'local_fixture.json',revision:'fixture-revision',title:'Fixture conversation',options:[{cli_id:'branch-a',messages:12,last_message_at:'2026-10-30T00:00:00.000Z'},{cli_id:'branch-b',messages:15,last_message_at:'2026-10-31T00:00:00.000Z'}]}));

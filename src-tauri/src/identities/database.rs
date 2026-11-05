@@ -1,5 +1,5 @@
 // [INPUT]: rusqlite/内嵌 SQLite、私有保险库目录和脱敏身份元数据与本机加盐的账号索引。
-// [OUTPUT]: SQLite v3 身份/浏览器目录及恢复事务、读取时计算过期状态的脱敏摘要、原地备份原子提交；备份不改选择指针，互斥提交后才回收空记录。
+// [OUTPUT]: SQLite v3 身份/浏览器目录、显式读取的用量显示缓存及恢复事务、读取时计算过期状态的脱敏摘要、原地备份原子提交；备份不改选择指针，互斥提交后才回收空记录。
 // [POS]: 保险库的索引事务；凭据和会话正文仅进入加密归档，不进入数据库。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use rusqlite::{params, Connection, OptionalExtension};
@@ -47,6 +47,7 @@ impl Database {
             CREATE TABLE IF NOT EXISTS identities(id TEXT PRIMARY KEY, name TEXT NOT NULL, archive TEXT NOT NULL, saved_at INTEGER NOT NULL, bytes INTEGER NOT NULL, policy TEXT NOT NULL,empty INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS state(key TEXT PRIMARY KEY,value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS identity_summaries(id TEXT PRIMARY KEY,summary TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS identity_usage(id TEXT PRIMARY KEY,usage TEXT NOT NULL);
 ").map_err(error)?;
         let tx = connection.unchecked_transaction().map_err(error)?;
         let version: i64 = tx
@@ -321,12 +322,39 @@ impl Database {
         }
         tx.execute("DELETE FROM identity_summaries WHERE id=?1", [id])
             .map_err(error)?;
+        tx.execute("DELETE FROM identity_usage WHERE id=?1", [id])
+            .map_err(error)?;
         tx.execute(
             "UPDATE state SET value='current' WHERE key='active' AND value=?1",
             [id],
         )
         .map_err(error)?;
         tx.commit().map_err(error)
+    }
+    /// Last explicitly fetched usage per saved identity; display cache only, never credentials.
+    pub fn usages(&self) -> Result<std::collections::BTreeMap<String, super::usage::Usage>, String> {
+        let mut query = self
+            .connection
+            .prepare("SELECT u.id,u.usage FROM identity_usage u JOIN identities i ON i.id=u.id")
+            .map_err(error)?;
+        let rows = query
+            .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
+            .map_err(error)?;
+        Ok(rows
+            .flatten()
+            .filter_map(|(id, text)| serde_json::from_str(&text).ok().map(|usage| (id, usage)))
+            .collect())
+    }
+    pub fn set_usage(&self, id: &str, usage: &super::usage::Usage) -> Result<(), String> {
+        let text = serde_json::to_string(usage).map_err(|_| "用量无法保存。")?;
+        self.connection
+            .execute(
+                "INSERT INTO identity_usage(id,usage) SELECT id,?2 FROM identities WHERE id=?1
+                 ON CONFLICT(id) DO UPDATE SET usage=excluded.usage",
+                params![id, text],
+            )
+            .map_err(error)?;
+        Ok(())
     }
     pub fn rename(&self, id: &str, name: &str) -> Result<(), String> {
         if self

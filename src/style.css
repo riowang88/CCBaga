@@ -418,7 +418,7 @@ h3 { margin: 0; font-size: 13px; font-weight: 500; }
 .identity-policy summary:focus-visible { outline:2px solid var(--foreground); outline-offset:-4px; }
 .identity-policy-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); padding:0 28px 20px; gap:14px 24px; }
 .identity-policy-row label { font-size:12px; line-height:1.4; }
-.identity-card { position:relative; flex:0 0 196px; min-width:0; height:312px; padding:24px 15px 14px; border:1px solid #d0d0ca; border-radius:16px; background:linear-gradient(155deg,#fff 10%,#fafaf8 65%,#f1f1ee); display:flex; flex-direction:column; box-shadow:inset 0 1px 0 #fff,inset 0 -2px 0 #e8e8e3,0 6px 0 #d2d2cc,0 7px 0 #bdbdb5,0 16px 24px -12px #0004; transition:box-shadow .18s; }
+.identity-card { position:relative; flex:0 0 222px; min-width:0; height:352px; padding:24px 15px 14px; border:1px solid #d0d0ca; border-radius:16px; background:linear-gradient(155deg,#fff 10%,#fafaf8 65%,#f1f1ee); display:flex; flex-direction:column; box-shadow:inset 0 1px 0 #fff,inset 0 -2px 0 #e8e8e3,0 6px 0 #d2d2cc,0 7px 0 #bdbdb5,0 16px 24px -12px #0004; transition:box-shadow .18s; }
 .identity-card:hover { box-shadow:inset 0 1px 0 #fff,inset 0 -2px 0 #e8e8e3,0 9px 0 #d2d2cc,0 10px 0 #bdbdb5,0 22px 30px -14px #0005; }
 .identity-card.current { color:#fff; background:linear-gradient(155deg,#343432 0%,#20201f 50%,#141413 100%); border-color:#353531; box-shadow:inset 0 1px 0 #ffffff35,inset 0 -2px 0 #080808,0 6px 0 #30302d,0 7px 0 #111,0 16px 24px -12px #0006; }
 .identity-card.current:hover { box-shadow:inset 0 1px 0 #ffffff35,inset 0 -2px 0 #080808,0 9px 0 #30302d,0 10px 0 #111,0 22px 30px -14px #0006; }
@@ -595,3 +595,29 @@ h3 { margin: 0; font-size: 13px; font-weight: 500; }
 .identity-client-details > summary:focus-visible { outline:2px solid var(--foreground); outline-offset:4px; }
 .identity-client-details > .identity-confirm { margin-top:12px; }
 @media(max-width:850px) { .identity-client-details { margin-inline:22px; } }
+/* 工牌内用量：会话/本周两条细进度，深色当前卡与浅色暂存卡共用；已重置窗口清空进度 */
+.card-usage { display:grid; gap:6px; margin-top:8px; padding-top:8px; border-top:1px dashed #d8d8d1; }
+.current .card-usage { border-top-color:#ffffff26; }
+.card-usage.pending, .card-usage.note { font-size:10px; color:var(--muted-foreground); }
+.current .card-usage.pending, .current .card-usage.note { color:#a9a9a0; }
+.card-usage.note.error { color:#c53030; }
+.current .card-usage.note.error { color:#ff8a80; }
+.card-usage.loading { opacity:.55; }
+.card-usage-meter { display:grid; gap:3px; }
+.card-usage-line { display:flex; justify-content:space-between; align-items:baseline; gap:6px; font-size:10.5px; }
+.card-usage-line > span { display:flex; align-items:baseline; gap:5px; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.card-usage-line small { font-size:9.5px; color:var(--muted-foreground); overflow:hidden; text-overflow:ellipsis; }
+.current .card-usage-line small { color:#9b9b92; }
+.identity-card > * { flex-shrink:0; }
+.card-usage-line strong { font-weight:600; font-variant-numeric:tabular-nums; color:#1d9b4f; }
+.current .card-usage-line strong { color:#5ee08f; }
+.card-usage-line strong.mid { color:#b7791f; }
+.current .card-usage-line strong.mid { color:#f6c26b; }
+.card-usage-line strong.high { color:#c53030; }
+.current .card-usage-line strong.high { color:#ff8a80; }
+.card-usage-meter.reset .card-usage-line strong { color:var(--muted-foreground); font-weight:500; }
+.card-usage-track { height:4px; border-radius:3px; background:#e6e6e0; overflow:hidden; }
+.current .card-usage-track { background:#ffffff1f; }
+.card-usage-track > span { display:block; height:100%; border-radius:inherit; background:#171717; transition:width .3s; }
+.current .card-usage-track > span { background:#f4f4ef; }
+@media (prefers-reduced-motion:reduce) { .card-usage-track > span { transition:none; } }

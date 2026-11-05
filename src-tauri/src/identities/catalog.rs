@@ -179,6 +179,7 @@ impl Store {
                 fs::remove_file(entry.path()).map_err(|_| "旧身份归档回收失败。")?;
             }
         }
+        super::sidecar::collect(&self.vault, &records);
         private::sync_parent(&self.vault.join("identities.sqlite"));
         Ok(())
     }

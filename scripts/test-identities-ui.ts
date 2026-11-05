@@ -45,7 +45,17 @@ try{
  await page.getByText('查看本机数据',{exact:true}).click();
  assert.match(await page.locator('.identity-client-status').innerText(),/发现数据不代表已经登录/);
  const cards=page.locator('.identity-card');
- await page.getByText('fixture@example.invalid',{exact:true}).waitFor();
+ await page.locator('.identity-card-rail').getByText('fixture@example.invalid',{exact:true}).waitFor();
+ // 用量在工牌内：只有页头一个「刷新」，点击后先读本地状态再读每个账号用量；已过重置时间显示「已重置」。
+ assert.equal(await page.locator('.identity-usage').count(),0);
+ assert.equal(await page.getByRole('button',{name:/^刷新/}).count(),1);
+ assert.equal(await page.locator('.identity-card:not(.empty) .card-usage').count(),await cards.count()-1);
+ await page.locator('.cleanup-title').getByRole('button',{name:'刷新'}).click();
+ const savedCard=page.locator('.identity-card:not(.empty):not(.current)').first();
+ await savedCard.locator('.card-usage-meter').first().waitFor();
+ assert.match(await savedCard.locator('.card-usage').innerText(),/已重置[\s\S]*41%/);
+ await page.locator('.identity-card.current .card-usage-meter').first().waitFor();
+ await page.locator('.cleanup-title').getByRole('button',{name:'刷新'}).and(page.locator(':not([disabled])')).waitFor();
  assert.equal(await cards.count(),41);assert.equal(await cards.first().getByRole('heading').innerText(),'空身份');
  assert.equal(await page.locator('.identity-switcher').count(),0);
  assert.equal(await page.getByText('上次使用',{exact:true}).count(),0);
@@ -114,7 +124,7 @@ try{
  assert.equal(request.policy.skills,false);assert.equal(request.targetId,'empty');assert.equal(request.currentName,'Identity 1');checks++;
  const target=page.locator('.identity-card:not(.current)').filter({has:page.getByRole('heading',{name:'Identity 3',exact:true})});
  await target.getByRole('button',{name:'切换',exact:true}).click();
- await page.getByRole('dialog').getByRole('button',{name:'保存当前身份并切换'}).click();await page.getByText('Fixture team',{exact:true}).waitFor();checks++;
+ await page.getByRole('dialog').getByRole('button',{name:'保存当前身份并切换'}).click();await page.locator('.identity-card-rail').getByText('Fixture team',{exact:true}).waitFor();checks++;
  assert.equal(await target.count(),0);checks++;
  const bound=cards.filter({has:page.getByRole('heading',{name:'Identity 1',exact:true})});
  await bound.getByRole('button',{name:'删除',exact:true}).click();

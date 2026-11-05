@@ -1,5 +1,5 @@
 // [INPUT]: 白名单身份源、SQLite 账号目录、Zstandard/旧 gzip 与认证加密流。
-// [OUTPUT]: 稳定账号/已选择本地槽位的不可变归档代次；v2 保存目录内链接且不跟随目标，完整认证后创建链接；v1 兼容。
+// [OUTPUT]: 稳定账号/已选择本地槽位的不可变归档代次；v2 保存目录内链接且不跟随目标，完整认证后创建链接；v1 兼容。；load 末尾以同代次凭据侧车覆盖 claudeAiOauth（失败回退归档），保存后播种侧车
 // [POS]: 保险库的数据格式边界，与 store 的工作区切换事务分离，旧 gzip 归档保持可读。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use super::{
@@ -82,6 +82,9 @@ fn append<W: Write>(
 }
 impl Store {
     pub(super) fn load(&self, record: &Record) -> Result<Stage, String> {
+        self.load_inner(record, true)
+    }
+    fn load_inner(&self, record: &Record, sidecar: bool) -> Result<Stage, String> {
         if !super::valid_id(&record.id) || !super::catalog::archive_name(&record.archive) {
             return Err("身份归档编号无效。".into());
         }
@@ -207,10 +210,16 @@ impl Store {
             Ok(manifest)
         })();
         match result {
-            Ok(manifest) => Ok(Stage {
-                path: folder,
-                manifest,
-            }),
+            Ok(manifest) => {
+                let mut stage = Stage { path: folder, manifest };
+                // CCBaga-renewed CLI OAuth supersedes the archived copy for this generation.
+                // An unreadable sidecar falls back to the archive instead of blocking the switch.
+                if sidecar && super::sidecar::overlay(&mut stage, &self.vault, &self.key, record).is_err() {
+                    drop(stage);
+                    stage = self.load_inner(record, false)?;
+                }
+                Ok(stage)
+            }
             Err(e) => {
                 let _ = fs::remove_dir_all(folder);
                 Err(e)
@@ -464,6 +473,12 @@ impl Store {
                 None,
             );
             let stage = self.load(&record)?;
+            // Seed the renewable copy now, while the credentials are already decrypted, so a
+            // later usage refresh never has to decrypt the whole archive.
+            if let Ok(Some(oauth)) = super::sidecar::stage_oauth(&stage) {
+                let _ = super::sidecar::write(&self.vault, &self.key, &record, &oauth);
+            }
+            let _ = super::sidecar::write_seed(&self.vault, &self.key, &super::sidecar::seed_from_stage(&stage, &record));
             reporter.log("verify_archive", "ok", "认证归档已完整验收。", 1, Some(1));
             Ok((record, stage))
         })();

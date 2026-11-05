@@ -146,11 +146,47 @@ fn desktop_oauth_cache_allowlist_rejects_whole_config_and_other_keys() {
         category: "desktop".into(), keys: vec!["oauth:tokenCache".into()],
     };
     assert!(cleaner::identity::allowed(&f.home, &source));
+    let current = cleaner::identity::Source {
+        keys: vec!["oauth:tokenCache".into(), "oauth:tokenCacheV2".into(), "lastKnownAccountUuid".into()],
+        ..source.clone()
+    };
+    assert!(cleaner::identity::allowed(&f.home, &current));
     for keys in [vec![], vec!["theme".into()], vec!["oauth:tokenCache".into(), "theme".into()]] {
         assert!(!cleaner::identity::allowed(&f.home, &cleaner::identity::Source { keys, ..source.clone() }));
     }
     f.write("Library/Application Support/Claude/config.json", b"{}");
     assert!(cleaner::identity::sources_for_client(&f.home, &Policy::default(), true).unwrap().is_empty());
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn desktop_token_cache_v2_and_account_marker_follow_identity() {
+    // Desktop 4.x clears a restored cache when lastKnownAccountUuid still names the previous
+    // account, and the V2 cache otherwise stays behind as another account's token.
+    let f = Fixture::new();
+    let path = "Library/Application Support/Claude/config.json";
+    let p = Policy::default();
+    let r = Reporter::channel(None);
+    let mut s = store::Store::open(&f.vault, &f.home).unwrap();
+    let read = || -> serde_json::Value {
+        serde_json::from_slice(&fs::read(f.home.join(path)).unwrap()).unwrap()
+    };
+    f.login("A", "org", "a");
+    f.write(path, br#"{"oauth:tokenCacheV2":"v2-A","lastKnownAccountUuid":"uuid-A","theme":"dark"}"#);
+    s.switch("empty", "A", &p, &r).unwrap();
+    let a = s.records()[0].id.clone();
+    assert!(read().get("oauth:tokenCacheV2").is_none());
+    assert!(read().get("lastKnownAccountUuid").is_none());
+    f.login("B", "org", "b");
+    f.write(path, br#"{"oauth:tokenCacheV2":"v2-B","lastKnownAccountUuid":"uuid-B","theme":"light"}"#);
+    s.switch(&a, "B", &p, &r).unwrap();
+    assert_eq!(read()["oauth:tokenCacheV2"], "v2-A");
+    assert_eq!(read()["lastKnownAccountUuid"], "uuid-A");
+    assert_eq!(read()["theme"], "light");
+    let b = s.records().into_iter().find(|v| v.id != a).unwrap().id;
+    s.switch(&b, "A", &p, &r).unwrap();
+    assert_eq!(read()["oauth:tokenCacheV2"], "v2-B");
+    assert_eq!(read()["lastKnownAccountUuid"], "uuid-B");
 }
 
 #[cfg(target_os = "macos")]
@@ -586,11 +622,14 @@ fn opening_and_switching_preserve_distinct_desktop_accounts_and_personal_setting
     let desktop = "AppData/Roaming/Claude";
     #[cfg(not(windows))]
     let desktop = "Library/Application Support/Claude";
+    f.write(
+        &format!("{desktop}/config.json"),
+        br#"{"lastKnownAccountUuid":"desktop-b","theme":"dark"}"#,
+    );
+    let config = || -> serde_json::Value {
+        serde_json::from_slice(&fs::read(f.home.join(desktop).join("config.json")).unwrap()).unwrap()
+    };
     let retained = [
-        (
-            "config.json",
-            r#"{"lastKnownAccountUuid":"desktop-b","theme":"dark"}"#,
-        ),
         ("Preferences", r#"{"personal":"keep"}"#),
         (
             "Local State",
@@ -634,6 +673,15 @@ fn opening_and_switching_preserve_distinct_desktop_accounts_and_personal_setting
     let r = Reporter::channel(None);
     s.switch("empty", "Account A", &p, &r).unwrap();
     assert_retained();
+    // The Desktop account marker leaves with the identity; personal keys stay.
+    assert_eq!(
+        config(),
+        if cfg!(target_os = "linux") {
+            serde_json::json!({"lastKnownAccountUuid":"desktop-b","theme":"dark"})
+        } else {
+            serde_json::json!({"theme":"dark"})
+        }
+    );
     // Linux 不处理 macOS 路径；其余平台仅暂存明确的 Desktop 登录存储。
     assert_eq!(
         f.home.join(desktop).join("Local Storage").exists(),
@@ -642,6 +690,7 @@ fn opening_and_switching_preserve_distinct_desktop_accounts_and_personal_setting
     let saved = s.records().into_iter().find(|row| !row.empty).unwrap();
     s.switch(&saved.id, "Empty", &p, &r).unwrap();
     assert_retained();
+    assert_eq!(config(), serde_json::json!({"lastKnownAccountUuid":"desktop-b","theme":"dark"}));
     assert_eq!(
         fs::read(f.home.join(desktop).join("Local Storage/state")).unwrap(),
         b"desktop-b-login"

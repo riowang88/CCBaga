@@ -38,6 +38,13 @@ pub(crate) const SETTINGS_IDENTITY_KEYS: &[&str] = &[
     "env.ANTHROPIC_AUTH_TOKEN",
     "apiKeyHelper",
 ];
+/// Desktop config.json keys that belong to the signed-in account. Old archives that only
+/// stored the first key remain valid: these are an allowlist superset, never required.
+pub(crate) const DESKTOP_IDENTITY_KEYS: &[&str] = &[
+    "oauth:tokenCache",
+    "oauth:tokenCacheV2",
+    "lastKnownAccountUuid",
+];
 fn definitions(root: &Path, policy: &Policy) -> Vec<Source> {
     let mut result: Vec<_> = targets::definitions(root)
         .into_iter()
@@ -89,10 +96,12 @@ fn definitions(root: &Path, policy: &Policy) -> Vec<Source> {
     for desktop in desktop_roots {
         // The app's Code OAuth cache is encrypted by Electron safeStorage.
         // Preserve it with the existing Desktop login/keychain snapshot, not personal settings.
+        // Current Desktop builds use tokenCacheV2 and compare lastKnownAccountUuid at launch:
+        // leaving either from the previous identity makes the app clear the restored cache.
         result.push(Source {
             path: desktop.join("config.json"),
             category: "desktop".into(),
-            keys: vec!["oauth:tokenCache".into()],
+            keys: DESKTOP_IDENTITY_KEYS.iter().map(|k| (*k).into()).collect(),
         });
         if !policy.mcp {
             result.push(Source {

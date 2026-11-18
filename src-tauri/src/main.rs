@@ -53,6 +53,24 @@ async fn copy_result(app: tauri::AppHandle, text: String) -> Result<(), String> 
     .map_err(|_| "复制失败。")?;
     receive.await.map_err(|_| "复制失败。")?
 }
+/// 用户主动点击后把本机有界诊断日志放入剪贴板；不上传，由用户自行决定发给谁。
+#[tauri::command]
+async fn copy_diagnostics(app: tauri::AppHandle) -> Result<usize, String> {
+    let text = tauri::async_runtime::spawn_blocking(progress::export)
+        .await
+        .map_err(|_| "诊断日志读取被中断。")?;
+    if text.is_empty() {
+        return Err("还没有可复制的诊断日志。".into());
+    }
+    let lines = text.lines().count();
+    let (send, receive) = tokio::sync::oneshot::channel();
+    app.run_on_main_thread(move || {
+        let _ = send.send(native::copy(&text));
+    })
+    .map_err(|_| "复制失败。")?;
+    receive.await.map_err(|_| "复制失败。")??;
+    Ok(lines)
+}
 #[tauri::command]
 fn runtime_platform() -> &'static str {
     std::env::consts::OS
@@ -95,6 +113,9 @@ fn main() {
         }))
         .setup(|app| {
             startup_trace("host setup");
+            if let Ok(data) = app.path().app_data_dir() {
+                progress::install(&data.join("diagnostics"), app.path().home_dir().ok().as_deref());
+            }
             app.manage(ui_language::UiLanguage::load(app.handle()));
             app.manage(cleaner::Cleaner::default());
             app.manage(identities::login::Login::default());
@@ -136,6 +157,7 @@ fn main() {
             open_permissions,
             unlock_keychain,
             copy_result,
+            copy_diagnostics,
             cleaner::cleaner_scan,
             cleaner::cleaner_stop,
             cleaner::cleaner_processes,

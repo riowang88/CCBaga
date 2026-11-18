@@ -30,7 +30,8 @@ export function IdentityPanel({onBusy}: {onBusy?: (busy: boolean) => void; initi
   const [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [cliBusy, setCliBusy] = useState(false);
   const [residueBusy, setResidueBusy] = useState(false), [residueRevision, setResidueRevision] = useState(0);
   const [error, setError] = useState('');
-  const [sharingResult, setSharingResult] = useState<{accounts: number; added: number; repaired: number; skipped: number} | null>(null);
+  const [diagnostics, setDiagnostics] = useState('');
+  const [sharingResult, setSharingResult] = useState<{accounts: number; added: number; repaired: number; skipped: number; skipped_unsupported: number; skipped_missing_body: number; skipped_ambiguous_body: number; skipped_relation: number} | null>(null);
   const [sessionConflict, setSessionConflict] = useState<{conflict: SessionConflict; target: Target | 'sync'; choices: SessionChoice[]} | null>(null);
   const [selectedSession, setSelectedSession] = useState('');
   const [transfer, setTransfer] = useState<Identity | 'import' | null>(null), [transferBusy, setTransferBusy] = useState(false);
@@ -195,6 +196,10 @@ export function IdentityPanel({onBusy}: {onBusy?: (busy: boolean) => void; initi
       await refreshAfterError();
     } finally { setBusy(false); }
   }
+  async function copyDiagnostics() {
+    try { const lines = await invoke<number>('copy_diagnostics'); setDiagnostics(t('已复制 {lines} 行诊断日志，可直接粘贴发给开发者。', {lines})); }
+    catch (e) { setDiagnostics(t(String(e))); }
+  }
   function confirmDelete(target: Identity | 'current') { setDeletion(target); setAccepted(false); setDeleteBrowser(false); setError(''); }
   async function remove() {
     if (!deletion || !accepted || busy) return;
@@ -264,6 +269,10 @@ export function IdentityPanel({onBusy}: {onBusy?: (busy: boolean) => void; initi
       <button type="button" className="rb-btn" disabled={blocked} onClick={() => setTransfer('import')}>{t('导入')}</button>
     </header>
     {error && <p role="alert" className="rb-id-banner rb-err">{t(error)}</p>}
+    <p className="rb-muted rb-id-diagnostics">
+      <button type="button" className="rb-link" onClick={() => void copyDiagnostics()}>{t('复制诊断日志')}</button>{' '}
+      {diagnostics ? <span role="status">{diagnostics}</span> : t('遇到问题时复制后发给开发者。日志只存在本机、不上传，只含操作阶段、数量与错误，不含令牌、聊天正文或文件内容。')}
+    </p>
     {state?.recovery && <div className="rb-id-banner warn" role="alert">
       <strong>{t('有一次身份切换尚未完成')}</strong>
       <button type="button" className="rb-btn primary" disabled={locked || loading} onClick={() => choose('recovery')}>{t('恢复原身份')}</button>

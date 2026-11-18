@@ -1,5 +1,5 @@
 // [INPUT]: macOS 默认 Claude 桌面索引、正文消息标识/时间及原生回退记录。
-// [OUTPUT]: 自动跟进明确后继；分叉返回有版本校验的选择，保存旧索引与正文，不复制授权/任务。
+// [OUTPUT]: 自动跟进明确后继；分叉返回有版本校验的选择，保存旧索引与正文，不复制授权/任务；同一会话有多份正文时只认 cwd 对应项目目录下的一份，跳过按原因分项计数。
 // [POS]: 显式可选共享；调用方持锁并检查客户端停止，临时文件落盘关闭后提交，关闭共享不撤销已复制入口。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use super::private;
@@ -9,7 +9,24 @@ use serde_json::{Map, Value};
 use std::{collections::BTreeMap, fs, io::{Read, Write}, path::{Path, PathBuf}};
 const LIMIT: usize = 10_000;
 #[derive(Default, Serialize, Debug)]
-pub struct Report { pub accounts: usize, pub added: usize, pub repaired: usize, pub skipped: usize }
+pub struct Report {
+    pub accounts: usize, pub added: usize, pub repaired: usize, pub skipped: usize,
+    // skipped 的分项：未启动/远程/定时任务、本机无正文、多份正文无法确定、层级关系不完整。
+    pub skipped_unsupported: usize, pub skipped_missing_body: usize, pub skipped_ambiguous_body: usize, pub skipped_relation: usize,
+}
+// Claude Code 把会话正文放在 projects/<cwd 中非 ASCII 字母数字逐 UTF-16 单元替换为 '-'>/。
+// 超长路径会被截断加哈希，这里不猜测，匹配不到即视为无法确定。
+fn project_dir(cwd: &str) -> String {
+    cwd.encode_utf16().map(|u| if u < 128 && (u as u8).is_ascii_alphanumeric() { u as u8 as char } else { '-' }).collect()
+}
+// 会话进入 worktree 后旧目录会留下同名正文副本；客户端按 cwd 续聊，只认该目录下的那一份。
+fn body_path<'a>(paths: &'a [PathBuf], cwd: &str) -> Option<&'a PathBuf> {
+    if paths.len() == 1 { return paths.first(); }
+    let dir = project_dir(cwd);
+    let mut hits = paths.iter().filter(|p| p.parent().and_then(|d| d.file_name()).and_then(|n| n.to_str()) == Some(dir.as_str()));
+    let first = hits.next()?;
+    if hits.next().is_some() { None } else { Some(first) }
+}
 fn invalid() -> String { "桌面会话索引无法安全读取或存在冲突；未完成共享。".into() }
 fn uuid(s: &str) -> bool {
     s.len() == 36 && s.bytes().enumerate().all(|(i,b)| if [8,13,18,23].contains(&i) { b == b'-' } else { b.is_ascii_hexdigit() })
@@ -240,8 +257,16 @@ pub fn sync_selected(home: &Path, choices: &[Selection], check: impl Fn() -> Res
     #[cfg(not(target_os="macos"))] {
         let _ = (home,choices,check); return Err("桌面会话共享目前仅支持 macOS 默认 Claude App。".into());
     }
-    #[cfg(target_os="macos")]
-    sync_at_selected(home, &home.join("Library/Application Support/Claude/claude-code-sessions"), choices, check)
+    #[cfg(target_os="macos")] {
+        let result = sync_at_selected(home, &home.join("Library/Application Support/Claude/claude-code-sessions"), choices, check);
+        // 只记计数与固定错误文案；待选择版本的载荷含会话标题，不写入诊断日志。
+        match &result {
+            Ok(r) => crate::progress::note("share_sessions","report",&format!("accounts={} added={} repaired={} skipped={} unsupported={} missing_body={} ambiguous_body={} relation={}",r.accounts,r.added,r.repaired,r.skipped,r.skipped_unsupported,r.skipped_missing_body,r.skipped_ambiguous_body,r.skipped_relation)),
+            Err(e) if e.starts_with(CHOICE_PREFIX) => crate::progress::note("share_sessions","choice","需要选择会话版本"),
+            Err(e) => crate::progress::note("share_sessions","error",e),
+        }
+        result
+    }
 }
 #[cfg(test)]
 fn sync_at(home: &Path, root: &Path, check: impl Fn() -> Result<(),String>) -> Result<Report,String> {
@@ -262,7 +287,7 @@ fn sync_at_selected(home: &Path, root: &Path, choices: &[Selection], check: impl
     }
     report.accounts = buckets.len();
     // Read message identifiers/times only when distinct transcript versions need comparison.
-    let mut bodies = BTreeMap::<String,Vec<PathBuf>>::new();
+    let mut found = BTreeMap::<String,Vec<PathBuf>>::new();
     for project in entries(&home.join(".claude/projects"))? {
         // Existing unrelated linked project folders are not followed or changed.
         if fs::symlink_metadata(&project).map_err(|_| invalid())?.file_type().is_symlink() { continue; }
@@ -271,10 +296,12 @@ fn sync_at_selected(home: &Path, root: &Path, choices: &[Selection], check: impl
             let Some(id) = file.file_stem().and_then(|s| s.to_str()).filter(|s| uuid(s)) else { continue; };
             if file.extension().is_none_or(|s|s!="jsonl") { continue; }
             regular(&file)?;
-            bodies.entry(id.into()).or_default().push(file.clone());
-            if bodies.len() > LIMIT { return Err(invalid()); }
+            found.entry(id.into()).or_default().push(file.clone());
+            if found.len() > LIMIT { return Err(invalid()); }
         }
     }
+    // 每个 CLI 会话只保留一份已确定的正文路径，后续版本比较与复核都用它。
+    let mut bodies = BTreeMap::<String,Vec<PathBuf>>::new();
     let mut candidates = BTreeMap::<String,Vec<SessionRecord>>::new();
     // Missing relation fields are old shared copies. Conflicting nonempty relations
     // have no authoritative winner, so never use them to repair another account.
@@ -289,10 +316,14 @@ fn sync_at_selected(home: &Path, root: &Path, choices: &[Selection], check: impl
             originals.insert(file.clone(),value.clone());
             // Remote sessions and incomplete starts cannot be resumed from the local body.
             if value.get("cliSessionId").is_none_or(Value::is_null) || ["sshConfig","wslConfig","pendingFirstStart","scheduledTaskId"].iter().any(|k| value.get(*k).is_some_and(|v|!v.is_null())) {
-                report.skipped += 1; continue;
+                report.skipped += 1; report.skipped_unsupported += 1; continue;
             }
             let key = core(&value,name)?;
-            if bodies.get(&key.0).is_none_or(|paths|paths.len()!=1) { report.skipped += 1; continue; }
+            let Some(paths) = found.get(&key.0) else { report.skipped += 1; report.skipped_missing_body += 1; continue; };
+            let Some(chosen) = body_path(paths,&key.1) else { report.skipped += 1; report.skipped_ambiguous_body += 1; continue; };
+            // 同一 CLI 会话被不同项目路径的索引指向不同副本时没有权威来源。
+            if bodies.get(&key.0).is_some_and(|old| old[0] != *chosen) { report.skipped += 1; report.skipped_ambiguous_body += 1; continue; }
+            bodies.insert(key.0.clone(),vec![chosen.clone()]);
             let filtered = clean(&value)?;
             let relation=lineage(&value);
             if !relation.is_empty() {
@@ -347,7 +378,7 @@ fn sync_at_selected(home: &Path, root: &Path, choices: &[Selection], check: impl
                     }
                 }
                 Err(e) if e.kind()==std::io::ErrorKind::NotFound => {
-                    if !valid_spawn(&value) { report.skipped+=1;continue; }
+                    if !valid_spawn(&value) { report.skipped+=1;report.skipped_relation+=1;continue; }
                     if plan.len() >= LIMIT { return Err(invalid()); }
                     plan.push((path,serde_json::to_vec(&value).map_err(|_| invalid())?,None));
                 }

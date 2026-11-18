@@ -6,6 +6,7 @@ use super::{optimization_tests::Fixture, *};
 use std::{fs, path::PathBuf};
 
 // Retained adversarial cases. Synthetic HOME and browser directories only.
+// 另含策略由暂存改为保留后归档历史并回工作区、冲突另存、并回失败回滚不清工作区的回归。
 fn audit_browser(f: &Fixture, s: &store::Store, marker: &[u8]) -> PathBuf {
     let slot = s.db.browser_slot().unwrap();
     let path = f.root.join("browser/contexts").join(slot).join("profile");
@@ -189,4 +190,101 @@ fn manual_window_full_identity_to_browser_only_and_back_preserves_each_client() 
     assert_eq!(f.token(),"B-token"); assert_eq!(fs::read(f.home.join(desktop)).unwrap(),b"B-desktop");
     assert_eq!(fs::read(a_profile.join("Default/Cookies")).unwrap(),b"A-web");
     assert_eq!(fs::read(b_profile.join("Default/Cookies")).unwrap(),b"B-web");
+}
+
+#[test]
+fn stashed_history_returns_to_workspace_when_policy_becomes_keep() {
+    let f = Fixture::new();
+    let mut s = store::Store::open(&f.vault, &f.home).unwrap();
+    s.db.configure_browser(false, false, None).unwrap();
+    let r = Reporter::channel(None);
+    f.login("A", "org", "A-token");
+    f.write(".claude/projects/p/body.jsonl", b"A history");
+    f.write(".claude/projects/p/shared.jsonl", b"A version");
+    f.write(".claude/projects/p/same.jsonl", b"same");
+    f.write(".claude/history.jsonl", b"A prompts");
+    s.switch("empty", "A", &Policy::default(), &r).unwrap();
+    let a = s.records()[0].id.clone();
+    assert!(!f.home.join(".claude/projects").exists());
+    // 另一身份在保留策略下留下的工作区资料不能被覆盖。
+    f.write(".claude/projects/p/shared.jsonl", b"live version");
+    f.write(".claude/projects/p/same.jsonl", b"same");
+    f.write(".claude/projects/q/other.jsonl", b"live only");
+    f.write(".claude/history.jsonl", b"live prompts");
+    let keep = Policy { history: true, desktop_sessions: true, ..Policy::default() };
+    s.switch(&a, "empty", &keep, &r).unwrap();
+    let read = |p: &str| fs::read(f.home.join(p)).unwrap();
+    assert_eq!(read(".claude/projects/p/body.jsonl"), b"A history");
+    assert_eq!(read(".claude/projects/p/shared.jsonl"), b"live version");
+    assert_eq!(read(&format!(".claude/projects/p/shared.jsonl.baga-{a}")), b"A version");
+    assert!(!f.home.join(format!(".claude/projects/p/same.jsonl.baga-{a}")).exists());
+    assert_eq!(read(".claude/projects/q/other.jsonl"), b"live only");
+    assert_eq!(read(".claude/history.jsonl"), b"live prompts");
+    assert_eq!(read(&format!(".claude/history.jsonl.baga-{a}")), b"A prompts");
+    assert_eq!(f.token(), "A-token");
+    // 再保存一轮后旧代次被回收，资料仍在工作区。
+    s.switch("empty", "A", &keep, &r).unwrap();
+    s.switch(&a, "empty", &keep, &r).unwrap();
+    assert_eq!(read(".claude/projects/p/body.jsonl"), b"A history");
+    assert_eq!(read(&format!(".claude/projects/p/shared.jsonl.baga-{a}")), b"A version");
+    assert_eq!(s.records().len(), 1);
+}
+#[cfg(unix)]
+#[test]
+fn failed_merge_rolls_back_without_clearing_kept_workspace_history() {
+    use std::os::unix::fs::PermissionsExt;
+    let f = Fixture::new();
+    let mut s = store::Store::open(&f.vault, &f.home).unwrap();
+    s.db.configure_browser(false, false, None).unwrap();
+    let r = Reporter::channel(None);
+    f.login("A", "org", "A-token");
+    f.write(".claude/projects/p/body.jsonl", b"A history");
+    s.switch("empty", "A", &Policy::default(), &r).unwrap();
+    let a = s.records()[0].id.clone();
+    f.write(".claude/projects/q/other.jsonl", b"live only");
+    f.write(".claude/projects/p/keep.jsonl", b"live");
+    // 目标目录不可写：并回失败，切换回滚；工作区保留资料不被回滚清除，归档仍可再次恢复。
+    let locked = f.home.join(".claude/projects/p");
+    fs::set_permissions(&locked, fs::Permissions::from_mode(0o500)).unwrap();
+    let keep = Policy { history: true, ..Policy::default() };
+    let failed = s.switch(&a, "empty", &keep, &r);
+    fs::set_permissions(&locked, fs::Permissions::from_mode(0o700)).unwrap();
+    assert!(failed.is_err());
+    assert_eq!(fs::read(f.home.join(".claude/projects/q/other.jsonl")).unwrap(), b"live only");
+    assert_eq!(fs::read(f.home.join(".claude/projects/p/keep.jsonl")).unwrap(), b"live");
+    assert!(!profile::read(&f.home).present);
+    if s.db.get("recovery").unwrap().is_some() { s.recover("empty", &r).unwrap(); }
+    s.switch(&a, "empty", &keep, &r).unwrap();
+    assert_eq!(fs::read(f.home.join(".claude/projects/p/body.jsonl")).unwrap(), b"A history");
+    assert_eq!(fs::read(f.home.join(".claude/projects/q/other.jsonl")).unwrap(), b"live only");
+    assert_eq!(f.token(), "A-token");
+}
+
+#[test]
+fn history_left_in_superseded_archive_is_rescued_before_resave() {
+    let f = Fixture::new();
+    let mut s = store::Store::open(&f.vault, &f.home).unwrap();
+    s.db.configure_browser(false, false, None).unwrap();
+    let r = Reporter::channel(None);
+    f.login("A", "org", "A-token");
+    f.write(".claude/projects/p/body.jsonl", b"A history");
+    f.write(".claude/projects/p/grown.jsonl", b"old");
+    s.switch("empty", "A", &Policy::default(), &r).unwrap();
+    let a = s.records()[0].id.clone();
+    let keep = Policy { history: true, desktop_sessions: true, ..Policy::default() };
+    s.switch(&a, "empty", &keep, &r).unwrap();
+    // 旧版本切回后的状态：身份已激活，历史仍只在归档里；其中一条会话之后又有新内容。
+    fs::remove_file(f.home.join(".claude/projects/p/body.jsonl")).unwrap();
+    f.write(".claude/projects/p/grown.jsonl", b"old plus new");
+    for save_in_place in [true, false] {
+        if save_in_place { s.save_current("A", &keep, &r).unwrap(); } else { s.switch("empty", "A", &keep, &r).unwrap(); }
+        assert_eq!(fs::read(f.home.join(".claude/projects/p/body.jsonl")).unwrap(), b"A history");
+        assert_eq!(fs::read(f.home.join(".claude/projects/p/grown.jsonl")).unwrap(), b"old plus new");
+        assert_eq!(fs::read_dir(f.home.join(".claude/projects/p")).unwrap().count(), 2);
+        if save_in_place {
+            // 第一次保存已取代旧代次；回到“只在归档”的状态已不可能，仅验证后续保存不再生事。
+            continue;
+        }
+    }
+    assert_eq!(s.records().len(), 1);
 }

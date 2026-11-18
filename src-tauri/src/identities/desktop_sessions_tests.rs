@@ -1,5 +1,5 @@
 // [INPUT]: 隔离账号目录、平台原生绝对项目路径、合成索引/消息和显式元数据回放样本。
-// [OUTPUT]: 共享默认关闭、白名单、既有字段保留/IPC taskId 补齐、正常后继自动跟进、分叉选择及过期拒绝、冲突/脱离/链接/进程拒绝与切换保留回归。
+// [OUTPUT]: 共享默认关闭、白名单、既有字段保留/IPC taskId 补齐、正常后继自动跟进、分叉选择及过期拒绝、冲突/脱离/链接/进程拒绝与切换保留回归；worktree 多份正文按 cwd 目录选定与跳过原因分项。
 // [POS]: 不读取真实资料，不运行或终止真实客户端。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use super::*;
@@ -321,4 +321,19 @@ fn replay_desktop_metadata_fixture() {
     private::write(&b.join(&name),&serde_json::to_vec(&newer).unwrap()).unwrap();
     write_body(&f,CLI,&[(1,10)]);write_body(&f,NEXT_CLI,&[(1,10)]);
     sync_at(&f.home,&root,||Ok(())).unwrap();assert_eq!(read(&a.join(&name)).unwrap()["cliSessionId"],NEXT_CLI);
+}
+
+#[test] fn worktree_copies_resolve_to_the_cwd_transcript() {
+    let(f,root,_a,b)=setup();let cwd=f.home.join("project");let dir=project_dir(cwd.to_str().unwrap());
+    // 进入 worktree 后留下的旧副本：cwd 对应目录缺失时没有权威正文。
+    f.write(&format!(".claude/projects/{dir}--claude-worktrees-x/{CLI}.jsonl"),b"stale");
+    let r=sync_at(&f.home,&root,||Ok(())).unwrap();assert_eq!((r.added,r.skipped,r.skipped_ambiguous_body),(0,1,1));
+    f.write(&format!(".claude/projects/{dir}/{CLI}.jsonl"),b"current");
+    let r=sync_at(&f.home,&root,||Ok(())).unwrap();assert_eq!((r.added,r.skipped),(1,0));
+    assert_eq!(read(&b.join(format!("{ID}.json"))).unwrap()["cliSessionId"],CLI);
+}
+#[test] fn skip_reasons_are_reported_separately() {
+    let(f,root,_a,_b)=setup();fs::remove_file(f.home.join(format!(".claude/projects/project/{CLI}.jsonl"))).unwrap();
+    let r=sync_at(&f.home,&root,||Ok(())).unwrap();assert_eq!((r.skipped,r.skipped_missing_body,r.skipped_unsupported),(1,1,0));
+    assert_eq!(project_dir("/Users/a b/.claude/worktrees/中😀x_1"),"-Users-a-b--claude-worktrees----x-1");
 }

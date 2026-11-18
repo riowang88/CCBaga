@@ -304,6 +304,7 @@ impl Store {
         } else {
             None
         };
+        if let Some(previous) = &previous { self.rescue_superseded(previous, policy, reporter)?; }
         // 空资料的随机编号预留给首次保存的身份，避免登录后第一次暂存又改变种子。
         let draft = if reuse {
             self.db.browser_draft()?

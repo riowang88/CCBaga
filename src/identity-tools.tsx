@@ -41,7 +41,7 @@ export function ToolTabs({tabs}: {tabs: ToolTab[]}) {
 
 export function DesktopSharingPanel({enabled, locked, blocked, result, onToggle, onSync}: {
   enabled: boolean; locked: boolean; blocked: boolean;
-  result: {accounts: number; added: number; repaired: number; skipped: number} | null;
+  result: {accounts: number; added: number; repaired: number; skipped: number; skipped_unsupported: number; skipped_missing_body: number; skipped_ambiguous_body: number; skipped_relation: number} | null;
   onToggle: (enabled: boolean) => void; onSync: () => void;
 }) {
   const {t} = useI18n();
@@ -52,5 +52,6 @@ export function DesktopSharingPanel({enabled, locked, blocked, result, onToggle,
     <div><button type="button" className="rb-btn" disabled={blocked || !enabled} onClick={onSync}>{t('同步桌面会话')}</button></div>
     <p className="identity-caption">{t('切换时自动跟进可确认的最新聊天版本；不同分支需选择，旧正文保留。')}</p>
     {result && <p role="status">{t('桌面会话共享：{accounts} 个账号目录，新增 {added} 个入口，更新 {repaired} 个会话，跳过 {skipped} 条不支持的记录。', result)}</p>}
+    {result && result.skipped > 0 && <p role="status" className="rb-muted">{t('跳过明细：{skipped_unsupported} 条未启动、远程或定时会话；{skipped_missing_body} 条在本机 ~/.claude/projects 找不到聊天正文（可能已随其他身份暂存，需先切回该身份或开启保留会话历史）；{skipped_ambiguous_body} 条有多份正文无法确定；{skipped_relation} 条层级关系不完整。', result)}</p>}
   </div>;
 }

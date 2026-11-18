@@ -7,7 +7,7 @@ import {join} from 'node:path';
 import {createServer} from 'vite';
 import {chromium} from 'playwright-core';
 
-const server=await createServer({server:{host:'127.0.0.1',port:0,watch:{ignored:['**/src-tauri/**','**/browser-runtime/**']}},optimizeDeps:{include:['@tauri-apps/api/mocks']}});
+const server=await createServer({server:{host:'127.0.0.1',port:0,watch:null,hmr:false},optimizeDeps:{include:['@tauri-apps/api/mocks']}});
 await server.listen();
 const port=(server.httpServer!.address() as {port:number}).port;
 const base=`http://127.0.0.1:${port}`;

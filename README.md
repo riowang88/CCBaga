@@ -12,7 +12,7 @@
   <h1>RioBaga</h1>
   <p><strong>English</strong> · <a href="README.zh-CN.md">简体中文</a></p>
   <p><strong>A native macOS, Linux and Windows toolkit for a cleaner workspace and an environment you can verify.</strong></p>
-  <p>Claude identities · Browser fingerprints · System settings · Network Skill</p>
+  <p>Claude identities · Browser fingerprints · System settings · Network checks</p>
   <p>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-e8a181?style=flat-square" alt="MIT license" /></a>
     <img src="https://img.shields.io/badge/macOS-12%2B-111827?style=flat-square&amp;logo=apple&amp;logoColor=white" alt="macOS 12 and later" />
@@ -36,7 +36,7 @@
 
 **Intended use:** RioBaga is intended solely for people residing or traveling abroad to manage their own Claude identities. Use that violates Anthropic's official terms of service is prohibited.
 
-RioBaga brings local maintenance and environment setup into one focused desktop workflow. Inspect Claude data before removing it, rotate your companion browser's fingerprint and restart it, align system settings with a selected region, and compare real browser readings with the machine and network exit.
+RioBaga brings local maintenance and environment setup into one focused desktop workflow. Inspect Claude data before removing it, rotate your companion browser's fingerprint and restart it, set system settings for a selected region, and compare real browser readings with the machine and network exit.
 
 Two applications work together: **RioBaga-A** owns native operations; **RioBaga-B** runs an isolated Fingerprint Chromium profile. Browser measurements return to the host through a local session. Changing a setting and verifying its effect are separate steps.
 
@@ -50,12 +50,12 @@ Two applications work together: **RioBaga-A** owns native operations; **RioBaga-
   </tr>
   <tr>
     <td><strong>Native system settings</strong><br /><br />Apply timezone, preferred language and region settings. Open desktop controls for location and permissions; see platform-specific limits.</td>
-    <td><strong>AI-guided network setup</strong><br /><br />Three simple steps, a coding-agent selector and a copyable Skill installation prompt. Give the AI your files and connection details; it handles the commands.</td>
+    <td><strong>Read-only network checks</strong><br /><br />Exit IP, Claude domain reachability, environment consistency, DNS and WebRTC/UDP leak checks on one page. Unknown or untested is never shown as a pass.</td>
     <td><strong>Claude Code CLI tools</strong><br /><br />Detect the installation method and version. Uninstall or reinstall through native, npm/bun, Homebrew or WinGet workflows.</td>
   </tr>
 </table>
 
-**One region selector. Four everyday actions.** Easy setup puts browser cache cleanup, fingerprint rotation, timezone/language reset and identity archiving on the same page. The sidebar keeps advanced controls in Network, Claude identities, Browser and Computer.
+**One region selector, one click.** The Computer page (the default) applies the selected region's timezone, language and regional format, and can also turn off location and rotate RioBaga-B's fingerprint. The sidebar order is Computer, Network, Claude identities, Browser, then the Usage guide.
 
 The interface supports **English and Chinese**, with shared YAML catalogs. Switching the interface language does not change the computer or browser language.
 
@@ -96,39 +96,37 @@ On **macOS**, in-app updates replace A; use the latest DMG to update both apps. 
 
 ### Everyday setup
 
-Open **Easy setup**, select a country or region, then choose an action. Browser fingerprint rotation closes and restarts RioBaga-B, so save unfinished browser work first. Selecting a region changes language, timezone and regional settings; it does **not** change your public IP.
+Open **Computer**, select a country or region, tick the optional "also turn off location" and "also change RioBaga-B's fingerprint" boxes if wanted, then apply. Fingerprint rotation closes and restarts RioBaga-B, so save unfinished browser work first. Selecting a region changes language, timezone and regional settings; it does **not** change your public IP. Each step is reported as it actually finishes, and the page stops at the first failure.
 
 ### Claude identities
 
 Open **Claude identities** to manage the local state of both Claude Code and Claude Desktop. Choose **Empty identity** to archive the current state before leaving a fresh workspace, or choose a saved identity to restore it. Every switch saves the outgoing identity first.
 
-Expand **Keep in workspace** to choose retention for skills and commands, plugins, MCP configuration, personal settings, project records, conversation history, and caches/logs. Login data always moves with an archived identity. Project source outside Claude's own data directories is not scanned. A confirmation names the outgoing identity and summarizes what stays in the workspace before closing recognized Claude processes.
+The **Keep when switching accounts** chips directly under the cards choose retention for skills and commands, plugins, MCP configuration, personal settings, project records, conversation history, and caches/logs. Login data always moves with an archived identity. Project source outside Claude's own data directories is not scanned. A confirmation names the outgoing identity and summarizes what stays in the workspace before closing recognized Claude processes.
 
-Portrait identity cards scroll horizontally with spring motion and subtle hover tilt. The white empty identity stays first, followed by the current local account with available name, email and organization information. **Save backup / Update backup** saves the selected current state while retaining the workspace, sign-in and browser binding. **Empty identity** archives the outgoing state before leaving a fresh workspace. Select a saved card to restore that identity. **Direct delete** removes selected current data without creating an archive; deleting a saved card removes only that archive. Both deletion actions require an explicit confirmation.
+Portrait identity cards scroll horizontally with spring motion and subtle hover tilt; usage (session / week) shows on each card after the page's single **Refresh**. The white empty identity stays first, followed by the current local account with available name, email and organization information. **Save backup / Update backup** saves the selected current state while retaining the workspace, sign-in and browser binding. **Empty identity** archives the outgoing state before leaving a fresh workspace. Select a saved card to restore that identity. **Direct delete** removes selected current data without creating an archive; deleting a saved card removes only that archive. Both deletion actions require an explicit confirmation.
 
-Saved cards support password-protected **Export / Import** between devices with the same operating system. Import adds a saved identity without switching or overwriting existing accounts. Optional fingerprint settings exclude browser cookies, passwords and proxy settings; see [transfer limits](docs/identity-storage.md#move-a-saved-identity-to-another-device). Local plan/expiry badges are metadata, not server authentication results.
+Saved cards support password-protected **Export / Import** between devices with the same operating system. Import adds a saved identity without switching or overwriting existing accounts. Optional fingerprint settings exclude browser cookies, passwords and proxy settings; see [transfer limits](docs/identity-storage.md#move-a-saved-identity-to-another-device). Export skips local symbolic links (they point at paths on this machine) and reports how many were skipped; import checks for a duplicate account or fingerprint before reading the archive. Below the cards, **More tools** has four sections: per-client login and update, desktop session sharing (macOS), Claude file residue and CLI maintenance; **Copy diagnostic log** under the page title copies a bounded local log you can send yourself — nothing is uploaded. Local plan/expiry badges are metadata, not server authentication results.
 
 A local SQLite database tracks names, policies and recovery state. Data is compressed into an authenticated, encrypted `.baga` container outside Claude's working directories. Archive verification precedes workspace changes; failed switches roll back, and an interrupted switch exposes recovery. Recovery also saves the pre-recovery state. Ordinary archive tools cannot open this container directly; filesystem ownership or administrator access is not an absolute secrecy boundary.
 
 Expired or revoked server-side logins may need authentication again. The app manages the default local directories, not every custom Claude profile. The program-maintenance controls uninstall or reinstall Claude Code without removing the identity vault.
 
-### Browser verification
+### Browser and network checks
 
-Open **Browser** or the companion browser's local test page to measure the actual environment. Checks cover the network exit, country, timezone, language, platform, CPU count, engine version and location settings.
+Open **Network** for read-only checks of the actual environment: exit IP, Claude domain reachability, environment consistency, the latest DNS round and the latest WebRTC/UDP round (both measured inside RioBaga-B, started from the page). **Browser** only configures RioBaga-B — fingerprint seed, proxy, language/timezone, DNS mode, default browser — and clears its data. The measured checks cover the network exit, country, timezone, language, platform, CPU count, engine version and location settings.
 
 **Clear cache** retains sign-ins and personal browser data. **Clear all browser data** permanently resets the current identity's entire browser profile, including saved passwords, encryption metadata, bookmarks, history, extensions, settings and website sessions. It requires a separate confirmation and creates no backup. Other identities' profiles and the identity vault are retained; the selected fingerprint configuration applies when the browser opens again.
 
-The success page appears only when the measured checks match, the report reaches the cleaner and no measurement error remains. **DNS and WebRTC leak checks are not independently verified.** A green result describes the measured checks, not a guarantee of anonymity or account acceptance.
+The success page appears only when the measured checks match, the report reaches the cleaner and no measurement error remains. The WebRTC/UDP check contacts fixed public STUN servers (Google, then Cloudflare; no TURN, no credentials) only when you start it; DNS and WebRTC/UDP results are single observations, and unknown or untested is not a pass. A green result describes the measured checks, not a guarantee of anonymity or account acceptance.
 
-### Network setup
+### Network Skill (optional, separate)
 
-Open **Network** for three steps: **Get VPS → Get residential proxy → Install Skill**. Select **General**, **Codex**, **Cursor**, **OpenCode** or **Copilot**, then copy the installation prompt into your local coding agent. The prompt follows the app's English/Chinese setting.
-
-The [Network Skill](skills/ccbaga-network/README.md#installation) follows the Agent Skills specification and installs separately from the apps. It supports the npm `skills` CLI: `npx skills add liseami/CCBaga --skill ccbaga-network --global`; the AI selects the target tool, uses copy mode on Windows, and disables installer tracking. Give the AI your VPS address, the three matching PEM/PPK/PUB files or downloaded key bundle, and your residential SOCKS5 connection details. It handles file paths, private configuration, commands and checks; you do not need to open a terminal or edit JSON. Missing resources are purchased by you with the AI's guidance. Remote setup runs only after approval of the actual server changes.
+The app has no Skill installer or prompt. The [Network Skill](skills/ccbaga-network/README.md#installation) follows the Agent Skills specification and installs separately from the apps. It supports the npm `skills` CLI: `npx skills add liseami/CCBaga --skill ccbaga-network --global`; the AI selects the target tool, uses copy mode on Windows, and disables installer tracking. Ask your own coding agent to run it. Give the AI your VPS address, the three matching PEM/PPK/PUB files or downloaded key bundle, and your residential SOCKS5 connection details. It handles file paths, private configuration, commands and checks; you do not need to open a terminal or edit JSON. Missing resources are purchased by you with the AI's guidance. Remote setup runs only after approval of the actual server changes.
 
 The Skill supports authorized Debian 12/13 servers using root key login on port 22. It checks the SSH identity and fixed SOCKS5 exit, configures Xray/Reality and delivers a private local import file after server self-checks pass. Client setup uses **TUN ON**, **System Proxy OFF** and an empty explicit browser proxy; actual TUN/browser verification remains a separate step. The subscription URL uses HTTP and contains credentials; prefer the file retrieved over SSH.
 
-Provider buttons link to [DMIT](https://www.dmit.io/aff.php?aff=28800) and [Webshare](https://www.webshare.io/?referral_code=qlm1mt9xibc9). Network setup is optional; local cleanup does not require a VPS or a proxy subscription. **The app does not collect SSH keys or proxy credentials and does not deploy to servers.**
+Network setup is optional; local cleanup does not require a VPS or a proxy subscription. **The app does not collect SSH keys or proxy credentials and does not deploy to servers.**
 
 ## Architecture
 

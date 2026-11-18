@@ -323,7 +323,7 @@ fn location() -> Option<bool> {
 }
 fn snapshot() -> Value {
     json!({"timezone":timezone(), "timezones":zones(), "automatic_timezone":null,
-        "languages":[session_language()], "location_enabled":location(), "accessibility":false})
+        "languages":[session_language()], "locale":locale(), "location_enabled":location(), "accessibility":false})
 }
 pub unsafe fn rf_browser_machine() -> *mut c_char {
     let mut state = snapshot();

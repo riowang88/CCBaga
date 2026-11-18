@@ -68,6 +68,7 @@ mod tests {
         assert!(state["timezone"].as_str().is_some());
         assert!(state["timezones"].as_array().unwrap().len() > if cfg!(windows) { 30 } else { 100 });
         assert!(state["languages"].is_array());
+        assert!(state["locale"].as_str().is_some_and(|value| !value.is_empty()));
         assert!(state["location_enabled"].is_boolean() || state["location_enabled"].is_null());
         let invalid = CString::new("Invalid/Zone; touch /tmp/rf-injected").unwrap();
         assert!(

@@ -8,7 +8,7 @@ browser-verification.ts: 纯核验模型，逐项实际/目标值与失败清单
 browser-verification.test.ts: 跨平台虚构上下文验证三态、失败原因、连接/定位未知、简体台湾/脚本冲突、有效区域国家与目标时区改变，不访问网络。
 browser-network.ts: 按宿主服务目录经浏览器当前路由检测出口，限流/故障切换服务，校验纯IPv6地址字符而非URL语法并保留失败原因。
 browser-network.test.ts: 模拟限流、备用响应与非法出口，验证故障恢复和错误信息，不访问外网。
-main.tsx: A 品牌图与 BAGA! 标志取代装饰图标；单窗口极简侧栏按 Laper VerticalNavbar 的 240px 宽/72px Logo 区/40px 行与 14px 字级排布，傻瓜设置置顶，分隔线后依序网络环境、Claude 身份管理、浏览器环境、电脑环境、使用说明；按房屋、节点、身份盾牌、窗口、齿轮、文件夹分配图标；全局任务锁控制导航。
+main.tsx: 奶油侧栏（--rb-surface-soft 底、选中项 --rb-cream-strong，BAGA! 品牌文字暂保留，改名另做）：电脑环境（默认页）→ 网络环境 → Claude 身份 → 浏览器环境 ｜分隔｜ 使用说明，无图标；底部保留 AppUpdate 当前版本号/检查更新与 LanguageSwitch；全局任务锁 advancedBusy || updateBusy 控制导航；已删除傻瓜设置页，身份页不再接收 initialEmpty。
 help.tsx: 双语只读说明页，明确全清理仅删除当前身份的密码/书签/历史/扩展/设置且不新增备份；顶部常显旅居人员本人身份管理与禁止违反官方用户协议的声明；五项编号行保留操作后果和删除提示，details 折叠账号边界/申诉，不读取用户资料或调用原生命令。
 identities.tsx: 默认开启的浏览器联动开关/旧资料采用确认、独立资料标记和浏览器重开失败重试；空身份固定最左、当前账号其次的竖式 222×352 工牌（保持 54:85.6 证件比例，内含用量），单排横向卡片，顶部挂孔绿光表示当前身份、无障碍名称保留状态语义；当前与暂存卡片展示脱敏邮箱/组织、订阅档位与离线仅本地元数据凭据状态徽章，当前卡片支持原地加密保存/更新备份；Motion 弹簧滚轮/轻微悬停视差（按钮区冻结，卡片内部保持平面命中测试），原生媒体订阅使减弱动态偏好实时停止动画；滚动条/键盘保持原生，无分页或数量截断；当前账号不再另绘最近使用卡片；卡片直接切换、专用停止进程命令不扫描历史、折叠保留选项、名称、最多 32 项真实 Claude 进程预览，读取失败保持未知、切换/备份/恢复/永久删除 Alert 警告（需勾选确认，默认聚焦取消）；协调文件残留/CLI 的任务锁，身份变更使旧残留预览失效；凭据只在显式迁移密码输入中由用户提供，不展示归档凭据；导出/导入委托 identity-transfer.tsx。 新增分端资料三态、原档案缺字段未知、目标档案资料预览和人工维护窗口提示；显式 CLI 官方登录确认/取消/结果（邮箱为用户输入目标，B 组织不冒充自动核验）；只更新 CLI/App 的原档案确认，人工维护窗口与核对来源可见，不自动停止程序。
 identity-usage.tsx: 工牌内紧凑用量区（会话/本周细进度、单行重置倒计时或日期、过期窗口显示「已重置」、异常一行原因）；不发请求。页面只有页头一个「刷新」：identities.tsx 先读本地状态，再顺序读取当前账号（identities_usage，不续期）与每个已存账号（identities_usage_saved，原生代为续期），读取期间锁住其他操作；不自动轮询。
@@ -20,16 +20,17 @@ claude-residue-panel.tsx: 身份页内用户触发的固定 Claude 文件扫描�
 cleaner-activity.tsx: 单次调用隔离的 ActivityController 与身份卡片正下方 IdentityOperationProgress；身份/空身份/残留清理共用真实事件阶段、局部 n/N 与脉冲，不预填步骤或按时间推算百分比，未知总量只显示运行；密码迁移复用实际验收/写入/认证/提交阶段。失败/回滚/完成带警告分开呈现，保留实际耗时和原始日志用于即时切换语言；其他页面沿用 CleanupActivity。
 cleaner-model.ts: 文件残留快照类型与选择规则、POSIX/Windows 路径父子去重、子项排除、重扫编号映射与四舍五入进位一致的规模格式化，供预览和执行共享。
 cleaner-model.test.ts: 预设、跨平台父子选择隔离与重扫不扩大选择的回归，不调用清理命令。
-system.tsx: 电脑环境页，当前状态与目标草稿分离；时区、语言和定位各自应用；钥匙串解锁与系统授权入口归入本页；Windows 隐藏不适用的钥匙串按钮和辅助功能要求，使用实际系统授权状态。
-index.css: 系统字体与中性黑白基础主题入口，共享控件扫描；Landing 的几何与纹理归 style.css。
+system.tsx: 电脑环境页（照 Main.dc.html，rb 共享类）：顶部 get_regions 13 项地区胶囊、将设置的时区·语言·区域格式、「同时关闭定位」「同步浏览器指纹」与「应用到本机」；按 system_set_region →（勾选且未关闭）system_disable_location →（勾选）browser_rotate，且此前 browser_read 显示 B 运行时再 browser_launch 顺序执行，每步真实结果写入 CleanupActivity，抛错即停并说明已完成的步骤，定位未读回关闭记为提示；下方时区/首选语言行内编辑（搜索+选择+应用）与所选地区一致性、区域格式只读行（system_read.locale）、定位关闭；页尾系统授权与钥匙串（Windows 隐藏）文字链；窗口聚焦读回，页面加载不修改电脑。
+rb.css: RioBaga 设计基础与跨页面类契约：--rb-* 色板/字体变量（内嵌 src/fonts 的 Cormorant Garamond/Inter/JetBrains Mono，中文回退本机 Noto/宋体/苹方）与 rb-page/h1/sub/card(.line/.dark)/label/btn(.primary/.danger)/link/chip/seg/row/check/mono/muted/ok/warn/err；含禁用态、:focus-visible 与减弱动态；规范原文 docs/DESIGN.md。
+fonts/: 内嵌 OFL 字体 woff2 拉丁子集与许可原文，不走网络。
+index.css: 引入 Tailwind、Cromma 主题与 rb.css；把 Cromma 的 --background/--foreground/--primary/--border/--card/--panel*/--sidebar* 等主题变量映射到 --rb-* 色板（浅色唯一主题），不修改 vendor/。
 locales/: 双语 YAML 目录及导入类型，包含使用说明页的操作、安全和账号风险文案；见其 CLAUDE.md。
 i18n.ts: 共享界面语言订阅与文案格式化；优先精确键，动态原生结果按最具体模板匹配，未知诊断保留原文。
 i18n.test.ts: 双语键/插槽一致性、界面文案覆盖、浏览器全清理部分失败计数与原始路径、原生错误与语言切换回归；不访问真实设置。
 app-update.tsx: 侧栏静默/手动版本检查、实际字节进度、签名下载安装与重启失败重试；锁住其他任务，macOS 只更新 A，B 使用完整 DMG；Windows 先正常退出 B，再以签名 NSIS 更新两程序。
 language-switch.tsx: 极简中英文切换；宿主原子持久化成功后更新界面，失败保留原偏好并显示错误。
 dialog.tsx: Radix Dialog/AlertDialog 受控模态，警告阻止遮罩误关闭且默认聚焦取消；无 Trigger 时的原焦点恢复与读屏标题/描述，ModalShell 关闭按钮支持当前语言、底部操作自动换行。
-style.css: 16px 斜纹隔带、完整侧栏细线边框与 7px 点阵标题统一墨黑；立体身份卡片保持弹簧横滚和当前挂孔绿光；帮助页为响应式编号行、原生折叠区与键盘焦点，共用壳令牌；实测页复用同一令牌与细线卡片，红/黄/绿大背景、紧凑信号/对勾和可减弱动态的黄波纹，模态沿用 Cromma 控件。
-quick-actions.tsx: 标题为「傻瓜設定」的地区与四个快捷操作；Claude 快捷入口打开身份页的空身份确认；复用浏览器/系统命令，身份正文不进入快捷区。
+style.css: 外壳为奶油侧栏/画布与 .rb-nav 导航、侧栏底部版本号/更新/语言；电脑环境页 .system-rb-* 布局；其余身份卡片、帮助页、网络页与伴生实测页规则暂保持原样（由各页面会话换肤，收尾统一清理），--landing-* 细线令牌改取 --rb-hairline。
 vps.tsx: 「Claude 出口」claude.ai/api/platform/downloads 四域名只读 HTTP 检测，待测/检测中/成功/失败汇总、逐域结果与失败原因；重测清旧结果，空/缺失/异常返回不冒充成功；名称不代表已验证公网出口或分流规则，资源区只保留 Skill 安装入口，沿用细线网格与 01 标签，移除 DMIT/Webshare 推广与购买说明；斜纹隔带后的 Skill 区为通用/Codex/Cursor/OpenCode/Copilot 五项 LobeHub 图标分段、仅安装与运行的双语提示词与一键复制，复制状态随语言/工具失效；不收集凭据或执行部署。
 network-skill.ts: npm skills 标准安装命令/agent 标识与运行入口，通用项由 AI 选当前 agent，关闭安装统计；双语提示词仅安装/运行，具体网络协议归 Skill。
 network-skill.test.ts: 五项工具顺序、安装命令/调用符与完整双语复制内容回归，拒绝混入网络流程描述。

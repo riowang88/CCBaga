@@ -1,16 +1,63 @@
 /**
- * [INPUT]: Tailwind 4 与本地 Cromma UI 主题。
- * [OUTPUT]: 应用共用的系统字体、Laper 中性黑白页面底色、浅色基础主题与控件扫描入口。
- * [POS]: 两个前端入口的基础样式；业务布局在 style.css，不包含官网营销样式。
+ * [INPUT]: Tailwind 4、本地 Cromma UI 主题与 rb.css 奶油/珊瑚设计基础。
+ * [OUTPUT]: 内嵌 Inter/系统中文黑体正文、奶油页面底色；Cromma 主题变量整体映射到 --rb-* 色板，使 Button/Select/Input/Checkbox/对话框呈奶油/珊瑚风格；控件扫描入口。
+ * [POS]: 两个前端入口的基础样式；业务布局在 style.css；不修改 vendor/ 文件，只在此覆盖其令牌。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 @import "tailwindcss";
 @import "cromma-ui/theme.css";
+@import "./rb.css";
 @source "../vendor/cromma-ui/src";
 :root {
-  --ground: #f8f8f6;
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', 'PingFang SC', 'Hiragino Sans', sans-serif;
+  --ground: var(--rb-canvas);
+  --font-sans: var(--rb-sans);
   color-scheme: light;
+  /* Cromma 主题 → RioBaga 色板（浅色为唯一主题） */
+  --background: var(--rb-canvas);
+  --foreground: var(--rb-ink);
+  --page: var(--rb-canvas);
+  --card: var(--rb-canvas);
+  --card-foreground: var(--rb-ink);
+  --popover: var(--rb-canvas);
+  --popover-foreground: var(--rb-ink);
+  --primary: var(--rb-primary);
+  --primary-foreground: #fff;
+  --secondary: var(--rb-cream-strong);
+  --secondary-foreground: var(--rb-ink);
+  --muted: var(--rb-surface-soft);
+  --muted-foreground: var(--rb-muted);
+  --faint-foreground: #8f8c85;
+  --accent: var(--rb-card);
+  --accent-foreground: var(--rb-ink);
+  --destructive: var(--rb-err);
+  --destructive-foreground: #fff;
+  --border: var(--rb-hairline);
+  --input: var(--rb-canvas);
+  --field: var(--rb-canvas);
+  --field-border: var(--rb-hairline-strong);
+  --field-well: var(--rb-card);
+  --ring: var(--rb-primary);
+  --segment-thumb: var(--rb-canvas);
+  --panel: var(--rb-canvas);
+  --panel-outline: var(--rb-hairline);
+  --panel-foreground: var(--rb-ink);
+  --sidebar: var(--rb-surface-soft);
+  --sidebar-foreground: var(--rb-muted);
+  --sidebar-primary: var(--rb-primary);
+  --sidebar-primary-foreground: #fff;
+  --sidebar-accent: var(--rb-cream-strong);
+  --sidebar-accent-foreground: var(--rb-ink);
+  --sidebar-border: var(--rb-hairline);
+  --sidebar-ring: var(--rb-primary);
+  --row-selected: var(--rb-primary);
+  --row-selected-foreground: #fff;
+  --success: var(--rb-ok);
+  --warning: var(--rb-warn);
+  --primary-badge: var(--rb-primary);
+  --tag-base: var(--rb-canvas);
+  --tag-fg: var(--rb-ink);
+  --tag-on-base: var(--rb-dark);
+  --tag-on-fg: var(--rb-on-dark);
 }
 @theme inline { --color-ground: var(--ground); --font-sans: var(--font-sans); }
 body { margin: 0; min-height: 100%; background: var(--ground); color: var(--foreground); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }

@@ -1,6 +1,6 @@
 /*
  * [INPUT]: Foundation 时区与用户偏好、CoreLocation 状态、系统设置辅助功能接口。
- * [OUTPUT]: 电脑环境快照、首选语言与地区写入、管理员授权的时区修改与可核验的定位关闭。
+ * [OUTPUT]: 电脑环境快照（含 AppleLocale 区域格式，缺失回退当前 NSLocale）、首选语言与地区写入、管理员授权的时区修改与可核验的定位关闭。
  * [POS]: 电脑设置的 macOS 边界；定位通过系统开关关闭，不写 locationd 私有数据库。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -17,6 +17,11 @@ static NSArray *savedLanguages(void) {
         kCFPreferencesCurrentUser, kCFPreferencesAnyHost));
     return [value isKindOfClass:NSArray.class] ? value : NSLocale.preferredLanguages;
 }
+static NSString *savedLocale(void) {
+    id value = CFBridgingRelease(CFPreferencesCopyValue(CFSTR("AppleLocale"), kCFPreferencesAnyApplication,
+        kCFPreferencesCurrentUser, kCFPreferencesAnyHost));
+    return [value isKindOfClass:NSString.class] && [value length] ? value : NSLocale.currentLocale.localeIdentifier;
+}
 static NSDictionary *snapshot(void) {
     [NSTimeZone resetSystemTimeZone];
     NSDictionary *automatic = [NSDictionary dictionaryWithContentsOfFile:@"/Library/Preferences/com.apple.timezone.auto.plist"];
@@ -24,6 +29,7 @@ static NSDictionary *snapshot(void) {
         @"timezones": NSTimeZone.knownTimeZoneNames,
         @"automatic_timezone": automatic[@"Active"] ?: NSNull.null,
         @"languages": savedLanguages(),
+        @"locale": savedLocale(),
         @"location_enabled": @([CLLocationManager locationServicesEnabled]),
         @"accessibility": @(AXIsProcessTrusted())};
 }

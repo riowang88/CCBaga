@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 隔离 Playwright 引擎、Vite 与网络页虚构 IPC。
- * [OUTPUT]: Claude 出口四域名待测/检测中/成功/失败、浏览器质询可达、原因、空结果拒绝和双语 DOM 回归。
+ * [OUTPUT]: 网络环境检测页回归：无 Skill/提示词入口、Claude 可用性四域名待测/检测中/成功/失败与延迟、本机出口、一致性网格、DNS 最近一轮三态与「在 B 中检测」、WebRTC 如实未检测、完整报告链接仅 B 运行时可用、双语 DOM。
  * [POS]: 共用 UI 回归的功能证明，不截图或访问外部服务。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -10,47 +10,88 @@ export async function testNetworkDiagnostics(browser:Browser,base:string) {
  const context=await browser.newContext();
  await context.route('**/*',route=>route.request().url().startsWith(base+'/')?route.continue():route.abort());
  const page=await context.newPage();page.setDefaultTimeout(10000);
+ const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+ const fixture=(script:string)=>page.evaluate(script);
+ const commands=async()=>(await page.evaluate(()=>(window as any).networkFixture.commands)) as {command:string}[];
  try{
   await page.goto(base+'/tests/network.html');
-  await page.getByRole('heading',{name:'Claude 出口',exact:true}).waitFor();
-  assert.equal(await page.getByRole('heading',{name:/^(DMIT|Webshare)$/}).count(),0);
-  assert.equal(await page.getByRole('button',{name:/^(获取 VPS|获取家宽|VPS 帮助|家宽帮助)$/}).count(),0);
-  assert.equal(await page.locator('.network-step').count(),1);
-  await page.getByRole('button',{name:'安装 Skill',exact:true}).click();
-  await page.getByRole('button',{name:'复制提示词',exact:true}).click();
-  const commands=await page.evaluate(()=>(window as any).networkFixture.commands);
-  assert.deepEqual(commands[0],{command:'network_open_resource',args:{provider:'skill'}});
-  assert.equal(commands[1].command,'copy_result');assert.match(commands[1].args.text,/npx --yes skills add/);
+  await page.getByRole('heading',{name:'Claude 可用性',exact:true}).waitFor();
+  // ----- Skill 入口、提示词与推广均已移除 -----
+  assert.equal(await page.getByRole('button',{name:/^(安装 Skill|复制提示词|获取 VPS|获取家宽)$/}).count(),0);
+  assert.equal(await page.getByRole('heading',{name:/^(Skill|DMIT|Webshare)$/}).count(),0);
+  assert.equal(await page.getByRole('tab').count(),0);
+  // ----- WebRTC 未实现：如实未检测，不显示通过 -----
+  const webrtc=page.locator('.network-webrtc');
+  assert.equal(await webrtc.getAttribute('data-webrtc'),'unchecked');
+  assert.match(await webrtc.innerText(),/未检测.*不代表通过/s);
+  assert.equal(await webrtc.locator('.rb-ok').count(),0);
+  // ----- B 未运行：完整报告链接禁用，DNS 说明需要 B -----
+  const report=page.getByRole('button',{name:'在 B 中打开完整报告 →',exact:true});
+  assert.equal(await report.isDisabled(),true);
+  const dns=page.locator('.network-dns');
+  assert.equal(await dns.getAttribute('data-dns'),'stopped');
+  // ----- 一致性网格来自后端 checks，冲突/待测不冒充通过 -----
+  const checks=page.locator('.network-check');
+  assert.equal(await checks.count(),3);
+  assert.equal(await page.locator('.network-check.check-ok').count(),1);
+  assert.match(await page.locator('.network-check.check-mismatch').innerText(),/存在冲突/);
+  assert.match(await page.locator('.network-check.check-pending').innerText(),/尚未核验/);
+  // ----- 四域名探针：待测 → 检测中 → 成功 -----
   const panel=page.locator('.domain-diagnostics'),rows=panel.locator('.domain-diagnostics-item');
   assert.equal(await panel.getAttribute('data-status'),'idle');assert.equal(await rows.count(),4);
   assert.deepEqual(await panel.locator('.domain-name').allInnerTexts(),['claude.ai','api.anthropic.com','platform.claude.com','downloads.claude.ai']);
-  await panel.getByRole('button',{name:'开始检测',exact:true}).click();
+  await page.getByRole('button',{name:'开始检测',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('.domain-diagnostics')?.getAttribute('data-status')==='checking');
   assert.equal(await panel.locator('.domain-badge.checking').count(),4);
-  assert.equal(await panel.getByRole('button',{name:'检测中',exact:true}).isDisabled(),true);
+  assert.equal(await page.getByRole('button',{name:'检测中',exact:true}).isDisabled(),true);
+  await page.locator('.network-exit[data-status="observed"]').waitFor();
+  assert.match(await page.locator('.network-exit').innerText(),/198\.51\.100\.24.*US · Fixture City.*Fixture ISP/s);
   await page.evaluate(()=>(window as any).networkFixture.finish());
   await page.waitForFunction(()=>document.querySelector('.domain-diagnostics')?.getAttribute('data-status')==='passed');
   assert.equal(await panel.locator('.domain-badge.passed').count(),4);
   assert.match(await panel.locator('.domain-outcome').innerText(),/检测成功/);
-  assert.match(await rows.first().innerText(),/HTTP 403.*服务可达，需浏览器验证/);
+  assert.match(await rows.first().innerText(),/HTTP 403.*服务可达，需浏览器验证/s);
+  assert.match(await rows.first().innerText(),/35 ms/);
+  assert.deepEqual((await commands()).map(row=>row.command),['browser_check']);
   for(const mode of ['partial','error','empty','invalid']){
    await page.evaluate(mode=>(window as any).networkFixture.setMode(mode),mode);
-   await panel.getByRole('button',{name:'重新检测',exact:true}).click();
+   await page.getByRole('button',{name:'全部重新检测',exact:true}).click();
    assert.equal(await panel.locator('.domain-badge.passed').count(),0);
    await page.evaluate(()=>(window as any).networkFixture.finish());
    await page.waitForFunction(()=>document.querySelector('.domain-diagnostics')?.getAttribute('data-status')==='failed');
    assert.match(await panel.locator('.domain-outcome').innerText(),/检测失败/);
    if(mode==='partial'){
     assert.equal(await panel.locator('.domain-badge.failed').count(),1);
-    assert.match(await panel.locator('.domain-diagnostics-item.failed').innerText(),/HTTP 403.*受到安全拦截或限制/);
+    assert.match(await panel.locator('.domain-diagnostics-item.failed').innerText(),/HTTP 403.*受到安全拦截或限制/s);
    }else assert.match(await panel.locator('.domain-outcome').innerText(),mode==='error'?/fixture connection interrupted/:mode==='invalid'?/检测结果无效/:/部分检测未返回结果/);
   }
+  // ----- 在 B 中检测：启动 B 后 DNS 呈现最近一轮；空结果与失败如实显示 -----
+  await dns.getByRole('button',{name:'打开 B 并检测 →',exact:true}).click();
+  await page.locator('.network-dns[data-dns="idle"]').waitFor();
+  assert.equal(await report.isEnabled(),true);
+  await report.click();
+  assert.deepEqual((await commands()).slice(-2).map(row=>row.command),['browser_launch','browser_open_report']);
+  await fixture(`window.networkFixture.browser.dns_last={observation:{id:'a'.repeat(48),resolvers:[{ip:'1.1.1.1',country_code:'US',country:'United States',city:'',isp:'Fixture DNS',geo_error:null},{ip:'2001:db8::1',country_code:'',country:'',city:'',isp:'',geo_error:'DNS 服务返回 HTTP 503'}],observed_at:1780000000000},error:'',at:1780000000000};window.networkFixture.refresh();`);
+  await page.locator('.network-dns[data-dns="observed"]').waitFor();
+  assert.equal(await dns.locator('tbody tr').count(),2);
+  assert.match(await dns.innerText(),/共观测到 2 个解析器/);
+  assert.match(await dns.innerText(),/归属地未取得/);
+  assert.match(await dns.innerText(),/不自动等于泄露/);
+  await fixture(`window.networkFixture.browser.dns_last={observation:{id:'a'.repeat(48),resolvers:[],observed_at:1780000000000},error:'',at:1780000000000};window.networkFixture.refresh();`);
+  await page.locator('.network-dns[data-dns="empty"]').waitFor();
+  assert.match(await dns.innerText(),/空结果不代表安全/);assert.equal(await dns.locator('tbody tr').count(),0);
+  await fixture(`window.networkFixture.browser.dns_last={observation:null,error:'DNS 服务返回 HTTP 403',at:1780000000000};window.networkFixture.refresh();`);
+  await page.locator('.network-dns[data-dns="failed"]').waitFor();
+  assert.match(await dns.innerText(),/DNS 检测未完成.*HTTP 403/s);
+  await dns.getByRole('button',{name:'在 B 中检测 →',exact:true}).waitFor();
+  // ----- 英文界面 -----
   await page.evaluate(()=>(window as any).networkFixture.language('en'));
-  await page.getByRole('heading',{name:'Claude Egress',exact:true}).waitFor();
+  await page.getByRole('heading',{name:'Claude availability',exact:true}).waitFor();
   assert.match(await panel.locator('.domain-outcome').innerText(),/Check failed/);
-  await panel.getByRole('button',{name:'Check again',exact:true}).waitFor();
-  assert.equal(await page.getByRole('heading',{name:/^(DMIT|Webshare)$/}).count(),0);
-  await page.getByRole('button',{name:'Install Skill',exact:true}).waitFor();
-  return 8;
+  await page.getByRole('button',{name:'Run all checks again',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Open full report in B →',exact:true}).waitFor();
+  assert.match(await webrtc.innerText(),/Not checked/);
+  assert.deepEqual(errors,[]);
+  return 9;
  } finally {await context.close();}
 }

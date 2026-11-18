@@ -1,0 +1,107 @@
+/*
+ * [INPUT]: browser-start.tsx / browser-dns-panel.tsx 的既有类名与 data-* 状态；rb.css 变量缺失时用同值回退（本入口不加载主应用壳）。
+ * [OUTPUT]: 伴生检测页奶油/珊瑚视觉：奶油底、衬线标题、12px 圆角细线卡、深色身份工牌；检测中黄/失败红/通过绿三态语义色，保留 verification-ripple 波纹与减弱动态。
+ * [POS]: 仅由 browser-start.tsx 在 index.css/style.css 之后引入，完整定义本页布局，不依赖主应用斜纹/点阵壳；不改变任何判定逻辑。
+ * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+ */
+.browser-verification-page{
+  --vp-canvas:var(--rb-canvas,#faf9f5);--vp-card:var(--rb-card,#efe9de);--vp-dark:var(--rb-dark,#181715);--vp-ink:var(--rb-ink,#141413);
+  --vp-muted:var(--rb-muted,#6c6a64);--vp-line:var(--rb-hairline,#e6dfd8);--vp-primary:var(--rb-primary,#cc785c);
+  --vp-serif:var(--rb-serif,'Cormorant Garamond','Noto Serif SC',Georgia,serif);--vp-sans:var(--rb-sans,Inter,'Noto Sans SC',system-ui,sans-serif);--vp-mono:var(--rb-mono,'JetBrains Mono',ui-monospace,monospace);
+  --verification-bg:#f8e3dd;--verification-color:var(--rb-err,#c64545);
+  min-height:100vh;box-sizing:border-box;padding:20px;background:var(--vp-canvas);background-image:none;color:var(--vp-ink);font-family:var(--vp-sans);font-size:14px;line-height:1.55;transition:background-color 300ms ease;
+}
+.browser-verification-page.is-checking{--verification-bg:#f6ecd2;--verification-color:#8a6500}
+.browser-verification-page.is-passed{--verification-bg:#e2efe3;--verification-color:#2f7d47}
+.browser-verification-page *{box-sizing:border-box}
+.browser-verification-page h1,.browser-verification-page h2,.browser-verification-page h3{margin:0}
+.browser-start{width:100%;display:flex;flex-direction:column;gap:14px;border:0;background:none}
+.browser-verification-page .landing-section-band{display:none}
+
+/* ----- 顶部品牌 ----- */
+.verification-brand{min-height:44px;padding:0 4px;border:0;display:flex;align-items:center;justify-content:space-between;gap:20px}
+.verification-brand>div{display:flex;align-items:center;gap:12px}
+.verification-brand img{border-radius:8px}
+.verification-brand strong{font:500 22px/1.2 var(--vp-serif);letter-spacing:-.02em}
+.verification-brand>span{font:12px var(--vp-mono);color:var(--vp-muted)}
+
+/* ----- 深色身份工牌 ----- */
+.verification-identity{position:relative;display:flex;align-items:center;gap:18px;min-height:104px;margin:0;padding:22px 24px 18px;background:var(--vp-dark);color:var(--vp-canvas);border:0;border-radius:12px;box-shadow:none}
+.verification-identity::before{content:'';position:absolute;top:8px;left:27px;width:26px;height:4px;border-radius:4px;background:#3a3732}
+.verification-identity.linked::before{background:#7fd093;box-shadow:0 0 9px #7fd09399}
+.verification-identity-avatar{flex-shrink:0;display:grid;place-items:center;width:52px;height:52px;border-radius:50%;background:#252320;border:1px solid #3a3732;font:500 24px var(--vp-serif)}
+.verification-identity-account{flex:1;min-width:0}
+.verification-identity-account>span{color:var(--rb-on-dark-soft,#a09d96);font-size:11px;letter-spacing:1.5px}
+.verification-identity-account h2{margin:4px 0;font:500 24px/1.25 var(--vp-serif);letter-spacing:-.01em;overflow-wrap:anywhere}
+.verification-identity-account>div{display:flex;flex-wrap:wrap;gap:4px 14px;color:var(--rb-on-dark-soft,#a09d96);font-size:12px;overflow-wrap:anywhere}
+.verification-identity-state{flex-shrink:0;padding:6px 10px;border-radius:8px;border:1px solid #3a3732;font-size:12px;color:var(--rb-on-dark-soft,#a09d96)}
+.verification-identity.linked .verification-identity-state{color:var(--rb-ok-on-dark,#7fd093);border-color:#7fd09355}
+.verification-identity-state.attention{color:var(--rb-warn-on-dark,#e8a55a);border-color:#e8a55a66}
+
+/* ----- 三态横幅 ----- */
+.verification-banner{display:flex;align-items:center;gap:24px;min-height:120px;max-height:150px;padding:18px 24px;border-radius:12px;background-color:var(--verification-bg);background-image:none;transition:background-color 300ms ease}
+.verification-banner>button{margin-left:auto;background:var(--vp-primary);border-color:var(--rb-primary-active,#a9583e);color:#fff}
+.verification-title{display:grid;gap:4px}
+.verification-title>span{color:var(--verification-color);font-size:12px;font-weight:500;letter-spacing:1.5px}
+.verification-title h1{font:500 clamp(26px,3vw,36px)/1.15 var(--vp-serif);letter-spacing:-.02em}
+.verification-signal{position:relative;isolation:isolate;width:72px;height:72px;flex-shrink:0;color:var(--verification-color)}
+.verification-signal svg{position:relative;z-index:1;display:block;width:100%;height:100%}
+.verification-signal path{fill:none;stroke:white;stroke-width:7px;stroke-linecap:round;stroke-linejoin:round}
+.verification-signal>i{position:absolute;inset:0;border-radius:50%;border:1px solid currentColor;opacity:0}
+.is-checking .verification-signal>i{animation:verification-ripple 2.4s ease-out infinite}
+.is-checking .verification-signal>i:nth-child(2){animation-delay:1.2s}
+@keyframes verification-ripple{0%{transform:scale(.9);opacity:.55}100%{transform:scale(1.65);opacity:0}}
+
+/* ----- 依据 / 出口 / 原因 ----- */
+.verification-network{display:flex;flex-wrap:wrap;gap:12px 32px;padding:14px 20px;border:1px solid var(--vp-line);border-radius:12px;background:var(--vp-canvas)}
+.verification-network>div{display:flex;align-items:baseline;gap:12px}
+.verification-network span{color:var(--vp-muted);font-size:12px}
+.verification-network strong{font:500 13px var(--vp-mono);user-select:text}
+.verification-reasons{padding:16px 20px;border-radius:12px;border:1px solid var(--vp-line);border-left:3px solid var(--verification-color);background:var(--vp-canvas)}
+.verification-reasons h2{color:var(--verification-color);margin-bottom:10px;font:500 20px var(--vp-serif)}
+.verification-reasons ul{list-style:none;padding:0;margin:0;display:grid;gap:8px}
+.verification-reasons li{font-size:13px;line-height:1.6;overflow-wrap:anywhere}
+
+/* ----- 12 项结果 ----- */
+.verification-results{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.verification-check{min-width:0;min-height:88px;padding:14px 18px;border:0;border-radius:12px;background:var(--vp-card)}
+.verification-check:nth-child(n){border-right:0}
+.verification-check header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}
+.verification-check h2{font-size:12px;color:var(--vp-muted);font-weight:500;letter-spacing:.5px}
+.verification-check header>span{color:#2f7d47;font-size:17px;font-weight:600}
+.verification-check.failed{box-shadow:inset 3px 0 0 var(--rb-err,#c64545)}
+.verification-check.failed header>span{color:var(--rb-err,#c64545)}
+.verification-check.pending header>span{color:#8a6500;font-size:12px;font-weight:500}
+.verification-check>strong{display:block;font:500 14px var(--vp-mono);overflow-wrap:anywhere;user-select:text}
+.verification-check p{font-size:12px;line-height:1.6;margin:6px 0 0;color:var(--vp-muted)}
+.verification-loading{padding:20px;color:var(--vp-muted);font-size:13px;text-align:center}
+.verification-setting-help{margin-top:8px;font-size:12px;line-height:1.6}
+.verification-setting-help summary{cursor:pointer;width:fit-content;color:var(--rb-primary-active,#a9583e);font-weight:500}
+.verification-setting-help summary:focus-visible{outline:2px solid currentColor;outline-offset:3px}
+
+/* ----- DNS 实测 ----- */
+.verification-dns{padding:16px 20px;border:1px solid var(--vp-line);border-radius:12px;background:var(--vp-canvas)}
+.verification-dns header{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 16px}
+.verification-dns h2{font:500 20px var(--vp-serif);letter-spacing:-.01em}
+.verification-dns header span{font-size:12px;color:#8a6500}
+.verification-dns header button{margin-left:auto}
+.verification-dns[data-dns="observed"] header span{color:var(--vp-muted)}
+.verification-dns p{font-size:12px;line-height:1.6;color:var(--vp-muted);margin:8px 0 0}
+.verification-dns .verification-dns-error{color:var(--rb-err,#c64545)}
+.verification-dns-table{margin-top:12px;overflow-x:auto}
+.verification-dns table{width:100%;border-collapse:collapse;font-size:12px;text-align:left}
+.verification-dns th,.verification-dns td{padding:8px 12px 8px 0;border-bottom:1px solid var(--vp-line);vertical-align:top}
+.verification-dns th{font-weight:500;color:var(--vp-muted)}
+.verification-dns td:first-child{font-family:var(--vp-mono);overflow-wrap:anywhere}
+.verification-dns td{user-select:text}
+.verification-dns-help h3{margin-top:12px;font-size:12px;font-weight:600}
+
+/* ----- 底部连接状态 ----- */
+.verification-footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;padding:4px;font-size:12px;color:var(--vp-muted)}
+.verification-footer>span::before{content:'';display:inline-block;width:6px;height:6px;margin-right:8px;border-radius:50%;background:var(--rb-err,#c64545)}
+.verification-footer .connected::before{background:#2f7d47}
+
+@media (prefers-reduced-motion:reduce){.is-checking .verification-signal>i{animation:none;opacity:.35;transform:scale(1.12)}.is-checking .verification-signal>i:nth-child(2){transform:scale(1.25)}}
+@media (min-width:1400px){.verification-results{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (max-width:760px){.browser-verification-page{padding:10px}.verification-results{grid-template-columns:repeat(2,minmax(0,1fr))}.verification-banner{gap:16px;padding:16px}.verification-signal{width:60px;height:60px}}
+@media (max-width:440px){.verification-brand{flex-wrap:wrap;gap:8px}.verification-banner{flex-wrap:wrap;max-height:none}.verification-banner>button{margin-left:76px}.verification-results{grid-template-columns:1fr}.verification-dns header button{margin-left:0}.verification-identity{flex-wrap:wrap;padding:20px 16px 14px;gap:12px}}

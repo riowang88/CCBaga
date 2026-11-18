@@ -1,0 +1,61 @@
+/*
+ * [INPUT]: rb.css 共享变量（--rb-*）；缺失时使用同值回退，保证单独构建可读。
+ * [OUTPUT]: 网络环境检测页专属布局：页头、出口三卡、深色可用性/一致性卡、DNS 与 WebRTC 细线卡。
+ * [POS]: 仅由 vps.tsx 引入；不定义通用按钮/卡片，只排版本页结构。
+ * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+ */
+.network-page{display:flex;flex-direction:column;gap:14px}
+.network-head{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.network-head>div{flex:1;min-width:220px}
+.network-feedback{margin:0}
+.network-exit{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.network-exit .rb-card{min-width:0}
+.network-big{margin:0;font:500 24px/1.25 var(--rb-serif,'Cormorant Garamond','Noto Serif SC',serif);letter-spacing:-.01em;color:var(--rb-ink,#141413);overflow-wrap:anywhere}
+.network-big.rb-mono{font-family:var(--rb-mono,'JetBrains Mono',monospace);font-size:20px}
+.network-isp{font-size:20px}
+.network-note{margin:-4px 0 0;font-size:13px}
+.network-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
+.network-page h2.rb-label{margin:0 0 8px}
+.network-dark-note{margin:4px 0 8px;font-size:12px;color:var(--rb-on-dark-soft,#a09d96)}
+.network-small{font-size:12px;margin:8px 0 0}
+.network-foot{margin-top:4px}
+
+/* ----- 深色卡：Claude 可用性 ----- */
+.network-page .domain-outcome{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:6px;font-size:13px;color:var(--rb-on-dark-soft,#a09d96)}
+.network-page .domain-outcome strong{color:var(--rb-canvas,#faf9f5);font-weight:500}
+.network-page .domain-outcome.passed strong{color:var(--rb-ok-on-dark,#7fd093)}
+.network-page .domain-outcome.failed strong,.network-page .domain-outcome p{color:var(--rb-warn-on-dark,#e8a55a)}
+.network-page .domain-outcome p{margin:0;flex-basis:100%}
+.domain-diagnostics-list,.network-check-list{list-style:none;margin:0;padding:0}
+.rb-card.dark .rb-row{border-top-color:#2e2c28}
+.domain-diagnostics-item{display:flex;align-items:center;gap:12px;padding:9px 0;border-top:1px solid #2e2c28}
+.domain-item-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.domain-name{font-size:13px;color:var(--rb-canvas,#faf9f5)}
+.domain-detail,.domain-ip{font-size:12px;color:var(--rb-on-dark-soft,#a09d96);overflow-wrap:anywhere}
+.domain-latency{font-size:12px;color:var(--rb-on-dark-soft,#a09d96);white-space:nowrap}
+.domain-badge{font-size:13px;white-space:nowrap;color:var(--rb-on-dark-soft,#a09d96)}
+.domain-badge.passed{color:var(--rb-ok-on-dark,#7fd093)}
+.domain-badge.failed{color:var(--rb-warn-on-dark,#e8a55a)}
+.domain-badge.checking{animation:network-pulse 1.2s ease-in-out infinite}
+
+/* ----- 深色卡：环境一致性 ----- */
+.network-check{display:flex;align-items:flex-start;gap:12px;padding:9px 0;border-top:1px solid #2e2c28}
+.network-check>div{flex:1;min-width:0}
+.network-check strong{display:block;font-weight:500;font-size:13px;color:var(--rb-canvas,#faf9f5)}
+.network-check p{margin:2px 0 0;font-size:12px;color:var(--rb-on-dark-soft,#a09d96);overflow-wrap:anywhere}
+.network-check>span{font-size:13px;white-space:nowrap}
+.rb-card.dark .network-check .rb-ok{color:var(--rb-ok-on-dark,#7fd093)}
+.rb-card.dark .network-check .rb-warn,.rb-card.dark .network-check .rb-err{color:var(--rb-warn-on-dark,#e8a55a)}
+
+/* ----- 细线卡：DNS / WebRTC ----- */
+.network-card-head{display:flex;align-items:center;gap:12px}
+.network-card-head h2{flex:1}
+.network-card-head .rb-link{height:auto;padding:0 4px}
+.network-dns p,.network-webrtc p{margin:0}
+.network-dns-table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12px}
+.network-dns-table th{text-align:left;font-weight:500;color:var(--rb-muted,#6c6a64);padding:4px 8px 4px 0}
+.network-dns-table td{padding:6px 8px 6px 0;border-top:1px solid var(--rb-hairline,#e6dfd8);overflow-wrap:anywhere}
+
+@keyframes network-pulse{50%{opacity:.45}}
+@media (prefers-reduced-motion:reduce){.domain-badge.checking{animation:none}}
+@media (max-width:860px){.network-exit,.network-grid{grid-template-columns:minmax(0,1fr)}}

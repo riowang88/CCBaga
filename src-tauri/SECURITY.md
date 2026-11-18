@@ -19,9 +19,10 @@
 | `src/browser/config.rs` | 本机环境与用于出口探测的系统代理 | `Machine.system_proxy` 使用 `skip_serializing`，代理凭据不进入 WebView、浏览器回环 JSON 或 UI 日志；对应回归验证。 |
 | `src/browser/profile.rs` | 当前身份绑定的独立浏览器资料 | 仅清缓存与显式全清理分开；全清理删除该 user-data-dir 内全部登录、密码库与密钥元数据、书签、历史、扩展和偏好，不创建备份。执行前完整核验链接/所有者/快照与进程，逐项报告实际进度，失败保留部分完成事实；其他身份、保险库、引擎、系统钥匙串和资料目录外的指纹配置不在范围内。 |
 | `src/browser/server.rs` | 环境观测与有界本地身份显示字段在 A/B 之间交换 | 仅随机令牌 `127.0.0.1` 会话，限制请求大小与资源根目录；context 可显示本地绑定的名称/邮箱/组织，不包含令牌、账号 UUID 或匹配摘要，不代表网站登录认证；只读回报接口返回同会话的匿名环境观测/接收时间，不提供文件写入、命令执行或远程监听。 |
-| `src/browser/dns.rs` / 前端 DNS 实测 | B 请求本轮随机 `*.d.ip.net.coffee` 域名，A 请求固定 `ip.net.coffee/api/dns/result/{id}` 与解析器 GeoIP | 不发送账号/回环令牌/文件/认证 Cookie；使用独立临时随机轮次，不伪造来源头。A 只读结果，B 才是解析被测方；当前身份会话校验、两分钟过期、一次在途/三次读取、16 IP/32 KiB/20秒上限；指定代理失败不改直连。外部服务会看到 DNS 解析器和请求出口。 |
+| `src/browser/dns.rs` / 前端 DNS 实测（A 网络页只读同会话最近一轮） | B 请求本轮随机 `*.d.ip.net.coffee` 域名，A 请求固定 `ip.net.coffee/api/dns/result/{id}` 与解析器 GeoIP | 不发送账号/回环令牌/文件/认证 Cookie；使用独立临时随机轮次，不伪造来源头。A 只读结果，B 才是解析被测方；当前身份会话校验、两分钟过期、一次在途/三次读取、16 IP/32 KiB/20秒上限；指定代理失败不改直连。外部服务会看到 DNS 解析器和请求出口。 |
 | `src/browser/network.rs` / 前端出口探测 | 向 `ipwho.is`、`ipapi.co` 请求出口信息 | 外部服务会看到请求出口 IP；不发送本地文件、账号、密钥或浏览记录。服务失败使用同一路由备用服务，不伪造成功。 |
-| `src/network_links.rs` | 固定 VPS/家宽/Skill 公开入口与用户触发的 claude.ai/api.anthropic.com/platform.claude.com/downloads.claude.ai（官方安装器公开版本号路径）四个固定 HTTPS 探针 | 仅白名单地址与供应商配置编译内嵌；应用不选择密钥、不收集家宽资料、不注册 SSH/部署命令。探针不发送账号/Cookie/令牌/本地文件，不继承代理认证、不跟随重定向。下载版本探针只接受 HTTP 200，流式读取最多 64 字节并校验三段数字版本；空白、畸形、超限和截断正文均失败，正文不进入 UI。仅显示状态/延迟/连接对端，其他域名的 Cloudflare 浏览器质询只表示已到达站点边缘；不证明安装器完整可下载、账号可用、出口、DNS 或分流规则正确。 |
+| `src/browser/mod.rs` `browser_open_report` | 用户在网络页点击后，在当前已运行的 B 资料中打开固定 `https://ip.net.coffee/claude` | 地址为编译常量，WebView 不能传入 URL；B 未运行时拒绝且不启动新资料、不改配置/指纹/默认浏览器。该页面由第三方提供，会看到 B 的出口与浏览器环境；A 不读取、不保存其评分或标记。 |
+| `src/network_links.rs` | 固定 VPS/家宽公开入口（界面已无入口，Skill 入口已删除）与用户触发的 claude.ai/api.anthropic.com/platform.claude.com/downloads.claude.ai（官方安装器公开版本号路径）四个固定 HTTPS 探针 | 仅白名单地址与供应商配置编译内嵌；应用不选择密钥、不收集家宽资料、不注册 SSH/部署命令。探针不发送账号/Cookie/令牌/本地文件，不继承代理认证、不跟随重定向。下载版本探针只接受 HTTP 200，流式读取最多 64 字节并校验三段数字版本；空白、畸形、超限和截断正文均失败，正文不进入 UI。仅显示状态/延迟/连接对端，其他域名的 Cloudflare 浏览器质询只表示已到达站点边缘；不证明安装器完整可下载、账号可用、出口、DNS 或分流规则正确。 |
 | `src/identities/usage.rs` / `sidecar.rs` | 用户点击「刷新」时：当前账号以实时 Claude Code access token 向固定 `https://api.anthropic.com/api/oauth/usage` 发起 GET；已存账号在令牌 5 分钟内到期时先以 refresh token 向固定 `https://platform.claude.com/v1/oauth/token` POST 续期，再读用量 | 令牌只在原生内存，不进入 UI、日志、argv 或 SQLite；当前账号不续期、本地到期即不发送；已存账号续期时持有全局身份事务锁，轮换结果先以保险库主密钥 AES-GCM 加密、原子写入绑定归档代次的 `<id>-<代次>.cred` 再使用，写入失败报告可能需重新登录；侧车只含 claudeAiOauth，新代次、删除身份时回收，损坏时回退归档令牌。不跟随重定向、12 秒超时、响应最多 64 KiB；只缓存百分比/重置时间/套餐/读取时间。同一账号被其他工具同时续期会使对方令牌失效。结果不证明网页或 Desktop 登录有效。 |
 | `src/identities/desktop_token.rs` | 同一次用户点击中，macOS 原生读取默认 Desktop `config.json` 的 `oauth:tokenCacheV2` 与 `Claude Safe Storage` 口令（实时钥匙串或已认证归档），按 Electron safeStorage（PBKDF2-HMAC-SHA1/CommonCrypto AES-128-CBC）解密，取与 CLI 账号一致、未到期的访问令牌，只用于上述固定用量 GET | 只读：不续期、不写回、不修改 Desktop 资料；令牌与口令只在原生内存。已存身份的 Desktop 令牌与“是否有 CLI 令牌”标记以同一主密钥加密为 `<id>-<代次>.usage`，与 `.cred` 一同按代次/删除回收，避免每次刷新解密整包归档。 |
 | `skills/ccbaga-network/scripts/network.py` | 用户主动提供的附件、VPS 地址与家宽连接资料 | AI 经标准输入提交配置，验证后保存 Git/Skill 外的 0600 文件；拒绝覆盖和链接路径。配对后临时 PEM 0600，事务结束移除；仅所选 VPS 经 SSH 接收家宽配置，秘密不进入 argv/公开日志。用户交给 AI 的资料可能由其服务提供商处理，不能声称完全不进入模型。 |
@@ -31,7 +32,7 @@
 ## 状态与授权
 
 - Linux 源码安装器检查整个本安装应用目录下的进程，A 或 B 运行时均拒绝替换其资源；回归验证安装目录保持不变。
-- Linux 定位未知保持 `null`，不能显示已关闭或触发绿色通过；不可验证的机器对齐在任何系统修改前停止。
+- Linux 定位未知保持 `null`，不能显示已关闭或触发绿色通过；浏览器页写死美国的机器对齐（`browser_align`）已删除，系统地区修改只走电脑环境页。
 - 本仓库发布任务只允许 `riowang88/CCBaga` 的所有者触发和重跑；PR 和 fork 不触及签名凭据。开发文档不授予官方发布身份。
 
 ## 发布与入口边界

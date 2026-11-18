@@ -1,7 +1,7 @@
 /**
  * [INPUT]: B 实测轮次、回环连接状态和 A 返回的真实 DNS 观测。
  * [OUTPUT]: DNS 设置路径说明及解析器 IP/地区/运营商、空结果/失败/部分归属地未知与重新检测；不输出安全保证。
- * [POS]: browser.html 的独立 DNS 结果区，沿用现有 12 项基础环境规则，不把空结果计为通过。
+ * [POS]: browser.html 的独立 DNS 结果区，样式由 browser-start.css 的奶油细线卡提供；结果同时由宿主保存为同会话最近一轮供 A 网络页只读呈现；沿用现有 12 项基础环境规则，不把空结果计为通过。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 import type {BrowserConfig} from './browser-model';

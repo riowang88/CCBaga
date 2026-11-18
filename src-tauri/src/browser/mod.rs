@@ -1,5 +1,5 @@
 // [INPUT]: 本机指纹引擎（优先 /Applications/CCBaga-B.app，回退 ~/Applications）、配置/资料边界、真实浏览器观测、宿主界面语言与共享操作日志。
-// [OUTPUT]: 有界绑定身份上下文与浏览器设置/启动/缓存清理、显式完整资料重置和环境核验；完整重置只处理当前绑定 user-data-dir，按真实项目计数；launch.args 与 SQLite 共用资料/指纹参数，恢复期间阻断启动；向身份事务提供当前/目标资料占用核对。
+// [OUTPUT]: 有界绑定身份上下文与浏览器设置/启动/缓存清理、显式完整资料重置和环境核验（含同会话最近一轮 DNS 结果）；仅 B 运行时在当前资料打开固定报告地址；已删除写死美国的系统对齐；完整重置只处理当前绑定 user-data-dir，按真实项目计数；launch.args 与 SQLite 共用资料/指纹参数，恢复期间阻断启动；向身份事务提供当前/目标资料占用核对。
 // [POS]: 独立浏览器模块的唯一编排入口；改变资料前必须退出浏览器；不自行改系统默认浏览器，只发起系统确认。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 pub(crate) mod config;
@@ -55,9 +55,6 @@ extern "C" {
     fn rf_browser_register(path: *const c_char) -> *mut c_char;
     fn rf_browser_default_read(bundle: *const c_char) -> *mut c_char;
     fn rf_browser_set_default(bundle: *const c_char) -> *mut c_char;
-    fn rf_system_region(language: *const c_char, locale: *const c_char) -> *mut c_char;
-    fn rf_system_timezone(zone: *const c_char) -> *mut c_char;
-    fn rf_system_location() -> *mut c_char;
 }
 #[derive(Default)]
 pub struct Browser {
@@ -71,6 +68,19 @@ struct Session {
     received_at: Option<u64>,
     report: Option<Report>,
     dns: Option<dns::Run>,
+    dns_last: Option<DnsLast>,
+}
+/// 本会话最近一轮 B 触发的 DNS 读取结果；会话随身份/配置换新时一并丢弃。
+#[derive(Clone, Serialize)]
+pub(super) struct DnsLast {
+    observation: Option<dns::Observation>,
+    error: String,
+    at: u64,
+}
+impl DnsLast {
+    fn new(observation: Option<dns::Observation>, error: String, at: u64) -> Self {
+        Self { observation, error, at }
+    }
 }
 #[derive(Clone, Serialize)]
 pub struct Context {
@@ -105,6 +115,7 @@ pub struct Snapshot {
     report: Option<Report>,
     report_received_at: Option<u64>,
     machine_exit: Option<Exit>,
+    dns_last: Option<DnsLast>,
     checks: Vec<Check>,
 }
 fn identity_context(
@@ -218,6 +229,7 @@ fn open_session(
     let web = web(app)?;
     *state.session.lock().unwrap() = Some(Session {
         dns: None,
+        dns_last: None,
         token: token.clone(),
         report: None,
         received_at: None,
@@ -445,15 +457,15 @@ fn snapshot(app: &tauri::AppHandle) -> Result<Snapshot, String> {
     let engine = engine(app)?;
     let engine_version = packaged_version(app, &engine);
     let running = profile::running(&profile)?;
-    let (report, report_received_at) = app
+    let (report, report_received_at, dns_last) = app
         .state::<Browser>()
         .session
         .lock()
         .unwrap()
         .as_ref()
         .filter(|_| running)
-        .map(|x| (x.report.clone(), x.received_at))
-        .unwrap_or((None, None));
+        .map(|x| (x.report.clone(), x.received_at, x.dns_last.clone()))
+        .unwrap_or((None, None, None));
     let host = app.state::<Browser>().host.lock().unwrap().clone();
     let checks = network::checks(
         &machine,
@@ -482,6 +494,7 @@ fn snapshot(app: &tauri::AppHandle) -> Result<Snapshot, String> {
         report,
         report_received_at,
         machine_exit: host,
+        dns_last,
         checks,
     })
 }
@@ -662,83 +675,6 @@ pub async fn browser_check(app: tauri::AppHandle) -> Result<Snapshot, String> {
         Err(error) => Err(error),
     }
 }
-#[tauri::command]
-pub async fn browser_align(
-    app: tauri::AppHandle,
-    on_progress: Channel<Progress>,
-) -> Result<Snapshot, String> {
-    let settings = workspaces::scope(&root(&app)?)?;
-    let config = config::load(&settings)?;
-    let exit = network::probe(&config.proxy).await?;
-    if exit.country != "US" {
-        return Err("实际代理出口不是美国，未修改机器。".into());
-    }
-    run(move || {
-        let state = app.state::<Browser>();
-        let _guard = state.gate.lock().unwrap();
-        workspaces::ready(&root(&app)?)?;
-        let log = Reporter::channel(Some(on_progress));
-        if workspaces::scope(&root(&app)?)? != settings { return Err("浏览器身份已变化，请重试。".into()); }
-        if profile::running(&settings.join("profile"))? {
-            return Err("先退出浏览器，再对齐机器。".into());
-        }
-        let machine = config::machine()?;
-        if !machine.timezones.contains(&exit.timezone) {
-            return Err("出口未返回可用时区，未修改机器。".into());
-        }
-        #[cfg(target_os = "linux")]
-        {
-            if machine.location_enabled.is_none() {
-                return Err("Linux location state is unknown on this desktop; full machine alignment cannot be verified. No system settings were changed.".into());
-            }
-            let _: serde_json::Value = decode(unsafe {
-                rf_system_region(b"en-US\0".as_ptr().cast(), b"en_US\0".as_ptr().cast())
-            })?;
-        }
-        log.log(
-            "browser",
-            "running",
-            "设置实际美国出口对应的时区，请完成系统管理员授权。",
-            0,
-            None,
-        );
-        let zone = std::ffi::CString::new(exit.timezone.clone()).map_err(|_| "出口时区无效。")?;
-        let _: serde_json::Value = decode(unsafe { rf_system_timezone(zone.as_ptr()) })?;
-        log.log("browser", "ok", "系统时区已核验。", 1, Some(3));
-        let _: serde_json::Value = decode(unsafe {
-            rf_system_region(b"en-US\0".as_ptr().cast(), b"en_US\0".as_ptr().cast())
-        })?;
-        log.log("browser", "ok", "美国英语与 en_US 区域已保存。", 2, Some(3));
-        if config::machine()?.location_enabled != Some(false) {
-            let _: serde_json::Value = decode(unsafe { rf_system_location() })?;
-        }
-        let fresh = config::machine()?;
-        if fresh.location_enabled != Some(false)
-            || fresh.timezone != exit.timezone
-            || !fresh.locale.starts_with("en_US")
-            || fresh.languages.first().map(String::as_str) != Some("en-US")
-        {
-            return Err("部分系统设置未能核验，请查看电脑设置。".into());
-        }
-        let mut config = config;
-        config.follow_machine = true;
-        config.language = "en-US".into();
-        config.timezone = exit.timezone;
-        config::save(&workspaces::scope(&root(&app)?)?, &config)?;
-        refresh_launch_args(&app)?;
-        renew_session(&app);
-        log.log(
-            "browser",
-            "ok",
-            "机器与实际美国出口对齐完成；重新打开浏览器核验。",
-            3,
-            Some(3),
-        );
-        snapshot(&app)
-    })
-    .await
-}
-
 /// 快捷换指纹：正常退出后更新种子与选定地区，网络跟随 TUN；旧观测会话失效。
 #[tauri::command]
 pub async fn browser_rotate(app: tauri::AppHandle, region: String) -> Result<Snapshot, String> {
@@ -770,6 +706,41 @@ pub async fn browser_rotate(app: tauri::AppHandle, region: String) -> Result<Sna
         *state.host.lock().unwrap() = None;
         renew_session(&app);
         snapshot(&app)
+    })
+    .await
+}
+
+/// 网络页「在 B 中打开完整报告」的唯一固定地址；WebView 不能传入任意 URL。
+pub(crate) const REPORT_URL: &str = "https://ip.net.coffee/claude";
+/// 在当前正在运行的 B 资料中打开固定报告页；不启动新资料、不改配置或指纹，B 未运行时如实拒绝。
+#[tauri::command]
+pub async fn browser_open_report(app: tauri::AppHandle) -> Result<(), String> {
+    run(move || {
+        let state = app.state::<Browser>();
+        let _guard = state.gate.lock().unwrap();
+        workspaces::ready(&root(&app)?)?;
+        let root = root(&app)?;
+        let settings = workspaces::scope(&root)?;
+        let profile = settings.join("profile");
+        profile::check_path(&root, &profile)?;
+        if !profile::running(&profile)? {
+            return Err("请先打开 B 浏览器，再查看完整报告。".into());
+        }
+        let engine = engine(&app)?;
+        let config = config::load(&settings)?;
+        let machine = config::machine()?;
+        config.validate(&machine)?;
+        let mut child = Command::new(binary(&engine))
+            .args(config::arguments(&config, &machine, &profile, REPORT_URL, &version(&engine)))
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(|_| "无法在 B 浏览器中打开完整报告。")?;
+        std::thread::spawn(move || {
+            let _ = child.wait();
+        });
+        Ok(())
     })
     .await
 }

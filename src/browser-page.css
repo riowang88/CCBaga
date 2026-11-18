@@ -1,0 +1,44 @@
+/*
+ * [INPUT]: rb.css 共享变量与 .rb-card/.rb-row/.rb-seg/.rb-btn；缺失时使用同值回退。
+ * [OUTPUT]: 浏览器环境配置页专属排版：深色状态条、设置行（120px 标签列）、输入框、分段控件选中态、数据清理区与缓存折叠。
+ * [POS]: 仅由 browser.tsx 引入；不覆盖共享组件的基础样式。
+ * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+ */
+.browser-page{display:flex;flex-direction:column;gap:14px}
+.browser-head{display:flex;align-items:flex-end;gap:12px}
+.browser-head>div{flex:1}
+.browser-feedback{margin:0;font-size:13px}
+.browser-page h2.rb-label{margin:0 0 8px}
+
+.browser-status{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.browser-status-text{flex:1;min-width:220px}
+.browser-status-text .rb-ok{color:var(--rb-ok-on-dark,#7fd093)}
+.browser-status-meta{color:var(--rb-on-dark-soft,#a09d96)}
+.browser-status .rb-link{color:var(--rb-warn-on-dark,#e8a55a)}
+
+.browser-settings .rb-row{display:flex;align-items:center;gap:16px;padding:10px 0;border-top:1px solid var(--rb-hairline,#e6dfd8)}
+.browser-settings .rb-row>label,.browser-row-label{width:120px;flex:none;color:var(--rb-muted,#6c6a64);padding:0}
+.browser-row-wrap{flex-wrap:wrap}
+.browser-row-wrap>.browser-hint,.browser-row-wrap>.browser-manual,.browser-row-wrap>.browser-doh,.browser-row-wrap>details{flex-basis:100%;margin:0 0 0 136px}
+fieldset.browser-dns-settings{margin:0;min-width:0;border:0;border-top:1px solid var(--rb-hairline,#e6dfd8)}
+fieldset.browser-dns-settings>legend{float:left}
+.browser-input{flex:1;min-width:0;height:40px;box-sizing:border-box;border:1px solid #d9d0c2;border-radius:8px;background:var(--rb-canvas,#faf9f5);color:var(--rb-ink,#141413);padding:0 14px;font-size:13px}
+.browser-input:disabled{opacity:.6}
+.browser-input[aria-invalid=true]{border-color:var(--rb-err,#c64545)}
+.browser-hint{margin:0;font-size:12px}
+.browser-summary{flex:1;min-width:180px;font-size:13px}
+.browser-manual,.browser-doh{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.browser-doh>label{flex-basis:100%;font-size:13px;color:var(--rb-muted,#6c6a64)}
+.browser-doh>.browser-hint{flex-basis:100%}
+.browser-doh-endpoint{overflow-wrap:anywhere}
+.browser-spacer{flex:1}
+.browser-page .rb-seg button[aria-checked=true]{background:var(--rb-canvas,#faf9f5);color:var(--rb-ink,#141413)}
+.browser-page .rb-seg button:disabled{cursor:not-allowed;opacity:.7}
+
+.browser-data-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.browser-data-text{flex:1;min-width:240px}
+.browser-data-text p{margin:4px 0 0;font-size:13px}
+.browser-cache{margin-top:10px;font-size:12px}
+.browser-cache>div{display:flex;justify-content:space-between;gap:12px;padding:4px 0;border-top:1px solid var(--rb-hairline,#e6dfd8)}
+.browser-cache span{overflow-wrap:anywhere}
+@media (max-width:760px){.browser-row-wrap>.browser-hint,.browser-row-wrap>.browser-manual,.browser-row-wrap>.browser-doh,.browser-row-wrap>details{margin-left:0}.browser-settings .rb-row{flex-wrap:wrap}}

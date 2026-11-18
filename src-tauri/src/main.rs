@@ -172,7 +172,7 @@ fn main() {
             browser::browser_quit,
             browser::browser_clear,
             browser::browser_check,
-            browser::browser_align,
+            browser::browser_open_report,
             browser::browser_default_read,
             browser::browser_set_default,
             browser::browser_rotate,

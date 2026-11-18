@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 现有隔离 Playwright 引擎、Vite 本机地址与虚构出口/宿主响应。
- * [OUTPUT]: 顶部身份卡顺序/双语/联动/不匹配/空身份与真实 browser.html 的黄波纹/绿通过/红失败、图片解码、紧凑宽度/高度、未知目标单项黄色待测、区域来源、DNS 独立观测区不混入基础通过项数、逐项配置说明/重启语义、DNS 只读路径说明、重测与双语 DOM 回归。
+ * [OUTPUT]: 横幅三态语义色（奶油页面底）；顶部身份卡顺序/双语/联动/不匹配/空身份与真实 browser.html 的黄波纹/绿通过/红失败、图片解码、紧凑宽度/高度、未知目标单项黄色待测、区域来源、DNS 独立观测区不混入基础通过项数、逐项配置说明/重启语义、DNS 只读路径说明、重测与双语 DOM 回归。
  * [POS]: 身份 UI 回归共用引擎的伴生页验证，不截图、不调用真实宿主或外网。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -55,13 +55,13 @@ export async function testBrowserVerification(browser:Browser,base:string) {
   await page.waitForFunction(()=>{const img=document.querySelector('.verification-brand img') as HTMLImageElement;return img?.complete&&img.naturalWidth>0;});
   assert(await page.locator('.verification-banner').evaluate(node=>node.getBoundingClientRect().height<=150));
   assert(await page.locator('.browser-start').evaluate(node=>node.getBoundingClientRect().width>=window.innerWidth-40));
-  await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-verification]')!).backgroundColor==='rgb(228, 245, 233)');
+  await page.waitForFunction(()=>getComputedStyle(document.querySelector('.verification-banner')!).backgroundColor==='rgb(226, 239, 227)');
   failure=true;
   await page.getByRole('button',{name:'重新实测',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('[data-verification]')?.getAttribute('data-verification')==='failed');
   const country=page.locator('.verification-check.failed').filter({has:page.getByRole('heading',{name:'出口国家',exact:true})});
   assert.match(await country.innerText(),/JP/);assert.match(await country.innerText(),/US/);
-  await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-verification]')!).backgroundColor==='rgb(255, 241, 240)');
+  await page.waitForFunction(()=>getComputedStyle(document.querySelector('.verification-banner')!).backgroundColor==='rgb(248, 227, 221)');
   failure=false;unknown=true;
   await page.getByRole('button',{name:'重新实测',exact:true}).click();
   await page.locator('.verification-check.pending').filter({has:page.getByRole('heading',{name:'出口国家',exact:true})}).waitFor();

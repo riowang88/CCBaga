@@ -36,7 +36,8 @@ export function IdentityPanel({onBusy, initialEmpty=false}: {onBusy?: (busy:bool
  const [loading,setLoading]=useState(true), [busy,setBusy]=useState(false), [cliBusy,setCliBusy]=useState(false);
  const [residueBusy,setResidueBusy]=useState(false),[residueRevision,setResidueRevision]=useState(0);
  const [error,setError]=useState('');
- const [sharingResult,setSharingResult]=useState<{accounts:number;added:number;repaired:number;skipped:number}|null>(null);
+ const [diagnostics,setDiagnostics]=useState('');
+ const [sharingResult,setSharingResult]=useState<{accounts:number;added:number;repaired:number;skipped:number;skipped_unsupported:number;skipped_missing_body:number;skipped_ambiguous_body:number;skipped_relation:number}|null>(null);
  const [sessionConflict,setSessionConflict]=useState<{conflict:SessionConflict;target:Target|'sync';choices:SessionChoice[]}|null>(null);
  const [selectedSession,setSelectedSession]=useState('');
  const [transfer,setTransfer]=useState<Identity|'import'|null>(null),[transferBusy,setTransferBusy]=useState(false);
@@ -216,6 +217,10 @@ export function IdentityPanel({onBusy, initialEmpty=false}: {onBusy?: (busy:bool
   try {setState(await invoke<IdentityState>('identities_rename',{id:rename.id,value:renameValue}));setRename(null);setError('');}
   catch(e) {setError(String(e));} finally {setBusy(false);}
  }
+ async function copyDiagnostics() {
+  try {const lines=await invoke<number>('copy_diagnostics');setDiagnostics(t('已复制 {lines} 行诊断日志，可直接粘贴发给开发者。',{lines}));}
+  catch(e){setDiagnostics(t(String(e)));}
+ }
  async function syncDesktopSessions(sessionChoices:SessionChoice[]=[]) {
   if(busy||!policy.desktop_sessions||state?.recovery)return;
   setSessionConflict(null);setBusy(true);setError('');setSharingResult(null);
@@ -249,6 +254,7 @@ export function IdentityPanel({onBusy, initialEmpty=false}: {onBusy?: (busy:bool
  return <section className="identity-page">
   <header className="cleanup-title"><h1>{t('Claude 身份管理')}</h1><Button variant="secondary" size="small" disabled={locked||loading} leftIcon={<Refresh aria-hidden size={16} className={loading||usageBusy.size>0?'spin':''}/>} onClick={()=>void refreshAll()}>{t('刷新')}</Button></header>
   {error&&<p role="alert" className="cleanup-feedback error">{t(error)}</p>}
+  <p className="identity-caption"><Button variant="secondary" size="small" onClick={()=>void copyDiagnostics()}>{t('复制诊断日志')}</Button> {diagnostics?<span role="status">{diagnostics}</span>:t('遇到问题时复制后发给开发者。日志只存在本机、不上传，只含操作阶段、数量与错误，不含令牌、聊天正文或文件内容。')}</p>
   {state?.recovery&&<div className="identity-recovery" role="alert"><strong>{t('有一次身份切换尚未完成')}</strong><Button size="small" variant="ink" disabled={locked||loading} onClick={()=>choose('recovery')}>{t('恢复原身份')}</Button></div>}
     <section className="identity-library"><div className="identity-section-head"><h2>{t('身份')}</h2><div className="identity-library-controls"><span className="identity-count">{saved.length} {t('已保存身份')}</span><Button size="small" variant="secondary" disabled={blocked} onClick={()=>setTransfer('import')}>{t('导入')}</Button><Checkbox label={t('联动浏览器')} checked={state?.browser.enabled??false} disabled={blocked} onCheckedChange={value=>{setUseExisting(false);setBrowserReview(value===true);setError('');}}/></div></div>
    <div className="identity-card-rail" ref={rail} tabIndex={0} role="region" aria-label={t('身份')}>
@@ -297,6 +303,7 @@ export function IdentityPanel({onBusy, initialEmpty=false}: {onBusy?: (busy:bool
     <Button variant="secondary" size="small" disabled={blocked||!policy.desktop_sessions} onClick={()=>void syncDesktopSessions()}>{t('同步桌面会话')}</Button>
     <p className="identity-caption">{t('切换时自动跟进可确认的最新聊天版本；不同分支需选择，旧正文保留。')}</p>
     {sharingResult&&<p role="status">{t('桌面会话共享：{accounts} 个账号目录，新增 {added} 个入口，更新 {repaired} 个会话，跳过 {skipped} 条不支持的记录。',sharingResult)}</p>}
+    {sharingResult&&sharingResult.skipped>0&&<p role="status" className="identity-caption">{t('跳过明细：{skipped_unsupported} 条未启动、远程或定时会话；{skipped_missing_body} 条在本机 ~/.claude/projects 找不到聊天正文（可能已随其他身份暂存，需先切回该身份或开启保留会话历史）；{skipped_ambiguous_body} 条有多份正文无法确定；{skipped_relation} 条层级关系不完整。',sharingResult)}</p>}
    </div>}
   </details>
   {state?.browser_warning&&<div className="identity-recovery" role="alert"><span>{t(state.browser_warning)}</span><Button size="small" variant="secondary" disabled={blocked} onClick={()=>void retryBrowser()}>{t('打开浏览器')}</Button></div>}

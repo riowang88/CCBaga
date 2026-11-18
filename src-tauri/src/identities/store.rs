@@ -1,5 +1,5 @@
 // [INPUT]: SQLite 目录、用户策略、白名单源、已验收归档代次、认证加密与平台凭据桥。
-// [OUTPUT]: 可选桌面会话共享、原地备份、本地档案往返及同档案重选保护、回滚与真实进度；同卷把已解压目录或文件改名到清空目标，跨卷退回逐文件复制，JSON 键合并仍写回；同 service/account 的桌面钥匙串条目原地更新以保留本机授权；切换/恢复复查 B 资料、锁存进程冲突并保留恢复记录；目录内链接按链接恢复，旧归档瞬态锁不恢复。
+// [OUTPUT]: 可选桌面会话共享、原地备份、本地档案往返及同档案重选保护、回滚与真实进度；同卷把已解压目录或文件改名到清空目标，跨卷退回逐文件复制，JSON 键合并仍写回；同 service/account 的桌面钥匙串条目原地更新以保留本机授权；切换/恢复复查 B 资料、锁存进程冲突并保留恢复记录；目录内链接按链接恢复，旧归档瞬态锁不恢复；策略由暂存改为保留的归档资料在恢复后及旧代次被取代前并回工作区，不覆盖已有文件。
 // [POS]: 身份的文件事务；SQLite 与文件系统由恢复日志协调，不能假装是同一原子事务。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use super::{
@@ -383,6 +383,88 @@ impl Store {
             output.sync_all().map_err(problem)
         }
     }
+    /// 归档按“随身份暂存”保存、当前策略却“保留在工作区”的整项资料。恢复不会替换工作区，
+    /// 但也不能把它们留在即将被新代次取代的归档里，否则下次保存后永久丢失。缓存可再生，不并回。
+    pub(super) fn carried(stage: &Stage, policy: &Policy) -> Vec<(usize, Source)> {
+        stage.manifest.sources.iter().enumerate().filter(|(n, s)| {
+            s.keys.is_empty()
+                && !matches!(s.category.as_str(), "settings" | "cache")
+                && policy.keeps(&s.category)
+                && !identity::transient_lock(&stage.manifest.home, &s.path, &stage.path.join(format!("data/{n}")))
+        }).map(|(n, s)| (n, s.clone())).collect()
+    }
+    /// 保存会让同槽位的旧代次被回收。旧代次按暂存策略存着、现在改为保留的资料若不在工作区
+    /// （例如旧版本切回时未恢复），先取回缺失的部分；只在策略确有这种变化时才解密旧归档。
+    pub(super) fn rescue_superseded(&self, previous: &Record, policy: &Policy, reporter: &Reporter) -> Result<(), String> {
+        if previous.empty || !["skills", "plugins", "history"].iter().any(|c| policy.keeps(c) && !previous.policy.keeps(c)) {
+            return Ok(());
+        }
+        let stage = self.load(previous)?;
+        self.merge_carried(&stage, &Self::carried(&stage, policy), reporter, false)
+    }
+    fn same_file(a: &Path, b: &Path) -> bool {
+        let regular = |p: &Path| fs::symlink_metadata(p).ok().filter(|m| m.is_file()).map(|m| m.len());
+        match (regular(a), regular(b)) {
+            (Some(x), Some(y)) if x == y => {
+                let (Ok(mut a), Ok(mut b)) = (fs::File::open(a), fs::File::open(b)) else { return false };
+                let (mut left, mut right) = (vec![0u8; 1 << 16], vec![0u8; 1 << 16]);
+                loop {
+                    let Ok(n) = io::Read::read(&mut a, &mut left) else { return false };
+                    if n == 0 { return true; }
+                    if io::Read::read_exact(&mut b, &mut right[..n]).is_err() || left[..n] != right[..n] { return false; }
+                }
+            }
+            _ => false,
+        }
+    }
+    // 只新增：目标不存在才放入；两边都是真实目录才逐层合并；同名不同内容另存为 <名称>.baga-<身份编号>。
+    fn merge_extracted(&self, data: &Path, destination: &Path, tag: Option<&str>) -> Result<(), String> {
+        self.during_io()?;
+        let target = match fs::symlink_metadata(destination) {
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return self.place_extracted(data, destination),
+            Err(error) => return Err(problem(error)),
+            Ok(meta) => meta,
+        };
+        let source = fs::symlink_metadata(data).map_err(problem)?;
+        if source.is_dir() && target.is_dir() {
+            let mut entries = fs::read_dir(data).map_err(problem)?.collect::<Result<Vec<_>, _>>().map_err(problem)?;
+            entries.sort_by_key(|e| e.file_name());
+            for entry in entries {
+                self.merge_extracted(&entry.path(), &destination.join(entry.file_name()), tag)?;
+            }
+            return Ok(());
+        }
+        // 取回本身份旧归档时，工作区已有的同名项就是更新的版本，不另存旧副本。
+        let Some(tag) = tag else { return Ok(()); };
+        if Self::same_file(data, destination) { return Ok(()); }
+        let mut name = destination.file_name().ok_or_else(|| problem("merge"))?.to_os_string();
+        name.push(format!(".baga-{tag}"));
+        let aside = destination.with_file_name(name);
+        match fs::symlink_metadata(&aside) {
+            Err(error) if error.kind() == io::ErrorKind::NotFound => self.place_extracted(data, &aside),
+            Err(error) => Err(problem(error)),
+            // 同一身份此前已另存过；不覆盖。
+            Ok(_) => Ok(()),
+        }
+    }
+    pub(super) fn merge_carried(&self, stage: &Stage, sources: &[(usize, Source)], reporter: &Reporter, aside: bool) -> Result<(), String> {
+        if sources.is_empty() { return Ok(()); }
+        reporter.log("restore", "running", "正在把归档中改为保留的资料并回工作区。", 0, Some(sources.len()));
+        for (index, (n, source)) in sources.iter().enumerate() {
+            self.stopped()?;
+            if !identity::allowed(&self.home, source) {
+                return Err(format!("身份路径超出允许范围：{}", source.path.display()));
+            }
+            let data = stage.path.join(format!("data/{n}"));
+            if fs::symlink_metadata(&data).is_err() { continue; }
+            private::parents(source.path.parent().unwrap())?;
+            if fs::symlink_metadata(&source.path).is_ok() { private::safe(&source.path)?; }
+            self.merge_extracted(&data, &source.path, aside.then_some(stage.manifest.id.as_str()))?;
+            reporter.log("restore", "running", "已并回归档中的保留资料。", index + 1, Some(sources.len()));
+        }
+        reporter.log("restore", "ok", "归档中改为保留的资料已并回工作区，未覆盖已有文件。", sources.len(), Some(sources.len()));
+        Ok(())
+    }
     pub(super) fn restore(
         &self,
         stage: &Stage,
@@ -677,6 +759,8 @@ impl Store {
             reporter.log("credentials", "ok", "本地登录凭据已准备切换。", 1, Some(1));
             if let Some(stage) = incoming.as_ref() {
                 self.restore(stage, &next, policy, reporter, "restore")?;
+                // 不进入 next：失败回滚会清除 next，而并回目标是用户保留在工作区的资料。
+                self.merge_carried(stage, &Self::carried(stage, policy), reporter, true)?;
             }
             reporter.log(
                 "commit",

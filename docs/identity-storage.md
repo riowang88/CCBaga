@@ -6,13 +6,13 @@
 -->
 # Local identity storage
 
-CCBaga manages a local snapshot, not a server-side identity. Sign-in validity is determined by Anthropic. Only manage accounts you own and use them in accordance with the official terms.
+RioBaga manages a local snapshot, not a server-side identity. Sign-in validity is determined by Anthropic. Only manage accounts you own and use them in accordance with the official terms.
 
 ## What an identity contains
 
 Claude Code separates authentication from application data. Its [authentication reference](https://code.claude.com/docs/en/authentication) documents macOS Keychain credentials, the Linux/Windows credential file and separate configuration directories. The [directory reference](https://code.claude.com/docs/en/claude-directory#application-data) distinguishes transcripts, tool outputs, file snapshots, attachments, logs and configuration backups.
 
-CCBaga archives the approved sign-in fields and selected Desktop login stores. The user's retention choices determine whether skills, plugins, MCP, settings, project state, history and caches stay in the workspace or follow the snapshot. Actual project source directories are excluded. Custom configuration directories and Console profiles outside the default directory are not automatically switched.
+RioBaga archives the approved sign-in fields and selected Desktop login stores. The user's retention choices determine whether skills, plugins, MCP, settings, project state, history and caches stay in the workspace or follow the snapshot. Actual project source directories are excluded. Custom configuration directories and Console profiles outside the default directory are not automatically switched.
 
 A large archive can contain conversation transcripts, images, tool results, file history and Desktop databases. These are not all authentication requirements. They remain recoverable because the user selected them for archiving. Keeping a category in the workspace avoids copying it into subsequent snapshots but also leaves that category visible there. Compression cannot guarantee a fixed size, particularly for images and compressed database content.
 
@@ -60,9 +60,9 @@ The vault is protected local storage, not an isolation boundary against other pr
 
 SQLite commits the browser selection with the identity switch and restores the previous selection during rollback. An interrupted identity operation blocks browser startup until recovery. An empty identity receives a fresh browser directory. Reopening a saved identity reuses its directory; browser data is not compressed, copied or merged during switching. A failure to reopen the browser is reported separately after a committed identity change, with a retry action.
 
-The initial nonzero 32-bit fingerprint seed is derived from CCBaga's own random identity ID using SHA-256, with collisions registered and resolved locally. An unbound fresh browser directory reserves its random ID for the first saved identity, avoiding a seed change at that first save. It is not derived from an Anthropic account UUID or token. Renaming or refreshing credentials does not change it. Explicit fingerprint changes remain local to that identity and persist across switches.
+The initial nonzero 32-bit fingerprint seed is derived from RioBaga's own random identity ID using SHA-256, with collisions registered and resolved locally. An unbound fresh browser directory reserves its random ID for the first saved identity, avoiding a seed change at that first save. It is not derived from an Anthropic account UUID or token. Renaming or refreshing credentials does not change it. Explicit fingerprint changes remain local to that identity and persist across switches.
 
-Browser data remains outside the encrypted identity archive. Chromium and the OS manage its storage protection; this feature does not make the browser directory a CCBaga-encrypted vault. Unlinking returns to the original shared browser directory and retains identity directories. Deleting a saved identity retains browser data by default; deleting the associated browser data requires a separate selection and refuses a directory that is in use. No claim of secure disk erasure is made.
+Browser data remains outside the encrypted identity archive. Chromium and the OS manage its storage protection; this feature does not make the browser directory a RioBaga-encrypted vault. Unlinking returns to the original shared browser directory and retains identity directories. Deleting a saved identity retains browser data by default; deleting the associated browser data requires a separate selection and refuses a directory that is in use. No claim of secure disk erasure is made.
 
 First use still requires website sign-in. Restoring Code/Desktop credentials does not create website cookies or verify that all clients use the same account. Separate profiles do not change the public IP, prevent server-side correlation, or guarantee that browsers, extensions and websites make no external connections. Custom profiles created manually inside Chromium remain outside the identity-card model. See the [Chromium user data directory reference](https://chromium.googlesource.com/chromium/src/+/HEAD/docs/user_data_dir.md).
 
@@ -80,7 +80,7 @@ Browser transfer is available only for a saved identity with an existing browser
 
 The versioned package uses a random salt, PBKDF2-HMAC-SHA256 with 600,000 iterations and the existing AES-256-GCM authenticated stream around tar/Zstd. Import rejects links, unsafe/duplicate members, incompatible versions and payloads above 8 GiB or 100,000 data members. Native file selection yields a one-use five-minute ticket; arbitrary paths are not accepted from the UI. Passwords are not saved or logged. There is no password recovery.
 
-On macOS, saved Keychain account names are preserved. Claude Code looks up its default credential using its effective local username (including the `USER` environment setting); a different username on the new device may require signing in again with the official client. CCBaga does not guess account names from home-directory paths or rewrite Keychain ACLs. Custom secure-storage/configuration directories are outside the default scope.
+On macOS, saved Keychain account names are preserved. Claude Code looks up its default credential using its effective local username (including the `USER` environment setting); a different username on the new device may require signing in again with the official client. RioBaga does not guess account names from home-directory paths or rewrite Keychain ACLs. Custom secure-storage/configuration directories are outside the default scope.
 
 
 ## Controlled sign-in and updating one client

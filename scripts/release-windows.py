@@ -24,7 +24,7 @@ def main():
     phase=sys.argv[1] if len(sys.argv)>1 else 'all'
     if phase not in ['all','check','build','verify']:raise SystemExit('Invalid build phase')
     if phase=='verify':
-        run(sys.executable,'scripts/verify-windows-installer.py',str(ROOT/'releases'/f'CCBaga-{version}-windows-x86_64-setup.exe'),str(ROOT/'releases/Windows-engine-manifest.json'))
+        run(sys.executable,'scripts/verify-windows-installer.py',str(ROOT/'releases'/f'RioBaga-{version}-windows-x86_64-setup.exe'),str(ROOT/'releases/Windows-engine-manifest.json'))
         return
     if phase in ['all','check']:
         run('bun','test');run('bun','run','build')
@@ -45,7 +45,7 @@ def main():
     installers=list((ROOT/'src-tauri/target/release/bundle/nsis').glob('*-setup.exe'))
     if len(installers)!=1:raise SystemExit('Expected exactly one NSIS installer')
     output=ROOT/'releases';output.mkdir(exist_ok=True)
-    installer=output/f'CCBaga-{version}-windows-x86_64-setup.exe'
+    installer=output/f'RioBaga-{version}-windows-x86_64-setup.exe'
     shutil.copyfile(installers[0],installer)
     engine=ROOT/'browser-runtime/WindowsBrowser'
     manifest={str(p.relative_to(engine)).replace('\\','/'):hashlib.file_digest(p.open('rb'),'sha256').hexdigest() for p in engine.rglob('*') if p.is_file()}

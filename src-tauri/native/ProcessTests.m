@@ -108,7 +108,7 @@ static int fixtureKill(pid_t pid, int signal) {
 }
 static NSString *fixtureBundle(NSString *root) {
     if ([root isEqual:@"/Applications/Claude.app"]) return @"com.anthropic.claudefordesktop";
-    if ([root isEqual:@"/Applications/CCBaga-B.app"] || [root isEqual:@"/private/fixture/CCBaga-B.app.bundle"]) return @"ai.local.requirement-french.browser";
+    if ([root isEqual:@"/Applications/RioBaga-B.app"] || [root isEqual:@"/private/fixture/RioBaga-B.app.bundle"]) return @"ai.local.requirement-french.browser";
     return @"unrelated.app";
 }
 #define proc_listallpids fixtureListAll
@@ -129,8 +129,8 @@ static void expectError(id value, NSString *reason) {
 }
 int main(void) { @autoreleasepool {
     NSString *cli=@"/opt/node_modules/@anthropic-ai/claude-code/cli.js";
-    NSString *main=@"/Applications/CCBaga-B.app/Contents/MacOS/Chromium";
-    NSString *helper=@"/Applications/CCBaga-B.app/Contents/Frameworks/Chromium Framework.framework/Versions/1/Helpers/Chromium Helper.app/Contents/MacOS/Chromium Helper";
+    NSString *main=@"/Applications/RioBaga-B.app/Contents/MacOS/Chromium";
+    NSString *helper=@"/Applications/RioBaga-B.app/Contents/Frameworks/Chromium Framework.framework/Versions/1/Helpers/Chromium Helper.app/Contents/MacOS/Chromium Helper";
     NSString *profile=[NSTemporaryDirectory() stringByAppendingPathComponent:[@"CCBaga fixture " stringByAppendingString:NSUUID.UUID.UUIDString]];
     for (NSString *stage in @[@"first",@"path",@"final"]) {
         for (NSString *outcome in @[@"exit",@"unknown",@"reuse"]) {
@@ -219,7 +219,7 @@ int main(void) { @autoreleasepool {
     NSCAssert([json(rf_claude_processes()) count]==0,@"kernel-confirmed zombie is exited");
     rows=@[process(42001,1,@"/usr/local/bin/node",@[@"node",@"/tmp/unrelated.js",cli]), process(42003,1,@"/tmp/claude",@[@"claude"])];
     NSCAssert([json(rf_claude_processes()) count]==0,@"unrelated script or unsigned same-name executable is not Claude");
-    NSString *cloneMain=@"/private/fixture/CCBaga-B.app.bundle/Contents/MacOS/Chromium";
+    NSString *cloneMain=@"/private/fixture/RioBaga-B.app.bundle/Contents/MacOS/Chromium";
     rows=@[process(42001,1,cloneMain,@[@"Chromium",@"--user-data-dir",profile])];
     NSCAssert([json(rf_browser_running(profile.UTF8String))[@"running"] boolValue],@"macOS signed app clone must remain visible to profile occupancy checks");
     rows=@[process(42001,1,@"/private/fixture/unrelated.app.bundle/Contents/MacOS/Chromium",@[@"Chromium",@"--user-data-dir",profile])];

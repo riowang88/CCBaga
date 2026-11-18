@@ -47,12 +47,12 @@ export function BrowserPanel({ onBusy }: {
     async function makeDefault() { setAsking(true); setDefaultNote(''); try {
         const next = await invoke<DefaultBrowser>('browser_set_default');
         setPreferred(next);
-        setDefaultNote(next.is_default ? "CCBaga-B已是默认浏览器。" : "已向系统请求设为默认浏览器，请检查系统确认。");
+        setDefaultNote(next.is_default ? "RioBaga-B已是默认浏览器。" : "已向系统请求设为默认浏览器，请检查系统确认。");
         for (let i = 0; i < 20 && live.current; i++) {
             await new Promise(r => setTimeout(r, 1500));
             const fresh = await readDefault();
             if (fresh?.is_default) {
-                setDefaultNote("CCBaga-B已设为默认浏览器。");
+                setDefaultNote("RioBaga-B已设为默认浏览器。");
                 break;
             }
         }

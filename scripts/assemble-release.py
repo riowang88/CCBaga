@@ -15,8 +15,8 @@ OUT=ROOT/'releases'
 def main():
     version=os.environ['RELEASE_VERSION']
     if not re.fullmatch(r'\d+\.\d+\.\d+',version):raise SystemExit('Invalid release version')
-    installers=[f'CCBaga-{version}-macos-arm64.dmg',f'CCBaga-{version}-windows-x86_64-setup.exe',*[f'CCBaga-{version}-linux-x86_64.{ext}' for ext in ['deb','rpm','AppImage','pkg.tar.zst']]]
-    archive=f'CCBaga-{version}-macos-arm64.app.tar.gz'
+    installers=[f'RioBaga-{version}-macos-arm64.dmg',f'RioBaga-{version}-windows-x86_64-setup.exe',*[f'RioBaga-{version}-linux-x86_64.{ext}' for ext in ['deb','rpm','AppImage','pkg.tar.zst']]]
+    archive=f'RioBaga-{version}-macos-arm64.app.tar.gz'
     required={'SHA256SUMS':{installers[0],archive,archive+'.sig','latest.json'},
               'Linux-SHA256SUMS':set(installers[2:5]),'Arch-SHA256SUMS':{installers[5]},
               'Windows-SHA256SUMS':{installers[1]}}
@@ -33,13 +33,13 @@ def main():
     windows=json.loads((OUT/'latest-windows.json').read_text(encoding='utf-8'))
     if manifest['version']!=version or windows['version']!=version:raise SystemExit('Mixed release versions')
     manifest['platforms'].update(windows['platforms'])
-    expected={'darwin-aarch64':f'CCBaga-{version}-macos-arm64.app.tar.gz','windows-x86_64':f'CCBaga-{version}-windows-x86_64-setup.exe'}
+    expected={'darwin-aarch64':f'RioBaga-{version}-macos-arm64.app.tar.gz','windows-x86_64':f'RioBaga-{version}-windows-x86_64-setup.exe'}
     if set(manifest['platforms'])!=set(expected):raise SystemExit('Unexpected updater target')
     for platform,filename in expected.items():
         entry=manifest['platforms'][platform]
         url=f'https://github.com/riowang88/CCBaga/releases/download/v{version}/{filename}'
         if entry['url']!=url or entry['signature']!=(OUT/(filename+'.sig')).read_text(encoding='utf-8').strip():raise SystemExit('Updater URL/signature mismatch')
-    manifest['notes']='macOS updates CCBaga-A; Windows updates both applications. Save unfinished browser work before updating.'
+    manifest['notes']='macOS updates RioBaga-A; Windows updates both applications. Save unfinished browser work before updating.'
     (OUT/'latest.json').write_text(json.dumps(manifest,indent=2)+'\n',encoding='utf-8')
     public=installers+[expected['darwin-aarch64'],'latest.json']
     digests=[]
@@ -49,7 +49,7 @@ def main():
     public.append('SHA256SUMS')
     (ROOT/'release-files.txt').write_text(''.join('releases/'+name+'\n' for name in public),encoding='utf-8')
     labels=['macOS Apple Silicon · A + B','Windows x64 · A + B','Linux DEB','Linux RPM','Linux AppImage','Arch/pacman']
-    notes=['CCBaga combines recoverable local Claude identities, CLI management, real environment checks and an isolated companion browser.\n','\n| Platform | Installer |\n| --- | --- |\n']
+    notes=['RioBaga combines recoverable local Claude identities, CLI management, real environment checks and an isolated companion browser.\n','\n| Platform | Installer |\n| --- | --- |\n']
     for label,filename in zip(labels,installers):notes.append(f'| {label} | [Download](https://github.com/riowang88/CCBaga/releases/download/v{version}/{filename}) |\n')
     notes+=['\nEach installer contains both applications. On macOS drag both apps into Applications. On Windows run the setup installer; SmartScreen may show a warning because the installer has no Authenticode certificate. Organization policy can restrict installation.\n','\nSidebar updates verify signed downloads: macOS updates A, Windows updates A and B. Linux uses its package manager. The archive and latest.json are used by automatic updates; ordinary installation only needs the platform installer. SHA256SUMS covers public downloads.\n','\n[Usage](https://github.com/riowang88/CCBaga#readme) · [Network Skill](https://github.com/riowang88/CCBaga/tree/main/skills/ccbaga-network)\n']
     if manifest.get('macos_signing') == 'adhoc':

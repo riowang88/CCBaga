@@ -1,6 +1,6 @@
 #!/bin/sh
 # [INPUT]: assets/ 两张压缩品牌图、scripts/make-icon.swift 与 macOS iconutil。
-# [OUTPUT]: src-tauri/icons 下 CCBaga-A icon.png/icon.icns（橙底清理员 A），browser-runtime/icons 下 CCBaga-B icon.png/app.icns（橙底浏览器 B）。
+# [OUTPUT]: src-tauri/icons 下 RioBaga-A icon.png/icon.icns（橙底清理员 A），browser-runtime/icons 下 RioBaga-B icon.png/app.icns（橙底浏览器 B）。
 # [POS]: 两个应用图标的可重复生成入口；生成后由 brand-browser.sh 与 Tauri 打包使用。
 # [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 set -eu

@@ -17,6 +17,6 @@ bsdtar -xf "$package" -C "$temporary"
 python scripts/verify-linux-package.py "$temporary" packaging/arch/src/ccbaga/browser-runtime/LinuxBrowser/chrome
 grep -qx "pkgver = $CC_RELEASE_VERSION-1" "$temporary/.PKGINFO"
 mkdir -p releases
-target="CCBaga-$CC_RELEASE_VERSION-linux-x86_64.pkg.tar.zst"
+target="RioBaga-$CC_RELEASE_VERSION-linux-x86_64.pkg.tar.zst"
 cp "$package" "releases/$target"
 (cd releases; sha256sum "$target" > Arch-SHA256SUMS)

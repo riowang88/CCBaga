@@ -18,7 +18,7 @@ import dmgbuild
 
 ROOT = Path(__file__).resolve().parent.parent
 BROWSER = ROOT / 'browser-runtime/Browser.app'
-HOST = ROOT / 'src-tauri/target/release/bundle/macos/CCBaga-A.app'
+HOST = ROOT / 'src-tauri/target/release/bundle/macos/RioBaga-A.app'
 SIGNING_KEYS = ['TAURI_SIGNING_PRIVATE_KEY', 'TAURI_SIGNING_PRIVATE_KEY_PATH', 'TAURI_SIGNING_PRIVATE_KEY_PASSWORD']
 BUILD_ENV = {key: value for key, value in os.environ.items() if key not in SIGNING_KEYS and not key.startswith("APPLE_")}
 
@@ -111,7 +111,7 @@ def main():
         run('ditto', '-c', '-k', '--keepParent', HOST, archive)
         notarize(archive, HOST)
         # ----- 更新只签最终装订后的宿主字节；公钥留在应用，私钥不进入构建 -----
-        update_archive = output / f'CCBaga-{version}-macos-arm64.app.tar.gz'
+        update_archive = output / f'RioBaga-{version}-macos-arm64.app.tar.gz'
         with tarfile.open(update_archive, 'w:gz', dereference=False) as bundle:
             bundle.add(HOST, arcname=HOST.name)
         unpacked = work / 'updater-verification'
@@ -129,7 +129,7 @@ def main():
         manifest = output / 'latest.json'
         manifest.write_text(json.dumps({
             'version': version,
-            'notes': 'CCBaga-A update. For both applications, download the DMG from GitHub Releases.',
+            'notes': 'RioBaga-A update. For both applications, download the DMG from GitHub Releases.',
             'macos_signing': 'notarized' if notarized else 'adhoc',
             'pub_date': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
             'platforms': {'darwin-aarch64': {
@@ -140,9 +140,9 @@ def main():
         verify_env = build_env | {'CC_UPDATE_MANIFEST': str(manifest), 'CC_UPDATE_ARCHIVE': str(update_archive)}
         run('cargo', 'test', '--locked', '--manifest-path', 'src-tauri/Cargo.toml', '--features', 'custom-protocol',
             'updater_tests::published_archive_matches_embedded_key_and_signed_version', '--', '--ignored', env=verify_env)
-        stage = work / 'CCBaga'
+        stage = work / 'RioBaga'
         stage.mkdir()
-        for app, name in [(HOST, 'CCBaga-A.app'), (BROWSER, 'CCBaga-B.app')]:
+        for app, name in [(HOST, 'RioBaga-A.app'), (BROWSER, 'RioBaga-B.app')]:
             run('codesign', '--verify', '--deep', '--strict', app)
             if notarized:
                 run('spctl', '--assess', '--type', 'execute', '--verbose=2', app)
@@ -153,8 +153,8 @@ def main():
         if not notarized:
             install_note += 'This build uses ad-hoc signing and is not notarized by Apple. macOS may block first launch; review the downloaded app in System Settings > Privacy & Security. Organization policy may prohibit opening it.\n'
         (stage / 'Install.txt').write_text(install_note)
-        dmg = output / f'CCBaga-{version}-macos-arm64.dmg'
-        dmgbuild.build_dmg(str(dmg), 'CCBaga', settings_file=str(ROOT / 'scripts/dmg-settings.py'), defines={'stage': str(stage), 'root': str(ROOT)})
+        dmg = output / f'RioBaga-{version}-macos-arm64.dmg'
+        dmgbuild.build_dmg(str(dmg), 'RioBaga', settings_file=str(ROOT / 'scripts/dmg-settings.py'), defines={'stage': str(stage), 'root': str(ROOT)})
         run(sys.executable, 'scripts/verify-dmg.py', dmg, *([] if notarized else ['--adhoc']))
         run('codesign', '--force', '--sign', identity, *(['--timestamp'] if notarized else []), dmg)
         notarize(dmg, dmg)

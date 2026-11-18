@@ -1,4 +1,4 @@
-// [INPUT]: 本机指纹引擎（优先 /Applications/CCBaga-B.app，回退 ~/Applications）、配置/资料边界、真实浏览器观测、宿主界面语言与共享操作日志。
+// [INPUT]: 本机指纹引擎（优先 /Applications/RioBaga-B.app，回退 ~/Applications）、配置/资料边界、真实浏览器观测、宿主界面语言与共享操作日志。
 // [OUTPUT]: 有界绑定身份上下文与浏览器设置/启动/缓存清理、显式完整资料重置和环境核验（含同会话最近一轮 DNS 结果）；仅 B 运行时在当前资料打开固定报告地址；已删除写死美国的系统对齐；完整重置只处理当前绑定 user-data-dir，按真实项目计数；launch.args 与 SQLite 共用资料/指纹参数，恢复期间阻断启动；向身份事务提供当前/目标资料占用核对。
 // [POS]: 独立浏览器模块的唯一编排入口；改变资料前必须退出浏览器；不自行改系统默认浏览器，只发起系统确认。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -138,10 +138,10 @@ fn root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 #[cfg(target_os = "macos")]
 pub const BROWSER_ID: &str = "ai.local.requirement-french.browser";
 #[cfg(target_os = "macos")]
-const BROWSER_APP: &str = "CCBaga-B.app";
+const BROWSER_APP: &str = "RioBaga-B.app";
 #[cfg(target_os = "macos")]
 const LSREGISTER: &str = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister";
-/// install-apps.sh 安装的 CCBaga-B：优先 /Applications，回退 ~/Applications；存在时作为唯一引擎，避免同一包标识出现两份注册。
+/// install-apps.sh 安装的 RioBaga-B：优先 /Applications，回退 ~/Applications；存在时作为唯一引擎，避免同一包标识出现两份注册。
 #[cfg(target_os = "macos")]
 fn installed() -> Option<PathBuf> {
     let mut places = vec![PathBuf::from("/Applications")];
@@ -163,7 +163,7 @@ fn register(engine: &Path) -> Result<(), String> {
 fn bundle_id() -> CString {
     CString::new(BROWSER_ID).unwrap()
 }
-/// CCBaga-B 入口（launcher/CCBrowser.c）读取的参数：与实测启动相同，只去掉起始页。
+/// RioBaga-B 入口（launcher/CCBrowser.c）读取的参数：与实测启动相同，只去掉起始页。
 fn write_launch_args(
     root: &Path,
     config: &Config,
@@ -271,19 +271,19 @@ pub fn forget_start_url(app: &tauri::AppHandle) {
         let _ = fs::remove_file(root.join("start.url"));
     }
 }
-/// 宿主启动时建立起始页会话并带起 CCBaga-B（已在运行则不动），不抢焦点。
+/// 宿主启动时建立起始页会话并带起 RioBaga-B（已在运行则不动），不抢焦点。
 #[cfg(target_os = "macos")]
 pub fn companion(app: tauri::AppHandle) {
     std::thread::spawn(move || {
         if let Err(error) = start_companion(&app) {
-            eprintln!("CCBaga-B未随宿主启动：{error}");
+            eprintln!("RioBaga-B未随宿主启动：{error}");
         }
     });
 }
 #[cfg(target_os = "macos")]
 fn start_companion(app: &tauri::AppHandle) -> Result<(), String> {
-    // 外部 CCBaga-B.app 缺失时先停止。不要为此安装另一份引擎或新建资料槽位。
-    let browser = installed().ok_or("未安装 /Applications/CCBaga-B.app。")?;
+    // 外部 RioBaga-B.app 缺失时先停止。不要为此安装另一份引擎或新建资料槽位。
+    let browser = installed().ok_or("未安装 /Applications/RioBaga-B.app。")?;
     let state = app.state::<Browser>();
     let _guard = state.gate.lock().unwrap();
     let root = root(app)?;
@@ -296,7 +296,7 @@ fn start_companion(app: &tauri::AppHandle) -> Result<(), String> {
     let config = config::load(&settings)?;
     let machine = config::machine()?;
     config.validate(&machine)?;
-    // 先刷新参数：浏览器已由 CCBaga-B 入口先行启动时，下一次启动也能沿用指纹参数。
+    // 先刷新参数：浏览器已由 RioBaga-B 入口先行启动时，下一次启动也能沿用指纹参数。
     write_launch_args(&root, &config, &machine, &profile, &version(&browser))?;
     let page = open_session(app, &config, &machine, version(&browser))?;
     if profile::running(&profile)? {
@@ -308,7 +308,7 @@ fn start_companion(app: &tauri::AppHandle) -> Result<(), String> {
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
-            .map_err(|_| "无法重新连接运行中的 CCBaga-B。")?;
+            .map_err(|_| "无法重新连接运行中的 RioBaga-B。")?;
         std::thread::spawn(move || {
             let _ = child.wait();
         });
@@ -320,9 +320,9 @@ fn start_companion(app: &tauri::AppHandle) -> Result<(), String> {
         .args(["-g", "-a"])
         .arg(&browser)
         .status()
-        .map_err(|_| "无法打开 CCBaga-B。")?;
+        .map_err(|_| "无法打开 RioBaga-B。")?;
     if !status.success() {
-        return Err("LaunchServices 拒绝打开 CCBaga-B。".into());
+        return Err("LaunchServices 拒绝打开 RioBaga-B。".into());
     }
     launch::confirm_started(&root, &slot, &profile, || Ok(false))
 }
@@ -351,13 +351,13 @@ fn default_read() -> Result<DefaultBrowser, String> {
 pub async fn browser_default_read() -> Result<DefaultBrowser, String> {
     run(default_read).await
 }
-/// 一键设为默认浏览器：重新注册已安装的 CCBaga-B，注销应用数据中的旧引擎副本，再请求系统切换；macOS 会弹出确认框。
+/// 一键设为默认浏览器：重新注册已安装的 RioBaga-B，注销应用数据中的旧引擎副本，再请求系统切换；macOS 会弹出确认框。
 #[cfg(target_os = "macos")]
 #[tauri::command]
 pub async fn browser_set_default(app: tauri::AppHandle) -> Result<DefaultBrowser, String> {
     run(move || {
         let browser = installed()
-            .ok_or("未找到 /Applications/CCBaga-B.app，请先运行 bun run install:apps。")?;
+            .ok_or("未找到 /Applications/RioBaga-B.app，请先运行 bun run install:apps。")?;
         let copy = root(&app)?.join("engine/Browser.app");
         if copy.exists() {
             let _ = Command::new(LSREGISTER).arg("-u").arg(&copy).status();

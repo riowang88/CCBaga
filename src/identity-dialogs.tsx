@@ -23,7 +23,7 @@ function SavedMaterialRows({clients, browser}: {clients?: ClientMaterials | null
   return <div className="identity-confirm">
     <div className="identity-confirm-keep"><span>{t('Claude Code CLI')}</span><strong>{material(clients?.cli)}</strong></div>
     <div className="identity-confirm-keep"><span>{t('Claude App')}</span><strong>{material(clients?.desktop)}</strong></div>
-    <div className="identity-confirm-keep"><span>CCBaga-B</span><strong>{t(browser === true ? '已关联本机浏览器资料' : browser === false ? '无本机浏览器资料关联' : '资料状态未知')}</strong></div>
+    <div className="identity-confirm-keep"><span>RioBaga-B</span><strong>{t(browser === true ? '已关联本机浏览器资料' : browser === false ? '无本机浏览器资料关联' : '资料状态未知')}</strong></div>
   </div>;
 }
 

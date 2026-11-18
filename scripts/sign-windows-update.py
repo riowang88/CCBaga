@@ -10,7 +10,7 @@ import subprocess
 
 ROOT=Path(__file__).resolve().parent.parent
 version=os.environ['CC_RELEASE_VERSION']
-installer=ROOT/'releases'/f'CCBaga-{version}-windows-x86_64-setup.exe'
+installer=ROOT/'releases'/f'RioBaga-{version}-windows-x86_64-setup.exe'
 env={k:v for k,v in os.environ.items() if not k.startswith('APPLE_')}
 result=subprocess.run(['bun','run','tauri','signer','sign','--app-version',version,str(installer)],cwd=ROOT,env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
 if result.returncode:raise SystemExit('Windows updater signing failed')

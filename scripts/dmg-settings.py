@@ -6,7 +6,7 @@ from pathlib import Path
 
 ROOT = Path(defines['root'])
 stage = Path(defines['stage'])
-files = [str(stage / name) for name in ['CCBaga-A.app', 'CCBaga-B.app', 'LICENSE', 'NOTICE.md', 'Install.txt']]
+files = [str(stage / name) for name in ['RioBaga-A.app', 'RioBaga-B.app', 'LICENSE', 'NOTICE.md', 'Install.txt']]
 symlinks = {'Applications': '/Applications'}
 hide = ['LICENSE', 'NOTICE.md', 'Install.txt']
 icon = str(ROOT / 'src-tauri/icons/icon.icns')
@@ -25,7 +25,7 @@ arrange_by = None
 text_size = 16
 icon_size = 112
 icon_locations = {
-    'CCBaga-A.app': (200, 200),
-    'CCBaga-B.app': (200, 350),
+    'RioBaga-A.app': (200, 200),
+    'RioBaga-B.app': (200, 350),
     'Applications': (600, 275),
 }

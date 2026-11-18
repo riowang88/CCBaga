@@ -45,7 +45,7 @@ def install(build, prefix):
     for proc in Path('/proc').glob('[0-9]*/exe'):
         try:
             if proc.readlink().is_relative_to(app):
-                raise RuntimeError('Quit CCBaga-A and CCBaga-B before installing; installation left unchanged')
+                raise RuntimeError('Quit RioBaga-A and RioBaga-B before installing; installation left unchanged')
         except (FileNotFoundError, PermissionError, ProcessLookupError):
             pass
     applications = prefix / 'share/applications'
@@ -79,7 +79,7 @@ def install(build, prefix):
             if not launcher.is_symlink():
                 launcher.symlink_to(executable)
             applications.mkdir(parents=True, exist_ok=True)
-            for name, title, args in [('ccbaga-a', 'CCBaga-A', ''), ('ccbaga-browser', 'CCBaga-B', ' --browser %U')]:
+            for name, title, args in [('ccbaga-a', 'RioBaga-A', ''), ('ccbaga-browser', 'RioBaga-B', ' --browser %U')]:
                 target = applications / f'{name}.desktop'
                 if target.is_symlink():
                     raise RuntimeError('Refusing linked desktop entry')
@@ -107,7 +107,7 @@ def install(build, prefix):
     finally:
         if cleanup_stage:
             shutil.rmtree(stage)
-    print(f'Installed CCBaga-A and CCBaga-B in {app}. Launch {launcher}.')
+    print(f'Installed RioBaga-A and RioBaga-B in {app}. Launch {launcher}.')
 
 
 def main():

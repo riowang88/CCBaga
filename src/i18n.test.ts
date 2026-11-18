@@ -18,7 +18,7 @@ test('双语目录完整且命名插槽一致',()=>{
     expect(en[key].length).toBeGreaterThan(0);
     expect(slots(en[key])).toEqual(slots(zh[key]));
     // 应用真实路径与名称保留，其他英文文案不得混入中文。
-    expect(/[\u3400-\u9fff]/.test(en[key].replaceAll('CCBaga-B.app',''))).toBe(false);
+    expect(/[\u3400-\u9fff]/.test(en[key].replaceAll('RioBaga-B.app',''))).toBe(false);
   }
 });
 test('每个界面源文案与辅助名称都在 YAML 中',()=>{

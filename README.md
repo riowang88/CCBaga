@@ -8,8 +8,8 @@
 > **Local maintenance repository:** This repository tracks the installed `0.2.49+local.identity.6` fixes. See [maintenance baseline](LOCAL-DEVELOPMENT.md). New builds use this repository’s update endpoint and signing key; the first release requires signing and notarization credentials. Existing installed builds retain their embedded upstream channel until replaced.
 
 <div align="center">
-  <img src="docs/brand-logos.svg" width="320" height="149" alt="CCBaga-A and CCBaga-B logos, side by side" />
-  <h1>CCBaga</h1>
+  <img src="docs/brand-logos.svg" width="320" height="149" alt="RioBaga-A and RioBaga-B logos, side by side" />
+  <h1>RioBaga</h1>
   <p><strong>English</strong> · <a href="README.zh-CN.md">简体中文</a></p>
   <p><strong>A native macOS, Linux and Windows toolkit for a cleaner workspace and an environment you can verify.</strong></p>
   <p>Claude identities · Browser fingerprints · System settings · Network Skill</p>
@@ -32,13 +32,13 @@
   </p>
 </div>
 
-![CCBaga: native control, observable environments](docs/readme-hero.png)
+![RioBaga: native control, observable environments](docs/readme-hero.png)
 
-**Intended use:** CCBaga is intended solely for people residing or traveling abroad to manage their own Claude identities. Use that violates Anthropic's official terms of service is prohibited.
+**Intended use:** RioBaga is intended solely for people residing or traveling abroad to manage their own Claude identities. Use that violates Anthropic's official terms of service is prohibited.
 
-CCBaga brings local maintenance and environment setup into one focused desktop workflow. Inspect Claude data before removing it, rotate your companion browser's fingerprint and restart it, align system settings with a selected region, and compare real browser readings with the machine and network exit.
+RioBaga brings local maintenance and environment setup into one focused desktop workflow. Inspect Claude data before removing it, rotate your companion browser's fingerprint and restart it, align system settings with a selected region, and compare real browser readings with the machine and network exit.
 
-Two applications work together: **CCBaga-A** owns native operations; **CCBaga-B** runs an isolated Fingerprint Chromium profile. Browser measurements return to the host through a local session. Changing a setting and verifying its effect are separate steps.
+Two applications work together: **RioBaga-A** owns native operations; **RioBaga-B** runs an isolated Fingerprint Chromium profile. Browser measurements return to the host through a local session. Changing a setting and verifying its effect are separate steps.
 
 ## Features
 
@@ -71,24 +71,24 @@ Windows x86_64 uses one NSIS setup installer containing both A and B. The instal
 
 ### macOS
 
-Download the installer from this repository’s [GitHub Releases](https://github.com/riowang88/CCBaga/releases/latest). The distribution package is named `CCBaga-<version>-macos-arm64.dmg`. It contains both applications:
+Download the installer from this repository’s [GitHub Releases](https://github.com/riowang88/CCBaga/releases/latest). The distribution package is named `RioBaga-<version>-macos-arm64.dmg`. It contains both applications:
 
 | Application | Installed bundle | Role |
 | --- | --- | --- |
-| CCBaga-A | `CCBaga-A.app` | Identity management, system settings and environment verification |
-| CCBaga-B | `CCBaga-B.app` | Companion browser with a dedicated profile |
+| RioBaga-A | `RioBaga-A.app` | Identity management, system settings and environment verification |
+| RioBaga-B | `RioBaga-B.app` | Companion browser with a dedicated profile |
 
 Download **one DMG**; it contains both applications. There is no separate browser download. The installer uses the same pixel-art style as this README.
 
 1. Open the disk image and drag **both applications** into Applications.
-2. Launch CCBaga-A. It starts the companion browser automatically.
+2. Launch RioBaga-A. It starts the companion browser automatically.
 3. Choose English at the bottom of the sidebar if needed.
 
 Source builds are available through the [development guide](#development).
 
 ## Updates
 
-Use **Check for updates** at the bottom of CCBaga-A’s sidebar. Startup checks quietly; installation only starts when you choose **Update and restart**. Downloads show actual progress and are verified before installation. Failed downloads can be retried; a failed restart does not download the update again.
+Use **Check for updates** at the bottom of RioBaga-A’s sidebar. Startup checks quietly; installation only starts when you choose **Update and restart**. Downloads show actual progress and are verified before installation. Failed downloads can be retried; a failed restart does not download the update again.
 
 On **macOS**, in-app updates replace A; use the latest DMG to update both apps. On **Windows**, a verified NSIS update installs both A and B after closing this companion browser. On **Linux**, use the package manager or full package.
 
@@ -96,7 +96,7 @@ On **macOS**, in-app updates replace A; use the latest DMG to update both apps. 
 
 ### Everyday setup
 
-Open **Easy setup**, select a country or region, then choose an action. Browser fingerprint rotation closes and restarts CCBaga-B, so save unfinished browser work first. Selecting a region changes language, timezone and regional settings; it does **not** change your public IP.
+Open **Easy setup**, select a country or region, then choose an action. Browser fingerprint rotation closes and restarts RioBaga-B, so save unfinished browser work first. Selecting a region changes language, timezone and regional settings; it does **not** change your public IP.
 
 ### Claude identities
 
@@ -200,7 +200,7 @@ MACOSX_DEPLOYMENT_TARGET=12.0 \
   bun run tauri build --bundles app --features custom-protocol
 ```
 
-The host bundle is written to `src-tauri/target/release/bundle/macos/CCBaga-A.app`. The companion bundle remains at `browser-runtime/Browser.app` until copied to Applications as `CCBaga-B.app`.
+The host bundle is written to `src-tauri/target/release/bundle/macos/RioBaga-A.app`. The companion bundle remains at `browser-runtime/Browser.app` until copied to Applications as `RioBaga-B.app`.
 
 Production builds require `custom-protocol` to load the embedded UI. Compilation without it fails explicitly, preventing an installed app from depending on the development server.
 

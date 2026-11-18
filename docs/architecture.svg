@@ -3,7 +3,7 @@
 <!-- [OUTPUT]: README 极客像素风架构图，硬边方格和阶梯边角表达不同执行边界。 -->
 <!-- [POS]: 可导出的自包含工程图；所有连线对应现有接口，不是应用截图。 -->
 <!-- [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md -->
-<title id="title">CCBaga architecture</title><desc id="desc">React talks to the native Rust core, which invokes platform APIs and exchanges token-scoped browser reports. The UI offers a separate Skill installation prompt; the user runs it in a local AI coding agent for approved SSH deployment to a VPS and residential SOCKS5 exit.</desc>
+<title id="title">RioBaga architecture</title><desc id="desc">React talks to the native Rust core, which invokes platform APIs and exchanges token-scoped browser reports. The UI offers a separate Skill installation prompt; the user runs it in a local AI coding agent for approved SSH deployment to a VPS and residential SOCKS5 exit.</desc>
 <defs><pattern id="grid" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="2" height="2" fill="#222a2c"/></pattern></defs>
 <rect width="1120" height="624" fill="#101518"/><rect width="1120" height="624" fill="url(#grid)"/>
 <g fill="#fff4df" font-family="ui-monospace,SFMono-Regular,Consolas,monospace"><text x="40" y="44" font-size="18" font-weight="bold">$ cat architecture.map</text></g>
@@ -12,7 +12,7 @@
 
 <path d="M48 84H296V92H304V196H296V204H48V196H40V92H48Z" fill="#1c2428" stroke="#dd8959" stroke-width="2" shape-rendering="crispEdges"/>
 <path d="M56 100h8v8h-8zm16 0h8v8h-8zm16 0h8v8h-8z" fill="#dd8959" shape-rendering="crispEdges"/>
-<g font-family="ui-monospace,SFMono-Regular,Consolas,monospace"><text x="56" y="140" fill="#fff4df" font-size="18" font-weight="bold">CCBaga-A UI</text>
+<g font-family="ui-monospace,SFMono-Regular,Consolas,monospace"><text x="56" y="140" fill="#fff4df" font-size="18" font-weight="bold">RioBaga-A UI</text>
 <text x="56" y="166" fill="#b4c0b8" font-size="12">React + TypeScript</text>
 <text x="56" y="184" fill="#b4c0b8" font-size="12">Inputs / previews / results</text>
 </g>
@@ -30,7 +30,7 @@
 </g>
 <path d="M436 276H684V284H692V388H684V396H436V388H428V284H436Z" fill="#1c2428" stroke="#dd8959" stroke-width="2" shape-rendering="crispEdges"/>
 <path d="M444 292h8v8h-8zm16 0h8v8h-8zm16 0h8v8h-8z" fill="#dd8959" shape-rendering="crispEdges"/>
-<g font-family="ui-monospace,SFMono-Regular,Consolas,monospace"><text x="444" y="332" fill="#fff4df" font-size="18" font-weight="bold">CCBaga-B</text>
+<g font-family="ui-monospace,SFMono-Regular,Consolas,monospace"><text x="444" y="332" fill="#fff4df" font-size="18" font-weight="bold">RioBaga-B</text>
 <text x="444" y="358" fill="#b4c0b8" font-size="12">Isolated Chromium profile</text>
 <text x="444" y="376" fill="#b4c0b8" font-size="12">Launch / measure / compare</text>
 </g>

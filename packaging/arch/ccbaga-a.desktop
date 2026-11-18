@@ -4,7 +4,7 @@
 # [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 [Desktop Entry]
 Type=Application
-Name=CCBaga-A
+Name=RioBaga-A
 Comment=Claude maintenance and environment toolkit
 Exec=requirement-french
 Icon=requirement-french

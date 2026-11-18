@@ -6,7 +6,7 @@
 -->
 # Linux
 
-CCBaga-A builds on Linux x86_64. The pinned Fingerprint Chromium 148.0.7778.215 Linux engine is bundled with A; CCBaga-B is a desktop launcher into the same isolated browser profile. Both launch paths start the host and its authenticated local measurement session. There is no upstream Linux ARM64 engine for this pinned version.
+RioBaga-A builds on Linux x86_64. The pinned Fingerprint Chromium 148.0.7778.215 Linux engine is bundled with A; RioBaga-B is a desktop launcher into the same isolated browser profile. Both launch paths start the host and its authenticated local measurement session. There is no upstream Linux ARM64 engine for this pinned version.
 
 ## Installation
 

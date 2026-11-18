@@ -1,5 +1,5 @@
-# CCBaga - CCBaga-A（宿主，橙底清理员 A）与 CCBaga-B（指纹 Chromium，橙底浏览器 B）
-安装为 /Applications/CCBaga-A.app（ai.local.requirement-french）与 /Applications/CCBaga-B.app（ai.local.requirement-french.browser）；稳定包标识与独立资料目录保护钥匙串、设置和浏览器资料。
+# RioBaga - RioBaga-A（宿主，橙底清理员 A）与 RioBaga-B（指纹 Chromium，橙底浏览器 B）
+安装为 /Applications/RioBaga-A.app 与 /Applications/RioBaga-B.app（旧名 CCBaga-A.app/CCBaga-B.app 由 install-apps.py 安装时迁移移除）。改名只涉及显示名与 macOS 应用包文件名；Bundle ID（ai.local.requirement-french / ai.local.requirement-french.browser）、Cargo 包名、app_data_dir 与保险库 key.bin、种子派生串、CCBaga-DNS.json、归档魔数/扩展名、更新仓库 riowang88/CCBaga 一律不变——app_data_dir 由 identifier 推导，改了旧保险库将无法解密。Linux/Windows 的安装路径、可执行名、注册表键与 .desktop Exec 沿用 CCBaga-A/B（tauri.linux/windows.conf.json 显式固定 productName=CCBaga-A 以保持 Tauri 推导路径，仅窗口标题与桌面入口显示名为 RioBaga）。
 Tauri 2.12.1 + Rust + macOS AppKit/UniformTypeIdentifiers/Accessibility/Security/CoreLocation + SHA-256 + React 19.3.0 + TypeScript 5.9.3 + Cromma UI 本地副本 + Radix UI 1.6.7 + Tailwind CSS 4.3.3 + Motion 14.0.0 + Vite 7.3.6 + YAML 2.9.1（仅构建）
 
 <directory>
@@ -31,9 +31,9 @@ NOTICE.md - 第三方引擎、组件与图标的授权边界
 .gitignore - 排除本机凭据、依赖、引擎与发布产物
 </config>
 
-法则：侧栏傻瓜设置置顶，分隔线后网络环境、Claude 身份管理、浏览器环境、电脑环境，再分隔使用说明；BAGA! 品牌和黑白 Laper 斜纹/点阵壳，完整侧栏边框，底部更新与界面语言。YAML 中英文独立于系统/指纹语言，运行包嵌入前端，不依赖开发服务。
+法则：侧栏傻瓜设置置顶，分隔线后网络环境、Claude 身份管理、浏览器环境、电脑环境，再分隔使用说明；RioBaga 品牌和黑白 Laper 斜纹/点阵壳，完整侧栏边框，底部更新与界面语言。YAML 中英文独立于系统/指纹语言，运行包嵌入前端，不依赖开发服务。
 身份契约：默认范围同时覆盖 Claude Code 与 Claude Desktop；用户逐类选择保留在工作区或随身份暂存。登录/本地标识始终随身份；Skills、插件、MCP、个人设置、项目记录、会话历史和缓存分别选择，实际项目源码不扫描。空身份是把已选择的当前状态从 Claude 默认工作目录移开，保存可恢复身份后留出空工作区，不宣称抹除服务端记录或对同用户程序隐身。
-身份显示：用户点击时在原生层读取官方 OAuth 用量（会话/本周、重置时间，过期窗口标为已重置），结果仅作显示缓存。macOS 上优先只读 Desktop 登录令牌（解密 oauth:tokenCacheV2，账号须与 CLI 一致，长期有效，从不续期），没有或失败时再用 CLI；当前账号只用实时令牌、不续期；已存账号由 CCBaga 用 refresh token 代为续期，轮换结果先原子写入绑定归档代次的加密凭据侧车（<id>-<代次>.cred，仅 claudeAiOauth，不入 SQLite），归档加载时覆盖；同账号被其他工具同时续期会互相作废，需重新登录；只读默认 .claude.json 与本地凭据元数据中的 displayName/emailAddress/organizationName、订阅档位（Pro/Max 5x/Max 20x/Team/Enterprise/API）与本地凭据元数据状态（本地未过期/可尝试续期/本地已到期/API 密钥/未知）白名单；UI 不接收令牌；普通刷新只读目录与元数据，不解密归档回填摘要，不自动删除不同账号的Desktop资料或回收进行中的暂存目录。Desktop 仅元数据候选检测，未知或不可读账号明确标注，不宣称当前账号已通过服务端验证。
+身份显示：用户点击时在原生层读取官方 OAuth 用量（会话/本周、重置时间，过期窗口标为已重置），结果仅作显示缓存。macOS 上优先只读 Desktop 登录令牌（解密 oauth:tokenCacheV2，账号须与 CLI 一致，长期有效，从不续期），没有或失败时再用 CLI；当前账号只用实时令牌、不续期；已存账号由 RioBaga 用 refresh token 代为续期，轮换结果先原子写入绑定归档代次的加密凭据侧车（<id>-<代次>.cred，仅 claudeAiOauth，不入 SQLite），归档加载时覆盖；同账号被其他工具同时续期会互相作废，需重新登录；只读默认 .claude.json 与本地凭据元数据中的 displayName/emailAddress/organizationName、订阅档位（Pro/Max 5x/Max 20x/Team/Enterprise/API）与本地凭据元数据状态（本地未过期/可尝试续期/本地已到期/API 密钥/未知）白名单；UI 不接收令牌；普通刷新只读目录与元数据，不解密归档回填摘要，不自动删除不同账号的Desktop资料或回收进行中的暂存目录。Desktop 仅元数据候选检测，未知或不可读账号明确标注，不宣称当前账号已通过服务端验证。
 保险库：app_data_dir/identity-vault 与 Claude 工作目录分离；bundled SQLite 保存名称、策略、归档代次/大小/时间、脱敏身份摘要（identity_summaries）、本机 HMAC 账号索引与恢复日志，不保存凭据正文；FULL 同步、数据库事务。BAGAID01 容器用 tar/Zstandard 压缩（旧 tar/gzip 只读兼容）、ring AES-256-GCM 认证帧和独立归档密钥，保险库主密钥只在受保护本机 key.bin 中；POSIX 0700/0600、Windows 创建时明确用户所有者/独占 DACL。普通解压工具不能直接读取，但本机同用户/管理员不是绝对隔离边界；Windows所有权只接受TokenUser和实际TokenOwner，不泛化信任管理员组。
 切换与原地备份：同一 Code 账号 UUID/组织（缺失时邮箱/组织）更新同一槽位；名称和令牌刷新不生成新卡片。当前账号只显示当前卡片，无最近使用副本；支持在不退出当前工作区与关联浏览器的前提下将当前身份原地加密写入保险库（保存备份/更新备份）。切换的不可变归档代次完整验证后，与恢复标记一起更新 SQLite 指针，提交后回收旧代次；原地备份仅事务提交档案/名称/摘要，不改 active/browser 选择或启动参数；普通刷新不打开 Store 或解密整个归档列表，旧摘要缺期限保持未知，本地未过期不等于服务端有效；未知账号不猜测合并，恢复前检查点独立保存。切换或备份前最多预览 32 项真实进程名称/PID，查询失败保持未知，不读取旧 sessions JSON 猜工作区；用户确认后结束精确匹配进程，不隐式删除锁；新快照/旧档案恢复排除确认的普通瞬态锁和空锁目录，非空同名目录按保留策略处理；完整读取与归档验收成功后才改工作区。SQLite 与文件系统通过持久恢复状态协调；失败回滚，崩溃可恢复，恢复前也存下现状。复用所有权、链接、元数据快照和白名单检查；只合并所选 JSON 键，保留其他项目/MCP/设置。macOS 用户确认后在原生层保存默认 Code/Desktop 钥匙串正文，不经 UI、argv 或网络；不自动修改其他配置目录的账号。Linux/Windows 使用文件凭据；真实登录可能因服务端失效而需重新授权。
 直接删除：AlertDialog 警告默认聚焦取消，提示不可撤销/不新增备份，用户勾选并独立确认后按保留策略移除当前本地身份，不创建新归档；已有暂存身份不受影响。删除暂存卡片仅移除选定加密文件与 SQLite 记录，双资源失败留下可回收标记；不把普通文件删除宣称为物理安全擦除。

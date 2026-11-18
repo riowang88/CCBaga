@@ -12,7 +12,7 @@ export function verifyBrowser(context:BrowserContext|null,report:Report|null,lin
  const problems:string[]=[];
  if(error)problems.push(error);
  if(report?.error)problems.push(report.error);
- if(!linked&&!busy)problems.push('与 CCBaga-A的连接已断开，请在清理器内重新打开实测页。');
+ if(!linked&&!busy)problems.push('与 RioBaga-A的连接已断开，请在清理器内重新打开实测页。');
  if(context&&!context.region&&!busy)problems.push(context.config.follow_machine?'跟随本机模式下，系统区域与时区未匹配到支持的目标地区。':'当前浏览器语言与时区未匹配到支持的目标地区。请在浏览器环境中检查配置。');
  if(!report&&!busy&&!error)problems.push('尚未取得完整检测结果。');
  if(context&&report){

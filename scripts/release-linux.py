@@ -44,7 +44,7 @@ def build_rpm(deb, version):
         spec.write_text(f'''Name: ccbaga-a
 Version: {version}
 Release: 1
-Summary: CCBaga native maintenance and companion browser
+Summary: RioBaga native maintenance and companion browser
 License: MIT
 URL: https://github.com/liseami/CCBaga
 BuildArch: x86_64
@@ -52,7 +52,7 @@ AutoReqProv: no
 {requires}
 
 %description
-CCBaga-A with its isolated CCBaga-B companion browser.
+RioBaga-A with its isolated RioBaga-B companion browser.
 
 %prep
 %build
@@ -116,7 +116,7 @@ def main():
                 root /= 'squashfs-root'
             payload.verify(root, engine)
             payload.verify_glibc(root.rglob('*'))
-        target = output / f'CCBaga-{version}-linux-x86_64.{extension}'
+        target = output / f'RioBaga-{version}-linux-x86_64.{extension}'
         shutil.copy2(source, target)
         manifests.append(f'{payload.digest(target)}  {target.name}\n')
     (output / 'Linux-SHA256SUMS').write_text(''.join(manifests))

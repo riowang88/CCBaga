@@ -70,7 +70,7 @@ pub fn open_urls(app: tauri::AppHandle, args: Vec<String>) {
         .collect::<Vec<_>>();
     std::thread::spawn(move || {
         if let Err(error) = start_linux_companion(&app, &urls) {
-            eprintln!("CCBaga-B: {error}");
+            eprintln!("RioBaga-B: {error}");
         }
     });
 }
@@ -142,7 +142,7 @@ fn default_read() -> Result<DefaultBrowser, String> {
         https,
         installed: true,
         app: std::env::current_exe()
-            .map_err(|_| "Cannot locate CCBaga-A.")?
+            .map_err(|_| "Cannot locate RioBaga-A.")?
             .display()
             .to_string(),
     })
@@ -267,15 +267,15 @@ pub async fn browser_set_default(app: tauri::AppHandle) -> Result<DefaultBrowser
         profile::check_path(&data, &desktop)?;
         fs::create_dir_all(desktop.parent().unwrap()).map_err(|_| "Cannot create applications directory.")?;
         // AppImage extraction paths are temporary: register the persistent AppImage when available.
-        let executable = std::env::var_os("APPIMAGE").map(PathBuf::from).unwrap_or(std::env::current_exe().map_err(|_| "Cannot locate CCBaga-A.")?);
+        let executable = std::env::var_os("APPIMAGE").map(PathBuf::from).unwrap_or(std::env::current_exe().map_err(|_| "Cannot locate RioBaga-A.")?);
         let command = desktop_exec_command(&executable.to_string_lossy())?;
-        fs::write(&desktop, format!("[Desktop Entry]\nType=Application\nName=CCBaga-B\nExec={command} --browser %U\nIcon=ccbaga-browser\nTerminal=false\nCategories=Network;WebBrowser;\nMimeType=x-scheme-handler/http;x-scheme-handler/https;text/html;\n")).map_err(|_| "Cannot register CCBaga-B desktop entry.")?;
+        fs::write(&desktop, format!("[Desktop Entry]\nType=Application\nName=RioBaga-B\nExec={command} --browser %U\nIcon=ccbaga-browser\nTerminal=false\nCategories=Network;WebBrowser;\nMimeType=x-scheme-handler/http;x-scheme-handler/https;text/html;\n")).map_err(|_| "Cannot register CCBaga-B desktop entry.")?;
         for scheme in ["x-scheme-handler/http", "x-scheme-handler/https"] {
             let status = Command::new("xdg-mime").args(["default", LINUX_DESKTOP_ID, scheme]).status().map_err(|_| "Install xdg-utils to manage default applications.")?;
             if !status.success() { return Err("Default browser update failed; check desktop settings.".into()); }
         }
         let state = default_read()?;
-        if !state.is_default { return Err("Desktop did not confirm CCBaga-B as the default browser.".into()); }
+        if !state.is_default { return Err("Desktop did not confirm RioBaga-B as the default browser.".into()); }
         Ok(state)
     }).await
 }

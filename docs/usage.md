@@ -6,7 +6,7 @@
 -->
 # Usage guide
 
-CCBaga is intended solely for people residing or traveling abroad to manage their own Claude identities. Use that violates Anthropic's official terms of service is prohibited.
+RioBaga is intended solely for people residing or traveling abroad to manage their own Claude identities. Use that violates Anthropic's official terms of service is prohibited.
 
 Open **Guide** in the sidebar. The page supports English and Chinese.
 
@@ -14,7 +14,7 @@ Open **Guide** in the sidebar. The page supports English and Chinese.
 
 | Page | What to do |
 | --- | --- |
-| Easy setup | Choose a region and select an action. Clearing cache keeps sign-ins; changing the fingerprint restarts CCBaga-B. |
+| Easy setup | Choose a region and select an action. Clearing cache keeps sign-ins; changing the fingerprint restarts RioBaga-B. |
 | Claude identities | Save your work before backing up or switching. Save backup retains the workspace and browser binding; Export/Import moves saved snapshots between devices with the same OS. Sign-in data follows the identity; choose what else to keep or archive. An empty identity starts a fresh local workspace. |
 | Browser | Save settings, then open the check page. Clear cache retains sign-ins. Clear all browser data permanently removes the current identity's passwords, bookmarks, history, extensions, settings and sessions without a backup; confirm separately. |
 | Computer | Adjust time zone, language and region separately. Permission, a restart or sign-out may be required. This does not change your public IP. |

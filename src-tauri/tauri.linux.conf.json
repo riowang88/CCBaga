@@ -1,9 +1,10 @@
 {
+  "productName": "CCBaga-A",
   "app": {
     "windows": [
       {
         "label": "main",
-        "title": "CCBaga-A",
+        "title": "RioBaga-A",
         "width": 1040,
         "height": 820,
         "minWidth": 760,

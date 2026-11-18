@@ -25,7 +25,7 @@ class ReleaseAssemblyTests(unittest.TestCase):
         self.out = self.root / 'releases'
         self.out.mkdir()
         self.version = '1.2.3'
-        prefix = f'CCBaga-{self.version}'
+        prefix = f'RioBaga-{self.version}'
         self.dmg = prefix + '-macos-arm64.dmg'
         self.archive = prefix + '-macos-arm64.app.tar.gz'
         self.windows = prefix + '-windows-x86_64-setup.exe'

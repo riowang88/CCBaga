@@ -39,8 +39,8 @@ def main():
             with DSStore.open(str(mount / '.DS_Store'), 'r') as store:
                 if store['.']['icvp']['backgroundType'] != 2:
                     raise SystemExit('Finder image background is not configured')
-            apps = [('CCBaga-A.app', 'ai.local.requirement-french', 'requirement-french'),
-                    ('CCBaga-B.app', 'ai.local.requirement-french.browser', 'CCBrowser')]
+            apps = [('RioBaga-A.app', 'ai.local.requirement-french', 'requirement-french'),
+                    ('RioBaga-B.app', 'ai.local.requirement-french.browser', 'CCBrowser')]
             for name, identifier, executable in apps:
                 app = mount / name
                 with (app / 'Contents/Info.plist').open('rb') as stream:
@@ -52,7 +52,7 @@ def main():
                 run('codesign', '--verify', '--deep', '--strict', app)
                 if not args.adhoc:
                     run('spctl', '--assess', '--type', 'execute', app)
-                if name == 'CCBaga-A.app':
+                if name == 'RioBaga-A.app':
                     verify_browser_ui(app / 'Contents/Resources/browser-ui')
                 print(f'DMG payload verified: {name}', flush=True)
         finally:

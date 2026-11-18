@@ -4,7 +4,7 @@
 [POS]: README 的贡献入口，不提供发布操作流程。
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 -->
-# Contributing to CCBaga
+# Contributing to RioBaga
 
 Follow the [development guide](README.md#development) or [Linux setup](docs/linux.md). Use the existing lockfiles and UI components.
 

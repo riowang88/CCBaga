@@ -62,7 +62,7 @@ with patch.dict(os.environ, {'CC_MACOS_SIGNING_MODE': 'typo'}, clear=True):
 with tempfile.TemporaryDirectory(prefix='ccbaga-release-mode-') as temporary:
     root = Path(temporary)
     (root / 'package.json').write_text('{"version":"1.2.3"}')
-    host = root / 'CCBaga-A.app'
+    host = root / 'RioBaga-A.app'
     host.mkdir()
     (host / 'fixture').write_text('disposable app payload')
     (root / 'browser-runtime').mkdir()

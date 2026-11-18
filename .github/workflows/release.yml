@@ -200,9 +200,9 @@ jobs:
         with:
           name: linux-${{ github.run_id }}
           path: |
-            releases/CCBaga-*-linux-x86_64.deb
-            releases/CCBaga-*-linux-x86_64.rpm
-            releases/CCBaga-*-linux-x86_64.AppImage
+            releases/RioBaga-*-linux-x86_64.deb
+            releases/RioBaga-*-linux-x86_64.rpm
+            releases/RioBaga-*-linux-x86_64.AppImage
             releases/Linux-SHA256SUMS
           if-no-files-found: error
           retention-days: 14
@@ -229,7 +229,7 @@ jobs:
         with:
           name: arch-${{ github.run_id }}
           path: |
-            releases/CCBaga-*-linux-x86_64.pkg.tar.zst
+            releases/RioBaga-*-linux-x86_64.pkg.tar.zst
             releases/Arch-SHA256SUMS
           if-no-files-found: error
           retention-days: 14
@@ -409,5 +409,5 @@ jobs:
           fi
           mapfile -t assets < release-files.txt
           gh release create "$RELEASE_TAG" "${assets[@]}" \
-            --verify-tag --title "CCBaga $RELEASE_VERSION" --notes-file release-notes.md --draft
+            --verify-tag --title "RioBaga $RELEASE_VERSION" --notes-file release-notes.md --draft
           gh release edit "$RELEASE_TAG" --draft=false

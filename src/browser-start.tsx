@@ -32,7 +32,7 @@ const settingHelp:Record<string,string>={
   "本机定位": "macOS：系统设置 → 隐私与安全性 → 定位服务。Windows：设置 → 隐私和安全性 → 位置。Linux：桌面隐私设置。当前核验要求系统定位关闭；该操作影响其他应用，与网页定位权限分开。"
 };
 async function api<T>(route: string, body?: unknown): Promise<T> { const response = await fetch(new URL(route, location.href), { signal: AbortSignal.timeout(3000), cache:'no-store', credentials:'omit', redirect:'error', ...(body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}) }); if (!response.ok)
-    throw new Error("本地核验连接失败，请从CCBaga-A重新打开浏览器。"); return response.json(); }
+    throw new Error("本地核验连接失败，请从RioBaga-A重新打开浏览器。"); return response.json(); }
 function Start() {
     const {t,locale}=useI18n();
     const [context, setContext] = useState<BrowserContext | null>(null), [report, setReport] = useState<Report | null>(null), [busy, setBusy] = useState(true), [error, setError] = useState(''), [linked, setLinked] = useState(false), [reportedAt, setReportedAt] = useState(0);
@@ -106,7 +106,7 @@ function Start() {
 
     return <div className={`browser-verification-page is-${phase}`} data-verification={phase}>
      <main className="browser-start">
-      <header className="verification-brand"><div><img src={browserLogo} width={28} height={28} alt=""/><strong>CCBaga-B</strong></div><span>Chromium {context?.engine_version||'—'}</span></header>
+      <header className="verification-brand"><div><img src={browserLogo} width={28} height={28} alt=""/><strong>RioBaga-B</strong></div><span>Chromium {context?.engine_version||'—'}</span></header>
       <section className={`verification-identity${identityReady?' linked':''}`} aria-label={t('浏览器身份')} data-identity={identity?.status||'unknown'}>
        <div className="verification-identity-avatar" aria-hidden="true">{identity?.status==='empty'?'∅':Array.from(identityName)[0]?.toUpperCase()||'?'}</div>
        <div className="verification-identity-account"><span>Claude · {t('本地身份')}</span><h2>{identityName}</h2><div>{identity?.email&&identity.email!==identityName&&<span>{identity.email}</span>}{identity?.organization&&<span>{identity.organization}</span>}</div></div>
@@ -131,7 +131,7 @@ function Start() {
        <p>{t('通过固定公共 STUN（Google / Cloudflare）收集 UDP 候选并与本轮 HTTP 出口比对；不使用 TURN、不发送凭据。B 启动时已限制未代理 UDP，未取到候选通常是限制生效，但不能据此证明没有泄露。WebRTC 结果单独列示，不计入上方基础核验。')}</p>
       </section>
       <BrowserDns revision={dnsRevision} connected={linked} config={context?.config}/>
-      <footer className="verification-footer"><span className={linked?'connected':'disconnected'}>{t(linked?'已连接 CCBaga-A':'主应用未连接')}</span><time>{reportedAt?t('结果回传成功 {v0}',{v0:new Date(reportedAt).toLocaleTimeString(locale==='zh'?'zh-CN':'en-US')}):t('等待检测回传')}</time></footer>
+      <footer className="verification-footer"><span className={linked?'connected':'disconnected'}>{t(linked?'已连接 RioBaga-A':'主应用未连接')}</span><time>{reportedAt?t('结果回传成功 {v0}',{v0:new Date(reportedAt).toLocaleTimeString(locale==='zh'?'zh-CN':'en-US')}):t('等待检测回传')}</time></footer>
      </main>
     </div>;
 

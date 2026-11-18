@@ -8,11 +8,11 @@
 
 ## Install and update
 
-Download **one** `CCBaga-<version>-windows-x86_64-setup.exe` from [Releases](https://github.com/liseami/CCBaga/releases/latest). It installs CCBaga-A and the complete CCBaga-B browser engine for the current user. Start-menu shortcuts open either application; both use the same dedicated profile. The installer downloads Microsoft's WebView2 runtime if it is missing.
+Download **one** `RioBaga-<version>-windows-x86_64-setup.exe` from [Releases](https://github.com/liseami/CCBaga/releases/latest). It installs RioBaga-A and the complete RioBaga-B browser engine for the current user. Start-menu shortcuts open either application; both use the same dedicated profile. The installer downloads Microsoft's WebView2 runtime if it is missing.
 
 The installer does not have an Authenticode certificate. Windows may show SmartScreen; ordinary installations can use **More info → Run anyway**. Organization policy or Smart App Control may prevent this. Do not disable security policy to install the app. Compare the download's SHA-256 with `SHA256SUMS`.
 
-The sidebar checks for updates only from the official HTTPS manifest. Tauri verifies the installer signature and version, closes this companion browser, then exits A for the update. Windows updates install **both A and B**. Save unfinished work first. A manual reinstall also preserves profiles and personal Claude assets. By default, uninstall removes the programs and their own shortcuts/registrations, preserving profiles, skills and projects. The standard installer also offers an explicit **Delete application data** checkbox; selecting it removes CCBaga’s own saved profile and settings.
+The sidebar checks for updates only from the official HTTPS manifest. Tauri verifies the installer signature and version, closes this companion browser, then exits A for the update. Windows updates install **both A and B**. Save unfinished work first. A manual reinstall also preserves profiles and personal Claude assets. By default, uninstall removes the programs and their own shortcuts/registrations, preserving profiles, skills and projects. The standard installer also offers an explicit **Delete application data** checkbox; selecting it removes RioBaga’s own saved profile and settings.
 
 ## Platform behavior
 
@@ -21,7 +21,7 @@ The sidebar checks for updates only from the official HTTPS manifest. Tauri veri
 | Timezone | Maps the selected IANA zone to a supported Windows ID, uses `tzutil /s`, then reads the actual dynamic timezone through the Windows API. Insufficient permission opens Date & time settings and reports failure. |
 | Language and regional format | Uses the current-user International cmdlets, preserving other languages and input methods. Display language can require an installed language pack and sign-out/sign-in; a pending preference is not reported as an active language change. |
 | Default browser | Registers B's capabilities and HTTP/HTTPS handlers under HKCU, opens Windows Default apps for user confirmation, then reads both actual associations separately. It does not overwrite protected UserChoice settings. |
-| Fingerprint and restart | Normally closes only the browser using CCBaga's exact profile, updates the seed/region preferences, and restarts the bundled engine. Other Chrome profiles are unaffected. |
+| Fingerprint and restart | Normally closes only the browser using RioBaga's exact profile, updates the seed/region preferences, and restarts the bundled engine. Other Chrome profiles are unaffected. |
 | Claude Code CLI | Recognizes official native, global npm/bun and current-user WinGet installations. Uses the detected installation method for uninstall/reinstall and verifies the resulting version. Native reinstall downloads, decodes and parses the official bootstrap script before removing the old program, preserving it when the bootstrap download or validation fails. Custom launchers are preserved and automatic modification is refused. |
 | Claude identities | Uses private encrypted archives, SQLite recovery state, user-controlled retention, fixed file targets, current-user ownership, snapshots and reparse-point checks. Process termination checks the user's SID, exact executable/script, creation time and live handle. Credential Manager passwords are never enumerated or extracted; its entries are not automatically deleted. |
 | Location | Opens the Windows privacy control when a disabled state cannot be verified. Managed policies can require an administrator. |

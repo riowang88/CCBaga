@@ -2,7 +2,7 @@
 > L2 | 父级: ../CLAUDE.md
 make-icon.swift: AppKit 将压缩品牌图绘入 macOS 圆角网格，保持原图并添加透明留白与投影。
 make-icons.sh: 从 assets/ 品牌图生成各尺寸 iconset，iconutil 输出 src-tauri/icons 与 browser-runtime/icons。
-brand-browser.sh: 编译 CCBrowser 入口、写入 CCBaga-B 名称/图标/各语言显示名、清除构建资源扩展属性并调用 sign-browser.py 完整签名（显式固定 ai.local.requirement-french.browser，干净上游引擎也必须与宿主一致）。
+brand-browser.sh: 编译 CCBrowser 入口、写入 RioBaga-B 名称/图标/各语言显示名、清除构建资源扩展属性并调用 sign-browser.py 完整签名（显式固定 ai.local.requirement-french.browser，干净上游引擎也必须与宿主一致）。
 sign-browser.py: 内层 Mach-O → Helper 应用 → Framework → 浏览器外壳顺序签名；Developer ID 使用可信时间戳、Hardened Runtime，仅 Renderer/GPU 使用 JIT entitlement；本机临时签名清除 runtime，防止缺 Team ID 的 Framework 被库验证拒绝。
 test-release-env.py: 伪造凭据环境导入真实发布入口，断言 Apple/更新私钥不进入构建子进程环境，不加载真实密钥，并验证票据网络重试不绕过无效/持续失败。
 test-sign-browser.py: 临时伪引擎树验证叶子到容器的签名顺序、最小 JIT 授权与符号链接不重复遍历。
@@ -20,7 +20,7 @@ test-identity-operation.ts: 通过延期 IPC 和官方 Channel 回调验证工�
 test-windows.py: 子进程大小写无关地清除继承 PSModulePath，90 秒冷启动预算/逐项日志保留安全断言；Windows 原生/npm/WinGet 程序隔离样本的卸载重装、PATH外全局npm启动器识别；离线原生安装器字节/文本响应、安装/版本失败恢复哈希、junction 阻断回滚保留备份、下载/解析失败保留旧程序、安装失败不报告成功与自定义启动器拒绝；CI 实际语言/区域写入、输入法保留和完整还原。
 fetch-browser.py: 固定上游引擎与 SHA-256，核验版本/架构；在目标旁完整复制后公开三平台引擎，失败清理暂存目录，清理失败报告路径；干净 CI 检出不依赖维护者本机引擎。
 test-fetch-browser.py: 三平台真实临时文件树与显式下载/摘要/平台工具替身，回归复制失败后可重试、完整资源/权限/链接、既有引擎不变与清理失败路径；不下载或运行真实引擎。
-release-macos.py: 显式 adhoc/notarized 模式与可选 CC_RELEASE_VERSION；默认 notarized 仍需外部 Apple 凭据，CI 选择 adhoc 不调用公证/Gatekeeper且如实记录；两模式强制更新签名与载荷完整性；notarized 驱动三阶段公证装订，票据服务网络错误最多重试三次、其他验证失败立即阻断；明确将原生构建目录 Browser.app 暂存为交付名 CCBaga-B.app，再由 dmgbuild 无头写入 Finder 布局；装订后的宿主单独归档并签名绑定版本，更新私钥仅传给签名子进程；Apple 凭据不进入构建、DMG 或更新签名子进程，公证工具只通过明确参数接收其认证输入；官方更新器回归核验后生成公开 latest.json；产物和哈希记录写入被忽略的 releases/。
+release-macos.py: 显式 adhoc/notarized 模式与可选 CC_RELEASE_VERSION；默认 notarized 仍需外部 Apple 凭据，CI 选择 adhoc 不调用公证/Gatekeeper且如实记录；两模式强制更新签名与载荷完整性；notarized 驱动三阶段公证装订，票据服务网络错误最多重试三次、其他验证失败立即阻断；明确将原生构建目录 Browser.app 暂存为交付名 RioBaga-B.app，再由 dmgbuild 无头写入 Finder 布局；装订后的宿主单独归档并签名绑定版本，更新私钥仅传给签名子进程；Apple 凭据不进入构建、DMG 或更新签名子进程，公证工具只通过明确参数接收其认证输入；官方更新器回归核验后生成公开 latest.json；产物和哈希记录写入被忽略的 releases/。
 dmg-settings.py: 固定 800×500 像素背景、两应用到 Applications 的拖拽坐标；通知文件保留在盘内但默认隐藏，不依赖 Finder 自动化。
 verify-dmg.py: 复用 browser_ui 的宿主页面实际资源引用验收；只读挂载实际安装盘，校验双应用名称、包标识与启动入口，再校验严格签名、Applications 链接和像素背景；仅显式 --adhoc 不要求 Gatekeeper；Finder 元数据不得破坏应用签名。
 release-requirements.txt: dmgbuild、ds-store 与 mac-alias 的完整版本及 wheel SHA-256；仅发布阶段安装，不增大应用包。

@@ -4,8 +4,8 @@
 # [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 [Desktop Entry]
 Type=Application
-Name=CCBaga-B
-Comment=CCBaga companion fingerprint browser
+Name=RioBaga-B
+Comment=RioBaga companion fingerprint browser
 Exec=requirement-french --browser %U
 Icon=ccbaga-browser
 Terminal=false

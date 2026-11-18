@@ -31,7 +31,7 @@ export async function probeDns({signal,request,trigger,wait}:DnsDependencies):Pr
 export async function requestDns(path:string,signal:AbortSignal):Promise<unknown> {
  const response=await fetch(new URL(path,location.href),{method:path==='dns/start'?'POST':'GET',credentials:'omit',cache:'no-store',redirect:'error',signal:AbortSignal.any([signal,AbortSignal.timeout(25000)])});
  const text=await response.text();if(text.length>32768)throw new Error('DNS 服务响应过大。');
- let value:unknown;try{value=JSON.parse(text);}catch{throw new Error('本地 DNS 接口不可用，请从更新后的 CCBaga-A 重新打开浏览器。');}
+ let value:unknown;try{value=JSON.parse(text);}catch{throw new Error('本地 DNS 接口不可用，请从更新后的 RioBaga-A 重新打开浏览器。');}
  if(!response.ok)throw new Error(typeof (value as {error?:unknown})?.error==='string'?(value as {error:string}).error:'DNS 检测未完成。');
  return value;
 }

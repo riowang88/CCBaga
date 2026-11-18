@@ -11,7 +11,7 @@ browser-verification.ts: 纯核验模型，逐项实际/目标值与失败清单
 browser-verification.test.ts: 跨平台虚构上下文验证三态、失败原因、连接/定位未知、简体台湾/脚本冲突、有效区域国家与目标时区改变，不访问网络。
 browser-network.ts: 按宿主服务目录经浏览器当前路由检测出口，限流/故障切换服务，校验纯IPv6地址字符而非URL语法并保留失败原因。
 browser-network.test.ts: 模拟限流、备用响应与非法出口，验证故障恢复和错误信息，不访问外网。
-main.tsx: 奶油侧栏（--rb-surface-soft 底、选中项 --rb-cream-strong，BAGA! 品牌文字暂保留，改名另做）：电脑环境（默认页）→ 网络环境 → Claude 身份 → 浏览器环境 ｜分隔｜ 使用说明，无图标；底部保留 AppUpdate 当前版本号/检查更新与 LanguageSwitch；全局任务锁 advancedBusy || updateBusy 控制导航；已删除傻瓜设置页，身份页不再接收 initialEmpty。
+main.tsx: 奶油侧栏（--rb-surface-soft 底、选中项 --rb-cream-strong，RioBaga 品牌文字暂保留，改名另做）：电脑环境（默认页）→ 网络环境 → Claude 身份 → 浏览器环境 ｜分隔｜ 使用说明，无图标；底部保留 AppUpdate 当前版本号/检查更新与 LanguageSwitch；全局任务锁 advancedBusy || updateBusy 控制导航；已删除傻瓜设置页，身份页不再接收 initialEmpty。
 help.tsx: 双语只读说明页，明确全清理仅删除当前身份的密码/书签/历史/扩展/设置且不新增备份；顶部常显旅居人员本人身份管理与禁止违反官方用户协议的声明；五项编号行保留操作后果和删除提示，details 折叠账号边界/申诉，不读取用户资料或调用原生命令。
 identities.tsx: 身份页主编排（引入 identity.css）：页头「浏览器资料随身份切换」开关（默认开启、旧资料采用确认）、导入次要按钮与页面唯一的刷新（含各账号用量）；错误/未完成恢复/浏览器重开失败横幅；工牌横排后紧跟真实阶段进度（IdentityOperationProgress）；常驻保留策略条；「更多工具」分段：分端登录与更新、桌面会话共享（仅 macOS）、文件残留、CLI 管理。状态与 invoke 语义集中在此：切换/保存/恢复/删除/重命名/单端更新/CLI 官方登录/会话版本选择/桌面会话同步，专用停止进程命令不扫描历史；保留策略写入 ccbaga.identity-policy.v1（恢复采用旧档案策略时同步写回）；当前档案按 workspace_id 在原卡高亮不追加重复卡；协调文件残留/CLI/迁移的任务锁并经 onBusy 锁导航，身份变更使旧残留预览失效。initialEmpty 入参保留为可选并忽略。
 identity-cards.tsx: 卡片区：空身份固定最左（canvas 虚线）、当前账号其次（深色、「当前」标记、顶部挂孔绿光）、已存账号奶油色的竖式 222×352 工牌（54:85.6 证件比例，内含用量）；脱敏邮箱/组织、订阅档位与离线仅本地元数据凭据徽章、进程状态明确指 Claude 客户端；主操作直出（保存/更新备份、切换、使用空身份），重命名·导出·删除收进右上角 Radix「···」菜单（aria-label、键盘可达、非模态）；Motion 弹簧滚轮/轻微悬停视差（按钮区冻结），原生媒体订阅使减弱动态偏好实时停止；原生滚动条/键盘，无分页或数量截断；只呈现、不调用原生命令。

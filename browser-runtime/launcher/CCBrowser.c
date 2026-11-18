@@ -1,8 +1,8 @@
 /*
  * [INPUT]: LaunchServices 参数、宿主写入的 launch.args 与身份切换阻断文件；新宿主必须发布本次启动参数。
- * [OUTPUT]: 宿主 CCBaga-A 未运行时在后台带起它；读取宿主写入的 start.url（宿主刚启动时最多等 8 秒，并确认回环端口可连），
+ * [OUTPUT]: 宿主 RioBaga-A 未运行时在后台带起它；读取宿主写入的 start.url（宿主刚启动时最多等 8 秒，并确认回环端口可连），
  *           作为首个标签追加在参数末尾；随后以原进程编号 exec 同目录的 Chromium。链接打开经 Apple Event 送达，不受影响。
- * [POS]: CCBaga-B 应用包的 CFBundleExecutable。宿主直接启动 Contents/MacOS/Chromium，不经过本入口。
+ * [POS]: RioBaga-B 应用包的 CFBundleExecutable。宿主直接启动 Contents/MacOS/Chromium，不经过本入口。
  *        已带 --user-data-dir 时不注入参数；不读取、不修改浏览器资料。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -48,7 +48,7 @@ static int host_running(void) {
 static void launch_host(const char *apps_dir) {
     char host[PATH_MAX];
     struct stat st;
-    snprintf(host, sizeof(host), "%s/CCBaga-A.app", apps_dir);
+    snprintf(host, sizeof(host), "%s/RioBaga-A.app", apps_dir);
     int by_path = stat(host, &st) == 0 && S_ISDIR(st.st_mode);
     pid_t child = fork();
     if (child < 0) return;
@@ -99,7 +99,7 @@ int main(int argc, char **argv) {
     if (_NSGetExecutablePath(raw, &size) != 0 || !realpath(raw, exe)) return 1;
     char *slash = strrchr(exe, '/');
     if (!slash) return 1;
-    *slash = 0; /* exe = .../CCBaga-B.app/Contents/MacOS */
+    *slash = 0; /* exe = .../RioBaga-B.app/Contents/MacOS */
     char real[PATH_MAX];
     snprintf(real, sizeof(real), "%s/Chromium", exe);
     char apps[PATH_MAX];
@@ -129,7 +129,7 @@ int main(int argc, char **argv) {
             if (access(pending, F_OK) != 0 && stat(file, &args_stat) == 0 && (!fresh_host || args_stat.st_mtime >= began)) { ready = 1; break; }
             usleep(100 * 1000);
         }
-        if (!ready) { fputs("CCBaga-B: 等待宿主完成身份资料选择，请在主应用中恢复或重试。\n", stderr); return 1; }
+        if (!ready) { fputs("RioBaga-B: 等待宿主完成身份资料选择，请在主应用中恢复或重试。\n", stderr); return 1; }
         FILE *f = fopen(file, "r");
         if (!f) {
             /* 不回退到其他资料，避免联动身份与网页登录错位。 */
@@ -168,6 +168,6 @@ int main(int argc, char **argv) {
     }
     next[n] = NULL;
     execv(real, next);
-    perror("CCBaga-B: 无法启动 Chromium");
+    perror("RioBaga-B: 无法启动 Chromium");
     return 1;
 }

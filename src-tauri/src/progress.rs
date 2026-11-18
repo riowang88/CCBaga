@@ -103,7 +103,7 @@ fn collect(sink: &Sink) -> String {
         start += text[start..].find('\n').map_or(0, |n| n + 1);
         text.drain(..start);
     }
-    format!("CCBaga {} {} {}\n{}", env!("CARGO_PKG_VERSION"), std::env::consts::OS, std::env::consts::ARCH, text)
+    format!("RioBaga {} {} {}\n{}", env!("CARGO_PKG_VERSION"), std::env::consts::OS, std::env::consts::ARCH, text)
 }
 fn now() -> u64 {
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs())
@@ -211,7 +211,7 @@ mod diagnostics_tests {
         assert!(new <= LOG_LIMIT && old <= LOG_LIMIT, "{new} {old}");
         assert_eq!(std::fs::read_dir(&folder).unwrap().count(), 2);
         let exported = collect(&sink);
-        assert!(exported.len() <= EXPORT_LIMIT + 200 && exported.starts_with("CCBaga "));
+        assert!(exported.len() <= EXPORT_LIMIT + 200 && exported.starts_with("RioBaga "));
         assert!(exported.lines().skip(1).all(|line| line.starts_with("1970-01-01T00:00:00Z stage ok ")));
         assert_eq!(timestamp(1_794_960_000), "2026-11-18T00:00:00Z");
         std::fs::remove_dir_all(folder).unwrap();

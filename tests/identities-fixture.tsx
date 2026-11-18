@@ -63,7 +63,7 @@ function execute(command:string,args:any){
  if(command==='plugin:event|unlisten')return;
  if(fail===command){fail='';throw Error('fixture operation failed');}
  if(browserMode&&command==='browser_read')return structuredClone(browserState);
- if(browserMode&&command==='browser_default_read')return {is_default:true,http:'fixture',https:'fixture',installed:true,app:'CCBaga-B'};
+ if(browserMode&&command==='browser_default_read')return {is_default:true,http:'fixture',https:'fixture',installed:true,app:'RioBaga-B'};
  if(browserMode&&command==='browser_save'){browserState.config=structuredClone(args.config);return structuredClone(browserState);}
  if(browserMode&&command==='browser_clear'){browserState.cache=[];return structuredClone(browserState);}
  if(command==='identities_transfer_pick'){if(transfer.failPick){transfer.failPick=false;throw Error('fixture file selection failed');}if(transfer.cancel){transfer.cancel=false;return null;}return {token:'fixture-grant',file_name:'fixture.bagapack'};}

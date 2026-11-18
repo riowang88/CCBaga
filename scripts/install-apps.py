@@ -16,8 +16,9 @@ import time
 from urllib.parse import unquote, urlparse
 from browser_ui import verify_browser_ui
 ROOT = Path(__file__).resolve().parent.parent
-APPS = [('CCBaga-A.app', 'ai.local.requirement-french', 'CC清理器.app'),
-        ('CCBaga-B.app', 'ai.local.requirement-french.browser', 'CC浏览器.app')]
+# 第三项：同一包标识的历史应用名；安装新包时一并移除旧包，用户数据目录不动。
+APPS = [('RioBaga-A.app', 'ai.local.requirement-french', ('CCBaga-A.app', 'CC清理器.app')),
+        ('RioBaga-B.app', 'ai.local.requirement-french.browser', ('CCBaga-B.app', 'CC浏览器.app'))]
 REGISTER = '/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister'
 def run(*args):
     return subprocess.run([str(value) for value in args], check=True, capture_output=True, text=True)
@@ -59,12 +60,12 @@ def main():
     args = arguments()
     folder = Path(args.folder) if args.folder else None
     build = 'debug' if args.development else 'release'
-    sources = [folder / name for name, _, _ in APPS] if folder else [ROOT / f'src-tauri/target/{build}/bundle/macos/CCBaga-A.app', ROOT / 'browser-runtime/Browser.app']
+    sources = [folder / name for name, _, _ in APPS] if folder else [ROOT / f'src-tauri/target/{build}/bundle/macos/RioBaga-A.app', ROOT / 'browser-runtime/Browser.app']
     stage = Path(tempfile.mkdtemp(prefix='.ccbaga-install-', dir='/Applications'))
     cleanup_stage = True
     try:
         removals = []
-        for index, (source, (name, bundle_id, old_name)) in enumerate(zip(sources, APPS)):
+        for index, (source, (name, bundle_id, old_names)) in enumerate(zip(sources, APPS)):
             if identity(source) != bundle_id:
                 raise RuntimeError(f'Unexpected bundle identity: {source}')
             pending = stage / name
@@ -73,7 +74,7 @@ def main():
             if index == 0:
                 verify_browser_ui(pending / 'Contents/Resources/browser-ui')
             for base in [Path('/Applications'), Path.home() / 'Applications']:
-                for candidate in [base / name, base / old_name]:
+                for candidate in [base / name, *(base / old for old in old_names)]:
                     if candidate.exists():
                         if identity(candidate) != bundle_id:
                             raise RuntimeError(f'Conflicting application: {candidate}')
@@ -125,7 +126,7 @@ def main():
             shutil.rmtree(stage)
     try: refresh_dock()
     except subprocess.CalledProcessError: print('Applications installed; Dock refresh could not complete.', file=sys.stderr)
-    run('open', '-a', '/Applications/CCBaga-A.app')
-    print('Installed and launched CCBaga-A / CCBaga-B; ' + ('local development ad-hoc signatures verified.' if args.development else 'strict signatures and Gatekeeper passed.'))
+    run('open', '-a', '/Applications/RioBaga-A.app')
+    print('Installed and launched RioBaga-A / RioBaga-B; ' + ('local development ad-hoc signatures verified.' if args.development else 'strict signatures and Gatekeeper passed.'))
 if __name__ == '__main__':
     main()

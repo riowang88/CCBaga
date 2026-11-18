@@ -245,7 +245,7 @@ class InstallTests(unittest.TestCase):
             return iter([proc]) if path == Path('/proc') else original(path, pattern)
         (self.build / 'requirement-french').write_text('replacement')
         with patch.object(Path, 'glob', processes):
-            with self.assertRaisesRegex(RuntimeError, 'CCBaga-B'):
+            with self.assertRaisesRegex(RuntimeError, 'RioBaga-B'):
                 installer.install(self.build, self.prefix)
         self.assertEqual((self.prefix / 'bin/ccbaga-a').read_text(), 'fixture')
 

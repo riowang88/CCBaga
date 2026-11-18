@@ -7,7 +7,7 @@ fn register(_: &Path) -> Result<(), String> {
     Ok(())
 }
 fn register_default() -> Result<(), String> {
-    let exe = std::env::current_exe().map_err(|_| "无法定位 CCBaga-A。")?;
+    let exe = std::env::current_exe().map_err(|_| "无法定位 RioBaga-A。")?;
     let script = r#"
 $ErrorActionPreference='Stop'
 $base='HKCU:\Software\Clients\StartMenuInternet\CCBaga-B'
@@ -108,7 +108,7 @@ pub fn open_urls(app: tauri::AppHandle, args: Vec<String>) {
         .collect::<Vec<_>>();
     std::thread::spawn(move || {
         if let Err(error) = start_windows_companion(&app, &urls) {
-            eprintln!("CCBaga-B: {error}");
+            eprintln!("RioBaga-B: {error}");
         }
     });
 }
@@ -175,7 +175,7 @@ fn default_read() -> Result<DefaultBrowser, String> {
     let https = read("https");
     let is_default =
         http.eq_ignore_ascii_case("CCBaga-B.URL") && https.eq_ignore_ascii_case("CCBaga-B.URL");
-    let exe = std::env::current_exe().map_err(|_| "无法定位 CCBaga-A。")?;
+    let exe = std::env::current_exe().map_err(|_| "无法定位 RioBaga-A。")?;
     let installed = exe
         .parent()
         .is_some_and(|folder| binary(&packaged_engine(folder)).is_file());
@@ -185,7 +185,7 @@ fn default_read() -> Result<DefaultBrowser, String> {
         https,
         installed,
         app: std::env::current_exe()
-            .map_err(|_| "无法定位 CCBaga-A。")?
+            .map_err(|_| "无法定位 RioBaga-A。")?
             .display()
             .to_string(),
     })

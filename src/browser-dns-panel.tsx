@@ -26,7 +26,7 @@ export function BrowserDns({revision,connected,config}:{revision:number;connecte
   <header><h2 id="verification-dns-title">{t('DNS 解析器实测')}</h2><span role="status">{t(!connected?'主应用未连接':busy?'正在检测 DNS…':error?'DNS 检测未完成':result?.resolvers.length?'已取得 DNS 观测':result?'未取得解析器结果':'尚未检测 DNS')}</span><Button variant="ink" disabled={!connected||busy||!revision} loading={busy} onClick={()=>setRetry(n=>n+1)}>{t('重新检测 DNS')}</Button></header>
   <p className="browser-doh-endpoint">{t('DNS 配置目标：{v0}',{v0:t(dns.mode==='secure'?'指定 DoH':'沿用现有解析')})}{dns.mode==='secure'&&` · ${dohEndpoint(dns)}`}</p>
   <p>{t('配置目标不代表已验证使用该解析器；代理代为解析、启动解析和策略覆盖需另行核对。')}</p>
-  <p>{t('由当前 B 浏览器触发解析，CCBaga-A 读取 Net.Coffee 的本轮结果。')}</p>
+  <p>{t('由当前 B 浏览器触发解析，RioBaga-A 读取 Net.Coffee 的本轮结果。')}</p>
   {error&&<p className="verification-dns-error" role="alert">{t(error)}</p>}
   {result&&result.resolvers.length===0&&<p>{t('未取得解析器结果，无法判断 DNS 状态；空结果不代表安全或已加密。')}</p>}
   {!!result?.resolvers.length&&<><div className="verification-dns-table"><table><thead><tr><th>{t('DNS 解析器 IP')}</th><th>{t('国家 / 城市')}</th><th>{t('运营商')}</th></tr></thead><tbody>{result.resolvers.map(row=><tr key={row.ip}><td>{row.ip}</td><td>{row.geo_error?<span title={t(row.geo_error)}>{t('归属地未取得')}</span>:[row.country_code,row.country,row.city].filter(Boolean).join(' · ')}</td><td>{row.isp||t('未知')}</td></tr>)}</tbody></table></div><p>{t('共观测到 {v0} 个解析器 · {v1}',{v0:result.resolvers.length,v1:new Date(result.observed_at).toLocaleTimeString(locale==='zh'?'zh-CN':'en-US')})}</p></>}

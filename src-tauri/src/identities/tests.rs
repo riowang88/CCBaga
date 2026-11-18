@@ -33,8 +33,10 @@ fn nested_symlinks_round_trip_without_reading_or_changing_their_targets() {
     let stage = s.load(&a).unwrap();
     assert_eq!(stage.manifest.version, 2);
     let export = f.root.join("linked.bagapack");
-    assert!(s.export_pack(&export, "fixture-long-password", &a.id, None, &r).is_err());
-    assert!(!export.exists(), "local links must not be followed by portable export");
+    // 迁移导出跳过全部本机链接（不跟随、不写入），其余内容照常导出；逐项断言见 portable_tests。
+    s.export_pack(&export, "fixture-long-password", &a.id, None, &r).unwrap();
+    assert!(export.exists());
+    assert_eq!(std::fs::read(external.join("untouched")).unwrap(), b"external-private-content");
 }
 
 #[cfg(unix)]

@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 保存身份/浏览器绑定、原生一次性文件选择票据、密码、可信来源确认与共享真实进度流。
- * [OUTPUT]: 受控的加密迁移导出/导入确认；每次文件重选先清票据与确认，路径留在原生层，密码不持久化。
+ * [OUTPUT]: 受控的加密迁移导出/导入确认；每次文件重选先清票据与确认，路径留在原生层，密码不持久化；导出默认文件名带档案名与时间，导出失败保留所选位置。
  * [POS]: 身份管理的迁移边界；仅处理保存档案，导入不切换身份，浏览器只可携带指纹配置。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -12,6 +12,7 @@ import {useI18n} from './i18n';
 import {policyRows,type Identity,type IdentityState} from './identity-model';
 import type {ActivityController} from './cleaner-activity';
 type Grant={token:string;file_name:string};
+const stampNow=()=>{const d=new Date(),p=(n:number)=>String(n).padStart(2,'0');return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;};
 export function IdentityTransfer({target,hasBrowser,onClose,onBusy,onState,activity}:{target:Identity|'import'|null;hasBrowser:boolean;onClose:()=>void;onBusy:(busy:boolean)=>void;onState:(state:IdentityState)=>void;activity:ActivityController}){
  const {t,locale}=useI18n();
  const [grant,setGrant]=useState<Grant|null>(null),[password,setPassword]=useState(''),[repeat,setRepeat]=useState('');
@@ -24,7 +25,7 @@ export function IdentityTransfer({target,hasBrowser,onClose,onBusy,onState,activ
  const valid=Array.from(password).length>=12&&!tooLong&&(!exporting||password===repeat);
  async function pick(){
   if(!target||busy)return;setGrant(null);setAccepted(false);setBusy(true);setError('');
-  try{const chosen=await invoke<Grant|null>('identities_transfer_pick',{kind:exporting?'export':'import'});if(chosen)setGrant(chosen);}
+  try{const chosen=await invoke<Grant|null>('identities_transfer_pick',exporting?{kind:'export',suggested:`${target.name} ${stampNow()}`}:{kind:'import'});if(chosen)setGrant(chosen);}
   catch(error){setError(String(error));}finally{setBusy(false);}
  }
  async function submit(){
@@ -35,7 +36,7 @@ export function IdentityTransfer({target,hasBrowser,onClose,onBusy,onState,activ
   try{
    const next=await invoke<IdentityState>(exporting?'identities_export':'identities_import',exporting?{id:target.id,grant:selected.token,password:secret,includeBrowser:includeBrowser&&hasBrowser,onProgress}:{grant:selected.token,password:secret,onProgress});
    onState(next);activity.finish(true,exporting?'身份已加密导出。':'身份已导入，当前身份保持不变。');onClose();
-  }catch(error){setError(String(error));activity.finish(false,String(error));try{onState(await invoke<IdentityState>('identities_read'));}catch{/* 保留原始迁移错误；刷新失败不声称回滚。 */}}
+  }catch(error){setError(String(error));activity.finish(false,String(error));if(exporting)setGrant(selected);/* 原生层在文件未落盘时归还同一张票据，重试不必重选位置。 */try{onState(await invoke<IdentityState>('identities_read'));}catch{/* 保留原始迁移错误；刷新失败不声称回滚。 */}}
   finally{setBusy(false);}
  }
  return <AppDialog open={target!==null} onOpenChange={open=>{if(!open&&!busy)onClose();}} title={t(exporting?'导出身份':'导入身份')} description={t(exporting?'导出保存的登录与身份数据，请妥善保管文件和密码。':'仅支持相同操作系统；将新增保存身份，不切换当前身份。')} footer={<><Button variant="secondary" disabled={busy} onClick={onClose}>{t('取消')}</Button><Button variant="ink" disabled={busy||!grant||!valid||!accepted} loading={busy} onClick={()=>void submit()}>{t(exporting?'加密导出':'解密导入')}</Button></>}>

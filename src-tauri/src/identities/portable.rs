@@ -1,5 +1,5 @@
 // [INPUT]: 已认证本机身份归档、原生一次性文件选择、ring PBKDF2 与现有 AES-GCM/tar/Zstd 流。
-// [OUTPUT]: 密码保护的单身份 bagapack；兼容默认关闭的桌面共享策略字段，同 OS 验收后重定位并重封存；拒绝本机 v2 链接归档且不跟随链接导出目标内容。
+// [OUTPUT]: 密码保护的单身份 bagapack；兼容默认关闭的桌面共享策略字段，同 OS 验收后重定位并重封存；本机 v2 归档里的符号链接逐个跳过并计数，不跟随、不写入迁移包，导出包始终为 v1。
 // [POS]: 保险库的显式跨设备边界；不导出主密钥/SQLite，不切换身份或操作钥匙串，不迁移浏览器登录资料。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use super::{archive::{self, Manifest, Stage}, codec, compression, database::Record, private, store::{problem, Store}};
@@ -28,6 +28,7 @@ const MAX_PACK: u64 = MAX_TAR + MAX_TAR / 128 + 8 * 1024 * 1024;
 const TTL: Duration = Duration::from_secs(300);
 fn invalid() -> String { "迁移包无法验证、密码错误或格式不受支持；未导入身份。".into() }
 fn limit() -> String { "迁移包超过 8 GiB 或 100000 个成员的安全上限。".into() }
+fn unexportable() -> String { "已保存身份的来源范围或凭据格式不符合迁移包要求，无法导出。".into() }
 
 #[derive(Clone, Copy, PartialEq)]
 enum Kind { Export, Import }
@@ -103,13 +104,23 @@ impl Transfers {
         }
         Ok(entry.take().unwrap())
     }
+    /// 导出在目标文件落盘前失败时归还同一张票据（原有效期不变），用户无需重新选择位置。
+    fn restore(&self, grant: Grant) {
+        if fs::symlink_metadata(&grant.path).is_ok() { return; }
+        if let Ok(mut entry) = self.grant.lock() { if entry.is_none() { *entry = Some(grant); } }
+    }
+}
+fn suggested_name(name: Option<&str>) -> String {
+    let stem: String = name.unwrap_or("").chars().filter(|c| c.is_alphanumeric() || matches!(c, '-' | '_' | ' ')).take(64).collect();
+    let stem = stem.trim();
+    if stem.is_empty() { "identity.bagapack".into() } else { format!("{stem}.bagapack") }
 }
 #[tauri::command]
-pub(crate) async fn identities_transfer_pick(app: tauri::AppHandle, window: tauri::Window, kind: String) -> Result<Option<Selection>, String> {
+pub(crate) async fn identities_transfer_pick(app: tauri::AppHandle, window: tauri::Window, kind: String, suggested: Option<String>) -> Result<Option<Selection>, String> {
     let kind = Kind::parse(&kind)?;
     app.state::<Transfers>().grant.lock().map_err(|_| invalid())?.take();
-    let dialog = app.dialog().file().set_parent(&window).add_filter("CCBaga identity", &["bagapack"]);
-    let selection = if kind == Kind::Export { dialog.set_file_name("identity.bagapack").blocking_save_file() } else { dialog.blocking_pick_file() };
+    let dialog = app.dialog().file().set_parent(&window).add_filter("RioBaga identity", &["bagapack"]);
+    let selection = if kind == Kind::Export { dialog.set_file_name(suggested_name(suggested.as_deref())).blocking_save_file() } else { dialog.blocking_pick_file() };
     selection.map(|file| {
         let path = file.into_path().map_err(|_| "请选择本机文件。")?;
         app.state::<Transfers>().issue(path, kind)
@@ -191,27 +202,28 @@ fn each_data(stage: &Stage, visit: &mut impl FnMut(&Path, &Path, bool) -> Result
     for n in 0..stage.manifest.sources.len() { archive::walk(&stage.path.join(format!("data/{n}")), &stage.path, visit)?; }
     Ok(())
 }
-fn checked_data(stage: &Stage) -> Result<(usize, u64), String> {
-    if stage.manifest.version != 1 {
-        return Err("包含本机符号链接的身份暂不支持跨设备导出。".into());
-    }
-    let (mut count, mut size) = (0usize, 0u64);
+/// 返回（成员数、字节数、跳过的本机链接数）。链接只指向本机路径，不跟随也不写入迁移包。
+fn checked_data(stage: &Stage) -> Result<(usize, u64, usize), String> {
+    let (mut count, mut size, mut skipped) = (0usize, 0u64, 0usize);
     each_data(stage, &mut |path, relative, directory| {
+        if private::link_target(path)?.is_some() { skipped += 1; return Ok(()); }
         private::safe(path)?;
         count += 1;
-        if count > MAX_ENTRIES || !valid_member(relative) { return Err(limit()); }
+        if count > MAX_ENTRIES { return Err(limit()); }
+        if !valid_member(relative) { return Err("身份里有文件名含控制字符或过长，无法写入迁移包。".into()); }
         if !directory { size = size.checked_add(fs::metadata(path).map_err(problem)?.len()).ok_or_else(limit)?; }
         if size > MAX_BYTES { return Err(limit()); }
         Ok(())
     })?;
-    Ok((count, size))
+    Ok((count, size, skipped))
 }
 fn pack_data<W: Write>(tar: &mut tar::Builder<W>, stage: &Stage, reporter: &Reporter) -> Result<(), String> {
-    let (total, _) = checked_data(stage)?;
+    let (total, _, _) = checked_data(stage)?;
     let mut current = 0;
     let mut last = Instant::now();
     reporter.log("transfer_archive", "running", "正在写入迁移文件。", 0, Some(total));
     each_data(stage, &mut |path, relative, directory| {
+        if private::link_target(path)?.is_some() { return Ok(()); }
         if directory { tar.append_dir(relative, path).map_err(problem)?; }
         else { tar.append_file(relative, &mut fs::File::open(path).map_err(problem)?).map_err(problem)?; }
         current += 1;
@@ -229,20 +241,23 @@ impl Store {
         let record = self.record(id)?;
         reporter.log("transfer_validate", "running", "正在验收已保存身份。", 0, None);
         let stage = self.load(&record)?;
-        checked_data(&stage)?;
+        let (_, _, skipped) = checked_data(&stage)?;
         let mut manifest: Manifest = serde_json::from_value(serde_json::to_value(&stage.manifest).map_err(problem)?).map_err(problem)?;
-        manifest.credentials = credentials(&manifest.credentials, &manifest.policy)?;
+        // 链接已全部跳过，迁移包内只有普通文件和目录，按 v1 交付。
+        manifest.version = 1;
+        manifest.credentials = credentials(&manifest.credentials, &manifest.policy).map_err(|e| if e == invalid() { unexportable() } else { e })?;
         manifest.account_key = None;
         // Local observation/attestation is not proof of identity on a different computer.
         manifest.client_checks.clear();
         let metadata = Metadata { version: 1, name: record.name, manifest, browser: browser.map(BrowserSettings::from_config) };
-        validate_metadata(&metadata)?;
+        validate_metadata(&metadata).map_err(|e| if e == invalid() { unexportable() } else { e })?;
         let serialized = Zeroizing::new(serde_json::to_vec(&metadata).map_err(problem)?);
         if serialized.len() as u64 > MAX_METADATA { return Err(limit()); }
-        reporter.log("transfer_validate", "ok", "已保存身份已完整验收。", 1, Some(1));
+        if skipped > 0 { reporter.log("transfer_validate", "ok", &format!("已保存身份已完整验收；已跳过 {skipped} 个本机链接。"), 1, Some(1)); }
+        else { reporter.log("transfer_validate", "ok", "已保存身份已完整验收。", 1, Some(1)); }
         let salt = codec::random::<32>()?;
         let key = password_key(password, &salt)?;
-        let mut output = private::create(path)?;
+        let mut output = private::create(path).map_err(|_| "无法在所选位置创建迁移文件；请换一个本机文件夹。".to_string())?;
         let created = stamp(&output)?;
         let result = (|| {
             output.write_all(MAGIC).and_then(|_| output.write_all(&ITERATIONS.to_be_bytes())).and_then(|_| output.write_all(&salt)).map_err(problem)?;
@@ -427,16 +442,18 @@ mod tests;
 pub(crate) async fn identities_export(app: tauri::AppHandle, id: String, grant: String, password: String, include_browser: bool, on_progress: Channel<Progress>) -> Result<super::State, String> {
     let password = Zeroizing::new(password);
     let selection = app.state::<Transfers>().take(&grant, Kind::Export)?;
-    let cleaner = app.state::<crate::cleaner::Cleaner>(); cleaner.enter()?;
+    let cleaner = app.state::<crate::cleaner::Cleaner>();
+    if let Err(error) = cleaner.enter() { app.state::<Transfers>().restore(selection); return Err(error); }
     let worker = app.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
         let reporter = Reporter::channel(Some(on_progress));
-        let result = (|| {
+        let exported = (|| {
             let store = Store::open_for_transfer(&super::vault(&worker)?, &crate::cleaner::identity::root()?)?;
             let browser = if include_browser { crate::browser::portable_config(&worker, &id)? } else { None };
-            store.export_pack(&selection.path, &password, &id, browser, &reporter)?;
-            super::state(&worker)
+            store.export_pack(&selection.path, &password, &id, browser, &reporter)
         })();
+        // 失败时导出文件已移除或从未创建：归还票据，重试不必重新选择位置。
+        let result = match exported { Ok(()) => super::state(&worker), Err(error) => { worker.state::<Transfers>().restore(selection); Err(error) } };
         if let Err(error) = &result { reporter.fail(error); }
         result
     }).await.map_err(|_| "身份导出中断，请重新选择文件。".to_string()).and_then(|r| r);

@@ -260,3 +260,54 @@ fn single_client_local_attestation_is_not_exported_as_destination_evidence() {
     assert!(!store.load(&store.record(&id).unwrap()).unwrap().manifest.client_checks.is_empty());
     let path=fixture.root.join("associated.bagapack");store.export_pack(&path,PASSWORD,&id,None,&reporter).unwrap();let imported=read_pack(&fs::read(path).unwrap(),PASSWORD,&fixture.root).unwrap();assert!(imported.stage.manifest.client_checks.is_empty());
 }
+
+#[cfg(unix)]
+#[test]
+fn export_skips_local_links_from_v2_archives_and_imports_as_plain_v1() {
+    // 默认保留策略会把 ~/.claude/debug 打进归档；Claude Code 在其中维护 latest 链接。
+    let origin = Fixture::new();
+    origin.login("portable-L", "organization", "synthetic-token");
+    origin.write(".claude/debug/session.txt", b"synthetic-debug");
+    std::os::unix::fs::symlink(origin.home.join(".claude/debug/session.txt"), origin.home.join(".claude/debug/latest")).unwrap();
+    std::os::unix::fs::symlink("session.txt", origin.home.join(".claude/debug/relative")).unwrap();
+    std::os::unix::fs::symlink("/etc/hosts", origin.home.join(".claude/debug/outside")).unwrap();
+    let mut source = Store::open(&origin.vault, &origin.home).unwrap();
+    source.save_current("Linked", &Policy::default(), &Reporter::channel(None)).unwrap();
+    let record = source.records()[0].clone();
+    let stage = source.load(&record).unwrap();
+    assert_eq!(stage.manifest.version, 2);
+    assert_eq!(checked_data(&stage).unwrap().2, 3);
+    drop(stage);
+    let export = origin.root.join("linked.bagapack");
+    source.export_pack(&export, PASSWORD, &record.id, None, &Reporter::channel(None)).unwrap();
+    let destination = Fixture::new();
+    let target = Store::open(&destination.vault, &destination.home).unwrap();
+    let imported = read_pack(&fs::read(export).unwrap(), PASSWORD, &destination.root).unwrap();
+    assert_eq!(imported.stage.manifest.version, 1);
+    let row = target.import_pack(imported, None, &Reporter::channel(None)).unwrap();
+    let stage = target.load(&row).unwrap();
+    let debug = stage.manifest.sources.iter().position(|s| s.path.ends_with("debug")).unwrap();
+    let folder = stage.path.join(format!("data/{debug}"));
+    assert_eq!(fs::read(folder.join("session.txt")).unwrap(), b"synthetic-debug");
+    for name in ["latest", "relative", "outside"] { assert!(fs::symlink_metadata(folder.join(name)).is_err(), "{name} must not travel"); }
+}
+
+#[test]
+fn failed_export_returns_the_ticket_and_default_names_are_sanitized() {
+    let fixture = Fixture::new();
+    let path = fixture.root.join("retry.bagapack");
+    let grants = Transfers::default();
+    let ticket = grants.issue(path.clone(), Kind::Export).unwrap();
+    let grant = grants.take(&ticket.token, Kind::Export).unwrap();
+    assert!(grants.take(&ticket.token, Kind::Export).is_err());
+    grants.restore(grant);
+    let grant = grants.take(&ticket.token, Kind::Export).unwrap();
+    // 目标已经落盘时不归还：不能让同一张票据覆盖已有文件。
+    private::write(&path, b"written").unwrap();
+    grants.restore(grant);
+    assert!(grants.take(&ticket.token, Kind::Export).is_err());
+    assert_eq!(suggested_name(Some("工作账号 2026-11-18")), "工作账号 2026-11-18.bagapack");
+    assert_eq!(suggested_name(Some("../../etc/passwd\u{0}")), "etcpasswd.bagapack");
+    assert_eq!(suggested_name(Some("///")), "identity.bagapack");
+    assert_eq!(suggested_name(None), "identity.bagapack");
+}

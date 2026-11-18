@@ -92,6 +92,7 @@ jobs:
           rm -f "$identity_test"
           bun scripts/test-skill-install.ts
           python3 scripts/test-sign-browser.py
+          python3 scripts/test-browser-launcher.py
           python3 scripts/test-release-env.py
           python3 scripts/test-install-apps.py
           python3 skills/ccbaga-network/scripts/test_network.py

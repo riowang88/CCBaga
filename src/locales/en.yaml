@@ -1755,3 +1755,4 @@
 "两次密码不一致": "passwords must match"
 "未勾选确认": "tick the confirmation"
 "还差 {v0} 个字符": "{v0} more characters needed"
+"未找到 RioBaga-B：已检查 /Applications 与 ~/Applications 下的 RioBaga-B.app 和旧名 CCBaga-B.app。请用完整安装包（DMG）重新安装两个应用，统一为新名称。": "RioBaga-B not found. Checked RioBaga-B.app and the legacy name CCBaga-B.app in /Applications and ~/Applications. Reinstall both apps from the full installer (DMG) to use the new names."

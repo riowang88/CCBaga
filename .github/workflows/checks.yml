@@ -106,6 +106,7 @@ jobs:
         run: |
           python -m pip install --require-hashes --only-binary=:all: -r scripts/release-requirements.txt
           python scripts/test-sign-browser.py
+          python scripts/test-browser-launcher.py
           python scripts/test-release-env.py
           python scripts/test-install-apps.py
           clang -fobjc-arc -framework Foundation -framework Security src-tauri/native/IdentityTests.m -o "$RUNNER_TEMP/ccbaga-identity-test"

@@ -1,4 +1,4 @@
-// [INPUT]: 本机指纹引擎（优先 /Applications/RioBaga-B.app，回退 ~/Applications）、配置/资料边界、真实浏览器观测、宿主界面语言与共享操作日志。
+// [INPUT]: 本机指纹引擎（/Applications 再 ~/Applications，各自 RioBaga-B.app 优先、旧名 CCBaga-B.app 兼容，CFBundleIdentifier 核验后采用）、配置/资料边界、真实浏览器观测、宿主界面语言与共享操作日志。
 // [OUTPUT]: 有界绑定身份上下文与浏览器设置/启动/缓存清理、显式完整资料重置和环境核验（含同会话最近一轮 DNS 结果）；仅 B 运行时在当前资料打开固定报告地址；已删除写死美国的系统对齐；完整重置只处理当前绑定 user-data-dir，按真实项目计数；launch.args 与 SQLite 共用资料/指纹参数，恢复期间阻断启动；向身份事务提供当前/目标资料占用核对。
 // [POS]: 独立浏览器模块的唯一编排入口；改变资料前必须退出浏览器；不自行改系统默认浏览器，只发起系统确认。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -137,21 +137,42 @@ fn root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 }
 #[cfg(target_os = "macos")]
 pub const BROWSER_ID: &str = "ai.local.requirement-french.browser";
+/// 应用包文件名候选：新名优先，旧名兼容自动更新后仍保留 CCBaga-B.app 的老用户（updater 只原地替换 A，不改包名，也不更新 B）。
 #[cfg(target_os = "macos")]
-const BROWSER_APP: &str = "RioBaga-B.app";
+const BROWSER_APPS: [&str; 2] = ["RioBaga-B.app", "CCBaga-B.app"];
 #[cfg(target_os = "macos")]
 const LSREGISTER: &str = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister";
-/// install-apps.sh 安装的 RioBaga-B：优先 /Applications，回退 ~/Applications；存在时作为唯一引擎，避免同一包标识出现两份注册。
+/// 安装的 RioBaga-B：/Applications 新名 → 旧名，再 ~/Applications 新名 → 旧名；存在时作为唯一引擎，避免同一包标识出现两份注册。
 #[cfg(target_os = "macos")]
 fn installed() -> Option<PathBuf> {
     let mut places = vec![PathBuf::from("/Applications")];
     if let Some(home) = std::env::var_os("HOME") {
         places.push(PathBuf::from(home).join("Applications"));
     }
+    find_browser(&places)
+}
+/// 纯查找：按目录顺序、每个目录内按 BROWSER_APPS 顺序取第一个带 Chromium 程序且 Info.plist 的
+/// CFBundleIdentifier 等于 BROWSER_ID 的应用包；名字对但标识不符的候选跳过，不因文件名而信任。
+#[cfg(target_os = "macos")]
+fn find_browser(places: &[PathBuf]) -> Option<PathBuf> {
     places
-        .into_iter()
-        .map(|dir| dir.join(BROWSER_APP))
-        .find(|app| app.join("Contents/MacOS/Chromium").is_file())
+        .iter()
+        .flat_map(|dir| BROWSER_APPS.iter().map(move |name| dir.join(name)))
+        .find(|app| {
+            app.join("Contents/MacOS/Chromium").is_file()
+                && plist_string(app, "CFBundleIdentifier").as_deref() == Some(BROWSER_ID)
+        })
+}
+/// 读取应用包 Info.plist 的字符串键（XML/二进制均由 plutil 解析）；读取失败返回 None。
+#[cfg(target_os = "macos")]
+fn plist_string(app: &Path, key: &str) -> Option<String> {
+    let out = Command::new("/usr/bin/plutil")
+        .args(["-extract", key, "raw", "-o", "-"])
+        .arg(app.join("Contents/Info.plist"))
+        .output()
+        .ok()
+        .filter(|x| x.status.success())?;
+    Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 #[cfg(target_os = "macos")]
 fn register(engine: &Path) -> Result<(), String> {
@@ -282,8 +303,8 @@ pub fn companion(app: tauri::AppHandle) {
 }
 #[cfg(target_os = "macos")]
 fn start_companion(app: &tauri::AppHandle) -> Result<(), String> {
-    // 外部 RioBaga-B.app 缺失时先停止。不要为此安装另一份引擎或新建资料槽位。
-    let browser = installed().ok_or("未安装 /Applications/RioBaga-B.app。")?;
+    // 外部 RioBaga-B.app（或旧名 CCBaga-B.app）缺失时先停止。不要为此安装另一份引擎或新建资料槽位。
+    let browser = installed().ok_or(MISSING_BROWSER)?;
     let state = app.state::<Browser>();
     let _guard = state.gate.lock().unwrap();
     let root = root(app)?;
@@ -351,13 +372,15 @@ fn default_read() -> Result<DefaultBrowser, String> {
 pub async fn browser_default_read() -> Result<DefaultBrowser, String> {
     run(default_read).await
 }
+/// 找不到外部 B 时的统一说明：列出两种支持的名称与位置，并提示用完整安装包统一为新名称。
+#[cfg(target_os = "macos")]
+const MISSING_BROWSER: &str = "未找到 RioBaga-B：已检查 /Applications 与 ~/Applications 下的 RioBaga-B.app 和旧名 CCBaga-B.app。请用完整安装包（DMG）重新安装两个应用，统一为新名称。";
 /// 一键设为默认浏览器：重新注册已安装的 RioBaga-B，注销应用数据中的旧引擎副本，再请求系统切换；macOS 会弹出确认框。
 #[cfg(target_os = "macos")]
 #[tauri::command]
 pub async fn browser_set_default(app: tauri::AppHandle) -> Result<DefaultBrowser, String> {
     run(move || {
-        let browser = installed()
-            .ok_or("未找到 /Applications/RioBaga-B.app，请先运行 bun run install:apps。")?;
+        let browser = installed().ok_or(MISSING_BROWSER)?;
         let copy = root(&app)?.join("engine/Browser.app");
         if copy.exists() {
             let _ = Command::new(LSREGISTER).arg("-u").arg(&copy).status();
@@ -437,14 +460,7 @@ fn web(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 }
 #[cfg(target_os = "macos")]
 fn version(engine: &Path) -> String {
-    let out = Command::new("/usr/bin/plutil")
-        .args(["-extract", "CFBundleShortVersionString", "raw", "-o", "-"])
-        .arg(engine.join("Contents/Info.plist"))
-        .output();
-    out.ok()
-        .filter(|x| x.status.success())
-        .map(|x| String::from_utf8_lossy(&x.stdout).trim().to_string())
-        .unwrap_or_default()
+    plist_string(engine, "CFBundleShortVersionString").unwrap_or_default()
 }
 fn snapshot(app: &tauri::AppHandle) -> Result<Snapshot, String> {
     let root = root(app)?;

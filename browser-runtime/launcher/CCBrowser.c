@@ -1,6 +1,6 @@
 /*
  * [INPUT]: LaunchServices 参数、宿主写入的 launch.args 与身份切换阻断文件；新宿主必须发布本次启动参数。
- * [OUTPUT]: 宿主 RioBaga-A 未运行时在后台带起它；读取宿主写入的 start.url（宿主刚启动时最多等 8 秒，并确认回环端口可连），
+ * [OUTPUT]: 宿主 RioBaga-A 未运行时在后台带起它（同目录 RioBaga-A.app → 旧名 CCBaga-A.app，Bundle ID 核验，均不合格时 open -b）；读取宿主写入的 start.url（宿主刚启动时最多等 8 秒，并确认回环端口可连），
  *           作为首个标签追加在参数末尾；随后以原进程编号 exec 同目录的 Chromium。链接打开经 Apple Event 送达，不受影响。
  * [POS]: RioBaga-B 应用包的 CFBundleExecutable。宿主直接启动 Contents/MacOS/Chromium，不经过本入口。
  *        已带 --user-data-dir 时不注入参数；不读取、不修改浏览器资料。
@@ -20,6 +20,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include "host_lookup.h"
 
 #define HOST_ID "ai.local.requirement-french"
 #define HOST_SUFFIX ".app/Contents/MacOS/requirement-french"
@@ -47,9 +48,8 @@ static int host_running(void) {
 /* 双重 fork：open 进程不成为 Chromium 的子进程，避免僵尸。 */
 static void launch_host(const char *apps_dir) {
     char host[PATH_MAX];
-    struct stat st;
-    snprintf(host, sizeof(host), "%s/RioBaga-A.app", apps_dir);
-    int by_path = stat(host, &st) == 0 && S_ISDIR(st.st_mode);
+    /* 同目录 RioBaga-A.app 优先、旧名 CCBaga-A.app 兼容，均需 Bundle ID 一致；否则按 Bundle ID 交给 LaunchServices。 */
+    int by_path = find_host_app(apps_dir, HOST_ID, host, sizeof(host));
     pid_t child = fork();
     if (child < 0) return;
     if (child == 0) {
@@ -99,7 +99,7 @@ int main(int argc, char **argv) {
     if (_NSGetExecutablePath(raw, &size) != 0 || !realpath(raw, exe)) return 1;
     char *slash = strrchr(exe, '/');
     if (!slash) return 1;
-    *slash = 0; /* exe = .../RioBaga-B.app/Contents/MacOS */
+    *slash = 0; /* exe = .../RioBaga-B.app（或旧名 CCBaga-B.app）/Contents/MacOS */
     char real[PATH_MAX];
     snprintf(real, sizeof(real), "%s/Chromium", exe);
     char apps[PATH_MAX];

@@ -1,5 +1,5 @@
 // [INPUT]: 临时样本、指纹参数、固定清理边界与本机 HTTP 限流样本。
-// [OUTPUT]: 缓存/旧站点清理保留资产，显式完整重置同时清除密码与密钥、全部子 Profile 并隔离兄弟资料；链接/进程重启阻断与真实删除计数；地区/网络回归。
+// [OUTPUT]: 外部 B 新旧包名候选顺序与 Bundle ID 核验；缓存/旧站点清理保留资产，显式完整重置同时清除密码与密钥、全部子 Profile 并隔离兄弟资料；链接/进程重启阻断与真实删除计数；地区/网络回归。
 // [POS]: 浏览器模块行为验证；不访问用户实际资料。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use super::*;
@@ -787,4 +787,60 @@ fn webrtc_check_only_passes_on_match_and_rejects_invalid_reports() {
     assert!(serde_json::from_value::<network::Report>(json.clone()).is_ok());
     json["webrtc"] = serde_json::json!({"status":"match","udp_ips":[],"error":"","extra":1});
     assert!(serde_json::from_value::<network::Report>(json).is_err());
+}
+#[cfg(target_os = "macos")]
+fn fake_browser(dir: &Path, name: &str, id: &str) -> PathBuf {
+    let app = dir.join(name);
+    fs::create_dir_all(app.join("Contents/MacOS")).unwrap();
+    fs::write(app.join("Contents/MacOS/Chromium"), b"").unwrap();
+    fs::write(
+        app.join("Contents/Info.plist"),
+        format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\"><dict><key>CFBundleIdentifier</key><string>{id}</string><key>CFBundleShortVersionString</key><string>148.0.0</string></dict></plist>\n"),
+    )
+    .unwrap();
+    app
+}
+#[cfg(target_os = "macos")]
+#[test]
+fn browser_lookup_accepts_new_and_legacy_names_by_bundle_id() {
+    let root = sample();
+    let system = root.join("Applications");
+    let user = root.join("home/Applications");
+    fs::create_dir_all(&system).unwrap();
+    fs::create_dir_all(&user).unwrap();
+    let places = [system.clone(), user.clone()];
+    // 都没有：报错（None → MISSING_BROWSER），不回退其他位置。
+    assert_eq!(find_browser(&places), None);
+    // 只有旧名（老用户自动更新后的状态）。
+    let legacy = fake_browser(&system, "CCBaga-B.app", BROWSER_ID);
+    assert_eq!(find_browser(&places), Some(legacy.clone()));
+    assert_eq!(version(&legacy), "148.0.0");
+    // 两者都有：新名优先。
+    let current = fake_browser(&system, "RioBaga-B.app", BROWSER_ID);
+    assert_eq!(find_browser(&places), Some(current.clone()));
+    // 只有新名。
+    fs::remove_dir_all(&legacy).unwrap();
+    assert_eq!(find_browser(&places), Some(current.clone()));
+    // 名字对但标识不符：拒绝，继续看下一个候选。
+    fs::remove_dir_all(&current).unwrap();
+    fake_browser(&system, "RioBaga-B.app", "com.example.other");
+    fake_browser(&system, "CCBaga-B.app", "ai.local.requirement-french");
+    assert_eq!(find_browser(&places), None);
+    // 缺 Chromium 程序或 Info.plist 损坏也不采用。
+    let broken = fake_browser(&user, "RioBaga-B.app", BROWSER_ID);
+    fs::write(broken.join("Contents/Info.plist"), b"not a plist").unwrap();
+    assert_eq!(find_browser(&places), None);
+    fs::remove_dir_all(&broken).unwrap();
+    // ~/Applications 回退：系统目录候选均不合格时，用户目录旧名可用；用户目录新名优先于旧名。
+    let user_legacy = fake_browser(&user, "CCBaga-B.app", BROWSER_ID);
+    assert_eq!(find_browser(&places), Some(user_legacy));
+    let user_current = fake_browser(&user, "RioBaga-B.app", BROWSER_ID);
+    fs::remove_file(user_current.join("Contents/MacOS/Chromium")).unwrap();
+    assert_eq!(find_browser(&places), Some(user.join("CCBaga-B.app")));
+    fs::write(user_current.join("Contents/MacOS/Chromium"), b"").unwrap();
+    assert_eq!(find_browser(&places), Some(user_current));
+    // /Applications 合格的旧名优先于 ~/Applications 新名（目录顺序先于名称顺序）。
+    let system_legacy = fake_browser(&system, "CCBaga-B.app", BROWSER_ID);
+    assert_eq!(find_browser(&places), Some(system_legacy));
+    fs::remove_dir_all(&root).unwrap();
 }

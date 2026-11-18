@@ -18,7 +18,7 @@ Identity.m 的单端快照使用固定 scope：CLI 仅读默认 Code 服务，De
 
 浏览器占用桥的 running 使用 JSON true/false，原生夹具同时检查实际序列化类型与两种占用语义；Rust 的严格布尔反序列化不放宽。
 
-应用根识别兼容本机已观察到的 macOS code_sign_clone `.app.bundle/Contents/`；仍按实际 Info.plist 包标识、进程生命周期和资料参数匹配，不凭克隆形状信任程序。夹具覆盖已知 B 克隆与无关包标识拒绝。
+应用根识别与包名无关：新名 RioBaga-B.app 与自动更新后残留的旧名 CCBaga-B.app 同样按实际包标识归属，夹具覆盖旧名主进程/helper 与仿冒名拒绝。应用根识别兼容本机已观察到的 macOS code_sign_clone `.app.bundle/Contents/`；仍按实际 Info.plist 包标识、进程生命周期和资料参数匹配，不凭克隆形状信任程序。夹具覆盖已知 B 克隆与无关包标识拒绝。
 
 参数查询与原有枚举阶段统一内核确认退出语义：EINVAL/ESRCH 最多额外查询一次（间隔 10ms），只在内核确认退出时返回无进程；存活不可读、查询未知及生命周期变化仍拒绝。两个调用方显式处理已退出结果，Store 冲突锁存不改；无按程序路径的豁免。
 

@@ -5,3 +5,5 @@ checks.yml: 三平台初始引擎准备文件树与真实 Vite 产物资源引�
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 
 PR 三平台同时运行 test-assemble-release.py，使用临时假安装器核对完整九文件交付与平台摘要遗漏拒绝，不使用签名材料或发布权限。
+
+macOS 检查与发布同时运行 test-browser-launcher.py：编译真实 CCBrowser.c，以临时伪应用包核对 B 找 A 的新旧包名顺序与 Bundle ID 拒绝，不访问 /Applications。

@@ -11,6 +11,7 @@ identity=${CC_SIGN_IDENTITY:--}
 name=RioBaga-B
 
 /usr/bin/clang -O2 -Wall -arch arm64 -mmacosx-version-min=12.0 \
+  -framework CoreFoundation \
   -o "${app}/Contents/MacOS/CCBrowser" "${root}/browser-runtime/launcher/CCBrowser.c"
 cp "${root}/browser-runtime/icons/app.icns" "${app}/Contents/Resources/app.icns"
 

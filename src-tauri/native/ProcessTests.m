@@ -108,7 +108,7 @@ static int fixtureKill(pid_t pid, int signal) {
 }
 static NSString *fixtureBundle(NSString *root) {
     if ([root isEqual:@"/Applications/Claude.app"]) return @"com.anthropic.claudefordesktop";
-    if ([root isEqual:@"/Applications/RioBaga-B.app"] || [root isEqual:@"/private/fixture/RioBaga-B.app.bundle"]) return @"ai.local.requirement-french.browser";
+    if ([root isEqual:@"/Applications/RioBaga-B.app"] || [root isEqual:@"/Applications/CCBaga-B.app"] || [root isEqual:@"/private/fixture/RioBaga-B.app.bundle"]) return @"ai.local.requirement-french.browser";
     return @"unrelated.app";
 }
 #define proc_listallpids fixtureListAll
@@ -222,6 +222,13 @@ int main(void) { @autoreleasepool {
     NSString *cloneMain=@"/private/fixture/RioBaga-B.app.bundle/Contents/MacOS/Chromium";
     rows=@[process(42001,1,cloneMain,@[@"Chromium",@"--user-data-dir",profile])];
     NSCAssert([json(rf_browser_running(profile.UTF8String))[@"running"] boolValue],@"macOS signed app clone must remain visible to profile occupancy checks");
+    // 自动更新后仍保留旧包名的 B：按实际包标识识别，与新名一致。
+    NSString *legacyMain=@"/Applications/CCBaga-B.app/Contents/MacOS/Chromium";
+    NSString *legacyHelper=@"/Applications/CCBaga-B.app/Contents/Frameworks/Chromium Framework.framework/Versions/1/Helpers/Chromium Helper.app/Contents/MacOS/Chromium Helper";
+    rows=@[process(42001,1,legacyMain,@[@"Chromium",@"--user-data-dir",profile]),process(42002,42001,legacyHelper,@[@"Chromium Helper",@"--type=renderer"])];
+    NSCAssert([json(rf_browser_running(profile.UTF8String))[@"running"] boolValue],@"legacy CCBaga-B.app bundle name must stay visible to profile occupancy checks");
+    rows=@[process(42001,1,@"/Applications/RioBaga-B-copy.app/Contents/MacOS/Chromium",@[@"Chromium",@"--user-data-dir",profile])];
+    NSCAssert(![json(rf_browser_running(profile.UTF8String))[@"running"] boolValue],@"look-alike bundle name without the known bundle ID is not a managed browser");
     rows=@[process(42001,1,@"/private/fixture/unrelated.app.bundle/Contents/MacOS/Chromium",@[@"Chromium",@"--user-data-dir",profile])];
     NSCAssert(![json(rf_browser_running(profile.UTF8String))[@"running"] boolValue],@"clone-shaped path without the known bundle ID is not a managed browser");
     rows=@[process(42002,1,helper,@[@"Chromium Helper",@"--type=utility",[@"--user-data-dir=" stringByAppendingString:profile]])];

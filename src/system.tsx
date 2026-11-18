@@ -1,6 +1,6 @@
 /**
  * [INPUT]: rb.css 共享类、Cromma Input/Select、原生电脑环境快照（时区/语言/区域格式/定位）、get_regions 13 项地区目录、浏览器指纹命令与共享 YAML 文案。
- * [OUTPUT]: 电脑环境页：顶部「一键按地区设置」（地区胶囊、将设置的时区·语言·区域格式、可选关闭定位与同步浏览器指纹、逐步真实记录且失败即停）；下方当前设置逐项修改（时区/首选语言行内编辑、区域格式只读、定位关闭）；页尾系统授权与钥匙串（Windows 隐藏）文字链。
+ * [OUTPUT]: 电脑环境页：顶部「一键按地区设置」（地区胶囊、将设置的时区·语言·区域格式、可选关闭定位与「同步本机 B 浏览器指纹」（旁附一句说明：browser_rotate 给 B 换新随机种子并套用地区语言时区，运行中先退出再重开）、逐步真实记录且失败即停）；下方当前设置逐项修改（时区/首选语言行内编辑、区域格式只读、定位关闭）；页尾系统授权与钥匙串（Windows 隐藏）文字链。
  * [POS]: 系统设置的交互边界；草稿与当前状态分离，页面加载不修改电脑，窗口聚焦时读回；部分完成如实报告已完成的步骤。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -242,7 +242,7 @@ export function SystemPanel({ onBusy }: {
       <div className="system-rb-apply">
         <div className="system-rb-target">{t("将设置为")} <span className="rb-mono">{region ? `${region.timezone} · ${region.language} · ${region.locale}` : '—'}</span></div>
         <label className="rb-check"><input type="checkbox" checked={alsoLocation} disabled={busy !== null} onChange={e => setAlsoLocation(e.currentTarget.checked)}/>{t("同时关闭定位")}</label>
-        <label className="rb-check"><input type="checkbox" checked={syncBrowser} disabled={busy !== null} onChange={e => setSyncBrowser(e.currentTarget.checked)}/>{t("同步浏览器指纹")}</label>
+        <label className="rb-check system-rb-sync"><input type="checkbox" checked={syncBrowser} disabled={busy !== null} aria-describedby="system-sync-browser-note" onChange={e => setSyncBrowser(e.currentTarget.checked)}/><span><span>{t("同步本机 B 浏览器指纹")}</span><small id="system-sync-browser-note" className="rb-muted">{t("会给 B 换新指纹并套用该地区语言时区；B 运行中会先退出再重开。")}</small></span></label>
         <button type="button" className="rb-btn primary" disabled={disabled || !region} aria-busy={busy === 'region'} onClick={() => void applyRegion()}>{busy === 'region' ? t("正在应用…") : t("应用到本机")}</button>
       </div>
     </div>

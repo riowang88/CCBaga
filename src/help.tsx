@@ -1,10 +1,11 @@
 /**
  * [INPUT]: 共享 YAML 中英文目录与各页面的操作边界。
  * [OUTPUT]: 旅居人员本人身份管理用途声明、五项编号说明与折叠的账号边界/申诉步骤。
- * [POS]: 只读帮助页；区分仅缓存与当前身份全部本地浏览器资料删除，沿用 Landing 细线排版和原生 details，不调用原生命令或读取用户数据。
+ * [POS]: 只读帮助页；区分仅缓存与当前身份全部本地浏览器资料删除，奶油/珊瑚视觉（help.css：衬线标题、奶油声明卡、细线编号卡与奶油折叠卡）和原生 details，不调用原生命令或读取用户数据。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 import { useI18n } from './i18n';
+import './help.css';
 
 export function HelpPanel() {
     const { t } = useI18n();
@@ -31,15 +32,14 @@ export function HelpPanel() {
             t('连接资料交给 AI；远端部署前由你确认。')
         ] }
     ];
-    return <section className="system-page help-page">
-        <div className="cleanup-title"><h1>{t('使用说明')}</h1></div>
-        <p className="help-scope">{t('本软件仅供旅居人员管理本人的 Claude 身份，禁止用于违反 Anthropic 官方用户协议的行为。')}</p>
-        <ol className="help-topics">{topics.map((topic, index) => <li className="help-row" key={index}>
+    return <section className="rb-page help-page">
+        <header><h1 className="rb-h1">{t('使用说明')}</h1></header>
+        <p className="rb-card help-scope">{t('本软件仅供旅居人员管理本人的 Claude 身份，禁止用于违反 Anthropic 官方用户协议的行为。')}</p>
+        <ol className="rb-card line help-topics">{topics.map((topic, index) => <li className="help-row" key={index}>
             <div className="help-label"><span aria-hidden="true">{String(index + 1).padStart(2, '0')}</span><h2>{topic.title}</h2></div>
             <div className="help-copy">{topic.lines.map(line => <p key={line}>{line}</p>)}</div>
         </li>)}</ol>
-        <div className="landing-section-band" aria-hidden="true"/>
-        <div className="help-notes">
+        <div className="rb-card help-notes">
             <details className="help-details">
                 <summary>{t('账号与数据')}<span aria-hidden="true"/></summary>
                 <div className="help-copy">

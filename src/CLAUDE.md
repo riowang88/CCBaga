@@ -1,7 +1,7 @@
 # src/
 > L2 | 父级: ../CLAUDE.md
 界面只管理输入、状态和执行记录；本机权限交给原生层；网络页只做只读检测（出口、Claude 可用性、环境一致性、DNS 最近一轮、WebRTC/UDP 最近一轮四态），SSH 执行属于独立 Skill（界面不再提供 Skill 入口）。两入口复用 YAML 中英文文案，原始诊断保留到呈现时翻译；系统语言与界面语言独立。
-browser.tsx: 浏览器配置页（引入 browser-page.css）：深色状态条显示 B 运行/资料随身份切换/默认浏览器，「设为默认浏览器」三级链接（触发系统确认）、正常退出与打开实测；指纹种子与本地「随机换一个」、代理、语言时区跟随/手动、DNS 沿用/指定 DoH、设备指纹真实/种子分段控件与保存；当前身份独占资料的仅缓存清理与全部本地资料重置，全清理显式包含登录/密码/密钥/书签/历史/扩展/设置/缓存，不以缓存条目存在为前提；Alert 默认取消且需勾选确认、不新增备份，其他身份与保险库保持独立；出口与核验网格已移至网络页，美国机器对齐已删除。
+browser.tsx: 浏览器配置页（引入 browser-page.css）：深色状态条主状态一行、资料随身份切换/默认浏览器弱化第二行，每设置行一句主说明、补充说明收进 details，「设为默认浏览器」三级链接（触发系统确认）、正常退出与打开实测；指纹种子与本地「随机换一个」、代理、语言时区跟随/手动、DNS 沿用/指定 DoH、设备指纹真实/种子分段控件与保存；当前身份独占资料的仅缓存清理与全部本地资料重置，全清理显式包含登录/密码/密钥/书签/历史/扩展/设置/缓存，不以缓存条目存在为前提；Alert 默认取消且需勾选确认、不新增备份，其他身份与保险库保持独立；出口与核验网格已移至网络页，美国机器对齐已删除。
 browser-model.ts: 有界浏览器身份摘要与同步状态、同会话最近一轮 DNS 结果（dns_last）；工具箱与起始页共享配置、目标地区、机器、出口服务目录、观测接收时间与默认浏览器契约，不接入原生权限；三平台设备/CPU/版本核验由共用函数保持一致，Windows 必须 Win32。
 browser-start.tsx: 检测区上方紧凑深色身份工牌、绑定状态与不匹配/未知/断连；真实观测与回报编排，奶油底/衬线标题/12px 圆角卡片（browser-start.css），横幅以黄/红/绿语义色区分检测中/失败/通过并保留波纹与大对勾；与 HTTP 出口同轮采集 WebRTC/UDP 并随回报上送（仅页内重新实测或 URL 带 #webrtc 时连接 STUN，自动打开不连），独立卡显示四态、重测取消上一轮，不并入 12 项；重测清空旧结果，断连/未知/上报失败不通过；不接入 Tauri 权限。
 browser-webrtc.ts: 固定公共 STUN 常量（Google 主、Cloudflare 备，无 TURN/凭据）、SDP 候选解析（忽略 mDNS/host/relay/TCP，仅 UDP srflx）、与 HTTP 出口比对的四态判定（任一 UDP 出口不同含不同地址族即不一致；无候选/缺 HTTP 出口为未知；构造失败为已禁用）与 5 秒可取消采集。
@@ -12,14 +12,14 @@ browser-verification.test.ts: 跨平台虚构上下文验证三态、失败原�
 browser-network.ts: 按宿主服务目录经浏览器当前路由检测出口，限流/故障切换服务，校验纯IPv6地址字符而非URL语法并保留失败原因。
 browser-network.test.ts: 模拟限流、备用响应与非法出口，验证故障恢复和错误信息，不访问外网。
 main.tsx: 奶油侧栏（--rb-surface-soft 底、选中项 --rb-cream-strong，RioBaga 品牌文字暂保留，改名另做）：电脑环境（默认页）→ 网络环境 → Claude 身份 → 浏览器环境 ｜分隔｜ 使用说明，无图标；底部保留 AppUpdate 当前版本号/检查更新与 LanguageSwitch；全局任务锁 advancedBusy || updateBusy 控制导航；已删除傻瓜设置页，身份页不再接收 initialEmpty。
-help.tsx: 双语只读说明页，明确全清理仅删除当前身份的密码/书签/历史/扩展/设置且不新增备份；顶部常显旅居人员本人身份管理与禁止违反官方用户协议的声明；五项编号行保留操作后果和删除提示，details 折叠账号边界/申诉，不读取用户资料或调用原生命令。
+help.tsx: 双语只读说明页（引入 help.css，rb-page/rb-h1/rb-card 结构），明确全清理仅删除当前身份的密码/书签/历史/扩展/设置且不新增备份；顶部常显旅居人员本人身份管理与禁止违反官方用户协议的声明；五项编号行保留操作后果和删除提示，details 折叠账号边界/申诉，不读取用户资料或调用原生命令。
 identities.tsx: 身份页主编排（引入 identity.css）：页头「浏览器资料随身份切换」开关（默认开启、旧资料采用确认）、导入次要按钮与页面唯一的刷新（含各账号用量）；错误/未完成恢复/浏览器重开失败横幅；工牌横排后紧跟真实阶段进度（IdentityOperationProgress）；常驻保留策略条；「更多工具」分段：分端登录与更新、桌面会话共享（仅 macOS）、文件残留、CLI 管理。状态与 invoke 语义集中在此：切换/保存/恢复/删除/重命名/单端更新/CLI 官方登录/会话版本选择/桌面会话同步，专用停止进程命令不扫描历史；保留策略写入 ccbaga.identity-policy.v1（恢复采用旧档案策略时同步写回）；当前档案按 workspace_id 在原卡高亮不追加重复卡；协调文件残留/CLI/迁移的任务锁并经 onBusy 锁导航，身份变更使旧残留预览失效。initialEmpty 入参保留为可选并忽略。
 identity-cards.tsx: 卡片区：空身份固定最左（canvas 虚线）、当前账号其次（深色、「当前」标记、顶部挂孔绿光）、已存账号奶油色的竖式 222×352 工牌（54:85.6 证件比例，内含用量）；脱敏邮箱/组织、订阅档位与离线仅本地元数据凭据徽章、进程状态明确指 Claude 客户端；主操作直出（保存/更新备份、切换、使用空身份），重命名·导出·删除收进右上角 Radix「···」菜单（aria-label、键盘可达、非模态）；Motion 弹簧滚轮/轻微悬停视差（按钮区冻结），原生媒体订阅使减弱动态偏好实时停止；原生滚动条/键盘，无分页或数量截断；只呈现、不调用原生命令。
-identity-policy-bar.tsx: 紧贴卡片下方常驻的「切换账号时保持不变」七个切换片（Skills/插件/MCP/个人设置/项目记录/会话历史/缓存，aria-pressed=留在工作区）；桌面会话共享开启时会话历史强制保留且禁用。
+identity-policy-bar.tsx: 紧贴卡片下方常驻的「切换账号时保持不变」七个切换片（Skills/插件/MCP/个人设置/项目记录/会话历史/缓存，aria-pressed=留在工作区）；浅色两态：留在工作区=白底实线墨字绿点，跟身份走=淡底虚线弱化字空心点；桌面会话共享开启时会话历史强制保留、禁用外观（虚线弱化字+锁形）并显示原因行。
 identity-dialogs.tsx: 身份页全部确认窗：会话版本选择与直接删除/删除暂存/单端更新 Alert（默认聚焦取消、勾选确认）、切换/保存/恢复确认（目标档案资料只读预览、人工维护窗口、留在工作区/纳入备份摘要、最多 32 项进程预览，未知保持未知）、浏览器联动、CLI 官方登录（订阅要求、可刷新进程预览、邮箱为用户输入目标、取消/结果）与重命名；不接收令牌。
 identity-clients.tsx: 「分端登录与更新」段：CLI/App 两行显示 CLI 元数据与本地凭据状态、App 需在客户端核对、核对来源与时间；登录 CLI 入口与只更新 CLI/App 三级操作，单端更新目标名称；资料存在不写成登录有效。
 identity-tools.tsx: 「更多工具」WAI-ARIA 分段（方向键/Home/End，一次只显示一段，其余段保持挂载以保留进行中的状态与确认窗）与 macOS 桌面 Code 会话共享段（默认关闭、开启强制保留历史、手动同步与数量结果）。
-identity.css: 身份页专属样式，基于 rb.css 令牌（带回退值）与 .rb-identity 作用域覆盖 style.css 旧身份规则；旧规则留待收尾清理。
+identity.css: 身份页专属样式，基于 rb.css 令牌（带回退值）与 .rb-identity 作用域覆盖 style.css 仍在用的身份卡几何配色；含浅色系保留策略切换片。
 identity-usage.tsx: 工牌内紧凑用量区（会话/本周细进度、单行重置倒计时或日期、过期窗口显示「已重置」、异常一行原因）；不发请求。页面只有页头一个「刷新」：identities.tsx 先读本地状态，再顺序读取当前账号（identities_usage，不续期）与每个已存账号（identities_usage_saved，原生代为续期），读取期间锁住其他操作；不自动轮询。
 identity-transfer.tsx: 保存档案的密码加密迁移确认与备份时间提示，原生文件选择只回传限时一次性票据和文件名；双密码/范围确认与导入可信来源/配置执行后果确认，仅已绑定身份可选指纹配置，不携带浏览器登录资料，导入新增身份且不自动切换；重新选择先撤销旧票据与确认，取消也不能沿用前一文件授权；失败尽力读回而保留错误，复用卡片下真实进度。
 identity-model.test.ts: 旧摘要/无效期限/真实到期边界与 API 密钥状态的纯函数回归，不读取凭据或联网。
@@ -29,20 +29,21 @@ claude-residue-panel.tsx: 身份页内用户触发的固定 Claude 文件扫描�
 cleaner-activity.tsx: 单次调用隔离的 ActivityController 与身份卡片正下方 IdentityOperationProgress；身份/空身份/残留清理共用真实事件阶段、局部 n/N 与脉冲，不预填步骤或按时间推算百分比，未知总量只显示运行；密码迁移复用实际验收/写入/认证/提交阶段。失败/回滚/完成带警告分开呈现，保留实际耗时和原始日志用于即时切换语言；其他页面沿用 CleanupActivity。
 cleaner-model.ts: 文件残留快照类型与选择规则、POSIX/Windows 路径父子去重、子项排除、重扫编号映射与四舍五入进位一致的规模格式化，供预览和执行共享。
 cleaner-model.test.ts: 预设、跨平台父子选择隔离与重扫不扩大选择的回归，不调用清理命令。
-system.tsx: 电脑环境页（照 Main.dc.html，rb 共享类）：顶部 get_regions 13 项地区胶囊、将设置的时区·语言·区域格式、「同时关闭定位」「同步浏览器指纹」与「应用到本机」；按 system_set_region →（勾选且未关闭）system_disable_location →（勾选）browser_rotate，且此前 browser_read 显示 B 运行时再 browser_launch 顺序执行，每步真实结果写入 CleanupActivity，抛错即停并说明已完成的步骤，定位未读回关闭记为提示；下方时区/首选语言行内编辑（搜索+选择+应用）与所选地区一致性、区域格式只读行（system_read.locale）、定位关闭；页尾系统授权与钥匙串（Windows 隐藏）文字链；窗口聚焦读回，页面加载不修改电脑。
-rb.css: RioBaga 设计基础与跨页面类契约：--rb-* 色板/字体变量（内嵌 src/fonts 的 Cormorant Garamond/Inter/JetBrains Mono，中文回退本机 Noto/宋体/苹方）与 rb-page/h1/sub/card(.line/.dark)/label/btn(.primary/.danger)/link/chip/seg/row/check/mono/muted/ok/warn/err；含禁用态、:focus-visible 与减弱动态；规范原文 docs/DESIGN.md。
+system.tsx: 电脑环境页（照 Main.dc.html，rb 共享类）：顶部 get_regions 13 项地区胶囊、将设置的时区·语言·区域格式、「同时关闭定位」「同步本机 B 浏览器指纹」（旁附说明：给 B 换新指纹并套用地区语言时区，B 运行中先退出再重开）与「应用到本机」；按 system_set_region →（勾选且未关闭）system_disable_location →（勾选）browser_rotate，且此前 browser_read 显示 B 运行时再 browser_launch 顺序执行，每步真实结果写入 CleanupActivity，抛错即停并说明已完成的步骤，定位未读回关闭记为提示；下方时区/首选语言行内编辑（搜索+选择+应用）与所选地区一致性、区域格式只读行（system_read.locale）、定位关闭；页尾系统授权与钥匙串（Windows 隐藏）文字链；窗口聚焦读回，页面加载不修改电脑。
+rb.css: RioBaga 设计基础与跨页面类契约：--rb-* 色板/字体变量（对比度修正：--rb-primary-fill 主按钮实底、--rb-link 文字链、--rb-muted 加深，禁用态用明确配色而非透明度，正文与可交互文字 ≥4.5:1）（内嵌 src/fonts 的 Cormorant Garamond/Inter/JetBrains Mono，中文回退本机 Noto/宋体/苹方）与 rb-page/h1/sub/card(.line/.dark)/label/btn(.primary/.danger)/link/chip/seg/row/check/mono/muted/ok/warn/err；含禁用态、:focus-visible 与减弱动态；规范原文 docs/DESIGN.md。
 fonts/: 内嵌 OFL 字体 woff2 拉丁子集与许可原文，不走网络。
-index.css: 引入 Tailwind、Cromma 主题与 rb.css；把 Cromma 的 --background/--foreground/--primary/--border/--card/--panel*/--sidebar* 等主题变量映射到 --rb-* 色板（浅色唯一主题），不修改 vendor/。
+index.css: 引入 Tailwind、Cromma 主题与 rb.css；--primary 取 --rb-primary-fill；把 Cromma 的 --background/--foreground/--primary/--border/--card/--panel*/--sidebar* 等主题变量映射到 --rb-* 色板（浅色唯一主题），不修改 vendor/。
 locales/: 双语 YAML 目录及导入类型，包含使用说明页的操作、安全和账号风险文案；见其 CLAUDE.md。
 i18n.ts: 共享界面语言订阅与文案格式化；优先精确键，动态原生结果按最具体模板匹配，未知诊断保留原文。
 i18n.test.ts: 双语键/插槽一致性、界面文案覆盖、浏览器全清理部分失败计数与原始路径、原生错误与语言切换回归；不访问真实设置。
 app-update.tsx: 侧栏静默/手动版本检查、实际字节进度、签名下载安装与重启失败重试；锁住其他任务，macOS 只更新 A，B 使用完整 DMG；Windows 先正常退出 B，再以签名 NSIS 更新两程序。
 language-switch.tsx: 极简中英文切换；宿主原子持久化成功后更新界面，失败保留原偏好并显示错误。
 dialog.tsx: Radix Dialog/AlertDialog 受控模态，警告阻止遮罩误关闭且默认聚焦取消；无 Trigger 时的原焦点恢复与读屏标题/描述，ModalShell 关闭按钮支持当前语言、底部操作自动换行。
-style.css: 外壳为奶油侧栏/画布与 .rb-nav 导航、侧栏底部版本号/更新/语言；电脑环境页 .system-rb-* 布局；其余身份卡片、帮助页、网络页与伴生实测页规则暂保持原样（由各页面会话换肤，收尾统一清理），--landing-* 细线令牌改取 --rb-hairline。
-vps.tsx: 网络环境检测页（引入 network.css），纯只读：browser_check 的本机出口 IP/所在地/运营商、深色卡四域名 network_diagnose_domains 探针（含延迟，待测/检测中/成功/失败，空/缺失/异常不冒充成功，连接对端不等于出口）、深色卡环境一致性（后端 checks）、DNS 卡读取同会话最近一轮 B 结果并可「在 B 中检测」（browser_launch），空/失败/部分归属地未知如实呈现、WebRTC/UDP 卡读取最近一轮回报（一致/不一致显示 UDP 出口/未知/已禁用，只有一致为通过色）并可「在 B 中检测」；页头「在 B 中打开完整报告」仅 B 运行时可用（固定地址 browser_open_report）；不显示也不自算 IP 信任评分/代理标记/住宅属性，不改任何设置。
-network.css: 网络页专属布局（出口三卡、深色可用性/一致性卡、DNS/WebRTC 细线卡），变量缺失时回退同值。
-browser-page.css: 浏览器配置页专属排版（状态条、120px 标签列设置行、分段选中态、数据清理区）。
+style.css: 外壳为奶油侧栏/画布与 .rb-nav 导航、侧栏底部版本号/更新/语言、页面根自滚动；电脑环境页 .system-rb-* 布局；仍在用的身份卡/进度/对话框/文件残留/更新规则；旧网络、伴生页、帮助页与无引用规则已删除（由各页面 CSS 接管），main.tsx 先引入本文件、页面 CSS 后加载；--landing-* 细线令牌改取 --rb-hairline。
+vps.tsx: 网络环境检测页（引入 network.css；第一行可用性 | DNS+WebRTC，第二行全宽一致性），纯只读：browser_check 的本机出口 IP/所在地/运营商、深色卡四域名 network_diagnose_domains 探针（含延迟，待测/检测中/成功/失败，空/缺失/异常不冒充成功，连接对端不等于出口）、深色卡环境一致性（后端 checks）、DNS 卡读取同会话最近一轮 B 结果并可「在 B 中检测」（browser_launch），空/失败/部分归属地未知如实呈现、WebRTC/UDP 卡读取最近一轮回报（一致/不一致显示 UDP 出口/未知/已禁用，只有一致为通过色）并可「在 B 中检测」；页头「在 B 中打开完整报告」仅 B 运行时可用（固定地址 browser_open_report）；不显示也不自算 IP 信任评分/代理标记/住宅属性，不改任何设置。
+network.css: 网络页专属布局（照 Network.dc.html：出口三卡大字、深色可用性卡一行状态+无边框发丝线行、右侧 DNS/WebRTC 细线卡竖排、全宽深色一致性两栏），变量缺失时回退同值。
+browser-page.css: 浏览器配置页专属排版（状态条主状态/弱化第二行、120px 标签列设置行、13px 主说明与「更多」折叠、可读禁用输入、分段选中态、数据清理区）。
+help.css: 使用说明页奶油/珊瑚布局（声明卡、细线编号卡、奶油折叠卡），取代旧斜纹 help-* 规则。
 Linux 呈现边界：设备平台由原生快照提供；未知定位不显示关闭；系统授权提示不固定 macOS；更新入口在 Linux 明确要求通过包或源码更新，不请求用于 macOS/Windows 的签名更新源。
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 

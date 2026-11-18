@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 原生浏览器命令（读取/保存/启动/退出/清理/默认浏览器）、共用 DoH 目录、Cromma Select/Checkbox、共享活动日志与 YAML 文案。
- * [OUTPUT]: 浏览器配置页：B 运行状态与资料绑定标记、打开/退出、设为默认浏览器（系统确认）、指纹种子与「随机换一个」、代理、语言时区跟随/手动、DNS 沿用/指定 DoH、设备指纹模式、保存设置、仅缓存清理与当前身份全部本地资料清除。
+ * [OUTPUT]: 浏览器配置页：深色状态条（主状态一行 + 资料绑定/默认浏览器弱化第二行，右侧文字链/次要/主按钮）、打开/退出、设为默认浏览器（系统确认）、指纹种子与「随机换一个」、代理、语言时区跟随/手动、DNS 沿用/指定 DoH、设备指纹模式、保存设置；每行一句主说明，补充说明收进 <details>（语言与时区如何生效、生效边界与回退）、仅缓存清理与当前身份全部本地资料清除。
  * [POS]: 浏览器配置边界；出口与泄露检测归网络环境页；页面加载只读，资料删除必须由用户选择；全清理使用默认取消且需勾选确认的 AlertDialog，不新增备份，不影响其他身份资料。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -106,7 +106,7 @@ export function BrowserPanel({ onBusy }: {
     return <section className="rb-page browser-page" data-page="browser">
     <header className="browser-head"><div><h1 className="rb-h1">{t("浏览器环境")}</h1><p className="rb-sub">{t("只管 B 浏览器的配置和数据；出口与泄露检测在「网络环境」。")}</p></div><button type="button" className="rb-link" disabled={!!busy} onClick={() => void act('browser_read')}>{t("刷新状态")}</button></header>
     <div className="rb-card dark browser-status" role="group" aria-label={t("B 浏览器状态")}>
-      <div className="browser-status-text"><span className={state?.running ? 'rb-ok' : undefined}>{state?.running ? t("B 浏览器运行中") : t("B 浏览器未运行")}</span>{state?.identity_linked&&<span className="browser-status-meta"> · {t("浏览器资料随身份切换")}</span>}{preferred&&<span className="browser-status-meta"> · {t(preferred.is_default?"已是默认浏览器":"不是默认浏览器")}</span>}</div>
+      <div className="browser-status-text"><span className={state?.running ? 'rb-ok browser-status-main' : 'browser-status-main'}>{state?.running ? t("B 浏览器运行中") : t("B 浏览器未运行")}</span>{(state?.identity_linked||preferred)&&<span className="browser-status-meta">{[state?.identity_linked&&t("浏览器资料随身份切换"),preferred&&t(preferred.is_default?"已是默认浏览器":"不是默认浏览器")].filter(Boolean).join(' · ')}</span>}</div>
       {!preferred?.is_default&&<button type="button" className="rb-link" disabled={!!busy || asking || !preferred?.installed} aria-busy={asking} onClick={() => void makeDefault()}>{t("设为默认浏览器")}</button>}
       <button type="button" className="rb-btn" disabled={disabled || !state?.running} aria-busy={busy === 'browser_quit'} onClick={() => void act('browser_quit')}>{t("正常退出浏览器")}</button>
       <button type="button" className="rb-btn primary" disabled={disabled || !state?.engine_ready || !!changed} aria-busy={busy === 'browser_launch'} onClick={() => void act('browser_launch')}>{state?.running ? t("重新打开实测页") : t("打开浏览器并实测")}</button>
@@ -123,7 +123,8 @@ export function BrowserPanel({ onBusy }: {
         {!draft?.follow_machine && <div className="browser-manual"><Select aria-label={t("浏览器语言")} value={draft?.language} disabled={locked} onValueChange={v => { if (v)
           edit('language', v); }} items={['en-US', 'en-CA', 'en-GB', 'en-SG', 'en-AU', 'en', 'zh-Hans', 'zh-Hans-SG', 'zh-Hant', 'fr', 'de', 'es', 'it', 'ja', 'ko'].map(v => ({ value: v, label: v }))}/><Select aria-label={t("浏览器时区")} value={draft?.timezone} disabled={locked} onValueChange={v => { if (v)
           edit('timezone', v); }} items={(state?.machine.timezones || []).map(v => ({ value: v, label: v }))}/></div>}
-        <p className="rb-muted browser-hint">{t("跟随机器时，语言与时区取自系统；关闭跟随后可手动选择。这里只显示配置目标，实际生效值以 B 实测为准。")} {t("修改步骤：正常退出 B → 调整并保存设置 → 由 A 打开浏览器并实测。仅重新打开实测页不会重新加载语言、时区或代理。")}</p>
+        <p className="rb-muted browser-hint">{t("修改步骤：正常退出 B → 调整并保存设置 → 由 A 打开浏览器并实测。仅重新打开实测页不会重新加载语言、时区或代理。")}</p>
+        <details className="browser-hint browser-more"><summary>{t("语言与时区如何生效")}</summary><p className="rb-muted">{t("跟随机器时，语言与时区取自系统；关闭跟随后可手动选择。这里只显示配置目标，实际生效值以 B 实测为准。")}</p></details>
       </div>
       <fieldset className="rb-row browser-row-wrap browser-dns-settings" disabled={locked}>
        <legend className="browser-row-label">{t('DNS 解析设置')}</legend>
@@ -134,8 +135,7 @@ export function BrowserPanel({ onBusy }: {
         {dnsError&&<p className="rb-err browser-hint" role="alert">{t(dnsError)}</p>}
         <p className="rb-muted browser-hint">{t('严格 DoH：浏览器自行解析的网站域名在该服务失败时解析失败，不自动回退普通 DNS，也不切换其他服务商。')}</p>
        </div>}
-       <p className="rb-muted browser-hint">{t('仅作用于当前身份的 B 浏览器资料；正常退出 B、保存后，从 A 重新启动生效。不会修改系统 DNS、TUN 或代理服务器的 DNS。')}</p>
-       <details className="browser-hint"><summary>{t('生效边界与回退')}</summary><p className="rb-muted">{t("指定 DoH 时，A 每次全新启动 B 都会应用此配置；在 B 设置页手动修改，可能在下次启动时被覆盖。切回沿用会恢复 A 首次接管前的两项安全 DNS 设置。")}</p><p className="rb-muted">{t('HTTP/SOCKS 代理代为解析的域名不受浏览器 DoH 控制。DoH 服务自身域名的启动解析可能使用现有 DNS；该选项不强制 DoH 连接走代理，企业策略或家长控制也可能覆盖设置。请以重启后的 DNS 实测和必要的网络日志核对。')}</p></details>
+       <details className="browser-hint browser-more"><summary>{t('生效边界与回退')}</summary><p className="rb-muted">{t('仅作用于当前身份的 B 浏览器资料；正常退出 B、保存后，从 A 重新启动生效。不会修改系统 DNS、TUN 或代理服务器的 DNS。')}</p><p className="rb-muted">{t("指定 DoH 时，A 每次全新启动 B 都会应用此配置；在 B 设置页手动修改，可能在下次启动时被覆盖。切回沿用会恢复 A 首次接管前的两项安全 DNS 设置。")}</p><p className="rb-muted">{t('HTTP/SOCKS 代理代为解析的域名不受浏览器 DoH 控制。DoH 服务自身域名的启动解析可能使用现有 DNS；该选项不强制 DoH 连接走代理，企业策略或家长控制也可能覆盖设置。请以重启后的 DNS 实测和必要的网络日志核对。')}</p></details>
       </fieldset>
       <div className="rb-row"><span className="browser-row-label">{t("设备指纹")}</span><Segment label={t("设备指纹")} value={draft?.native_graphics || false} disabled={locked} onChange={v => edit('native_graphics', v)} options={[{value:true,label:t("使用真实设备指纹")},{value:false,label:t("使用种子生成")}]}/><span className="browser-spacer"/><button type="button" className="rb-btn primary" disabled={locked || !changed || !!dnsError} aria-busy={busy === 'browser_save'} onClick={() => draft && void act('browser_save', { config: draft })}>{t("保存设置")}</button></div>
     </section>

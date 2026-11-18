@@ -1,6 +1,6 @@
 /**
  * [INPUT]: docs/DESIGN.md 奶油/珊瑚视觉规范与四张已认可效果图（Main/Network/Identity/Browser）的实测 CSS 数值；src/fonts 内嵌 OFL 字体。
- * [OUTPUT]: --rb-* 色板/字体变量与共享类契约：rb-page/h1/sub/card(.line/.dark)/label/btn(.primary/.danger)/link/chip/seg/row/mono/muted/ok/warn/err；禁用、键盘焦点与减弱动态。
+ * [OUTPUT]: --rb-* 色板/字体变量与共享类契约：rb-page/h1/sub/card(.line/.dark)/label/btn(.primary/.danger)/link/chip/seg/row/mono/muted/ok/warn/err；对比度修正令牌 --rb-primary-fill（主按钮实底）/--rb-link（文字链）与加深的 --rb-muted，保证正文与可交互文字 ≥4.5:1；禁用态用明确配色而非透明度；键盘焦点与减弱动态。
  * [POS]: 全部页面共用的设计基础；由 index.css 引入，页面专属布局仍归 style.css；类名与变量名是跨会话契约，改名须同步所有页面。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -19,11 +19,13 @@
   --rb-dark-elevated: #252320;
   --rb-ink: #141413;
   --rb-body: #3d3d3a;
-  --rb-muted: #6c6a64;
+  --rb-muted: #62605a; /* 规范 #6c6a64 在奶油卡 #efe9de 上仅 4.48:1，略加深到 ≥4.5（卡上 5.2、奶油强 4.8） */
   --rb-hairline: #e6dfd8;
   --rb-hairline-strong: #d9d0c2;
   --rb-primary: #cc785c;
   --rb-primary-active: #a9583e;
+  --rb-primary-fill: #ad5f45; /* 主按钮实底：白字 4.67:1（#cc785c 上白字仅 3.28:1） */
+  --rb-link: #984c34; /* 文字链：canvas 5.8 / 奶油卡 5.1 / 奶油强 4.7 */
   --rb-on-dark: #faf9f5;
   --rb-on-dark-soft: #a09d96;
   --rb-ok: #2f7d47;
@@ -60,12 +62,12 @@
 .rb-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 18px; box-sizing: border-box; border-radius: 8px; border: 1px solid var(--rb-hairline-strong); background: var(--rb-canvas); color: var(--rb-ink); font: 500 14px var(--rb-sans); white-space: nowrap; box-shadow: var(--rb-shadow-btn); cursor: pointer; transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease, transform .15s ease; }
 .rb-btn:hover:not(:disabled) { background: var(--rb-surface-soft); }
 .rb-btn:active:not(:disabled) { transform: translateY(1px); box-shadow: none; }
-.rb-btn.primary { background: var(--rb-primary); border-color: var(--rb-primary-edge); color: #fff; box-shadow: var(--rb-shadow-primary); }
-.rb-btn.primary:hover:not(:disabled) { background: #c06d52; }
+.rb-btn.primary { background: var(--rb-primary-fill); border-color: var(--rb-primary-active); color: #fff; box-shadow: var(--rb-shadow-primary); }
+.rb-btn.primary:hover:not(:disabled) { background: #a0553c; }
 .rb-btn.primary:active:not(:disabled) { background: var(--rb-primary-active); box-shadow: inset 0 1px 2px rgba(20,20,19,.2); }
 .rb-btn.danger { border-color: #c64545; color: #a83232; }
 .rb-btn.danger:hover:not(:disabled) { background: #fbefec; }
-.rb-link { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 6px; border: 0; border-radius: 6px; background: none; color: var(--rb-primary-active); font: 500 14px var(--rb-sans); white-space: nowrap; cursor: pointer; }
+.rb-link { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 6px; border: 0; border-radius: 6px; background: none; color: var(--rb-link); font: 500 14px var(--rb-sans); white-space: nowrap; cursor: pointer; }
 .rb-link:hover:not(:disabled) { text-decoration: underline; text-underline-offset: 3px; }
 
 /* ── 胶囊与分段 ── */
@@ -96,7 +98,7 @@
 .rb-card.dark .rb-err { color: #f08a8a; }
 .rb-card.dark .rb-btn { background: var(--rb-dark-elevated); border-color: var(--rb-dark-elevated); color: var(--rb-on-dark); box-shadow: none; }
 .rb-card.dark .rb-btn:hover:not(:disabled) { background: #34322d; }
-.rb-card.dark .rb-btn.primary { background: var(--rb-primary); border-color: var(--rb-primary); color: #fff; box-shadow: var(--rb-shadow-primary); }
+.rb-card.dark .rb-btn.primary { background: var(--rb-primary-fill); border-color: var(--rb-primary-fill); color: #fff; box-shadow: var(--rb-shadow-primary); }
 .rb-card.dark .rb-btn.danger { border-color: #c64545; color: #f08a8a; }
 .rb-card.dark .rb-link { color: var(--rb-warn-on-dark); }
 .rb-card.dark .rb-chip { background: var(--rb-dark-elevated); border-color: var(--rb-dark-line); color: var(--rb-on-dark); box-shadow: none; }
@@ -110,9 +112,21 @@
 .rb-check input { width: 16px; height: 16px; margin: 0; accent-color: var(--rb-primary); }
 .rb-card.dark .rb-check { color: var(--rb-on-dark); }
 
-/* ── 禁用 / 焦点 / 减弱动态 ── */
-.rb-btn:disabled, .rb-link:disabled, .rb-chip:disabled, .rb-seg > button:disabled, .rb-check:has(input:disabled) { opacity: .5; cursor: default; }
-.rb-btn:disabled, .rb-chip:disabled { box-shadow: none; }
+/* ── 禁用 / 焦点 / 减弱动态 ──
+ * 禁用不用整体透明度（会把文字压到 2–3:1）：改为明确的禁用配色，文字对比度 ≥4.5:1，指针 not-allowed。 */
+.rb-btn:disabled, .rb-link:disabled, .rb-chip:disabled, .rb-seg > button:disabled, .rb-check:has(input:disabled) { opacity: 1; cursor: not-allowed; }
+.rb-btn:disabled { background: var(--rb-surface-soft); border-color: var(--rb-hairline); color: var(--rb-muted); box-shadow: none; }
+.rb-btn.primary:disabled { background: var(--rb-cream-strong); border-color: var(--rb-hairline-strong); color: #5f5d57; box-shadow: none; }
+.rb-btn.danger:disabled { background: var(--rb-surface-soft); border-color: #e3c3bd; color: #9a3a3a; }
+.rb-link:disabled { color: var(--rb-muted); text-decoration: none; }
+.rb-chip:disabled { box-shadow: none; color: var(--rb-muted); }
+.rb-seg > button:disabled { color: var(--rb-muted); }
+.rb-seg:has(> button:disabled) { background: var(--rb-surface-soft); box-shadow: inset 0 0 0 1px var(--rb-hairline); }
+.rb-check:has(input:disabled) { color: var(--rb-muted); }
+.rb-check input:disabled { opacity: .7; }
+.rb-card.dark .rb-btn:disabled { background: var(--rb-dark-elevated); border-color: var(--rb-dark-line); color: var(--rb-on-dark-soft); }
+.rb-card.dark .rb-btn.primary:disabled { background: #34322d; border-color: #3d3a35; color: var(--rb-on-dark-soft); box-shadow: none; }
+.rb-card.dark .rb-link:disabled { color: var(--rb-on-dark-soft); }
 .rb-btn:focus-visible, .rb-link:focus-visible, .rb-chip:focus-visible, .rb-seg > button:focus-visible, .rb-check input:focus-visible { outline: none; box-shadow: var(--rb-focus); }
 .rb-card.dark :is(.rb-btn, .rb-link, .rb-chip, .rb-seg > button):focus-visible { box-shadow: 0 0 0 2px var(--rb-dark), 0 0 0 4px var(--rb-primary); }
 @media (prefers-reduced-motion: reduce) {

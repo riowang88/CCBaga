@@ -1,7 +1,7 @@
 /*
  * [INPUT]: rb.css 设计令牌（--rb-*，此处带回退值，合并前也可读）与身份页子组件的类名。
- * [OUTPUT]: 身份页专属布局与配色：页头、横幅、工牌三态配色（空=canvas 虚线、当前=深色带「当前」标记、已存=奶油）、卡内主操作+「···」菜单、策略切换片、更多工具分段与分端登录行。
- * [POS]: 由 identities.tsx 引入；style.css 中旧身份规则保留到收尾清理，这里用 .rb-identity 作用域与新类名覆盖，不删旧规则。
+ * [OUTPUT]: 身份页专属布局与配色：页头、横幅、工牌三态配色（空=canvas 虚线、当前=深色带「当前」标记、已存=奶油）、卡内主操作+「···」菜单、浅色系策略切换片（留在工作区=白底实线墨字绿点；跟身份走=淡底虚线弱化字空心点；锁定=虚线弱化字+锁形标记与原因行）、更多工具分段与分端登录行。
+ * [POS]: 由 identities.tsx 引入，在 style.css 之后加载；style.css 仍保留在用的身份卡几何/动画，这里用 .rb-identity 作用域与新类名覆盖其配色。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 .identity-page.rb-identity { display:flex; flex-direction:column; gap:14px; padding:32px 28px; box-sizing:border-box; background:var(--rb-canvas,#faf9f5); color:var(--rb-ink,#141413); }
@@ -48,10 +48,19 @@
 .rb-id-policy-head > h2 { margin:0; font-size:16px; font-weight:500; }
 .rb-id-policy-head > p { margin:0; font-size:13px; }
 .rb-id-chips { display:flex; gap:8px; flex-wrap:wrap; }
-.rb-id-chips .rb-chip { display:inline-flex; align-items:center; gap:8px; }
-.rb-id-chip-dot { width:8px; height:8px; border-radius:50%; background:var(--rb-hairline-strong,#cfc5b4); }
-.rb-id-chips .rb-chip[aria-pressed=true] { background:var(--rb-dark,#181715); border-color:var(--rb-dark,#181715); color:var(--rb-on-dark-soft,#faf9f5); }
-.rb-id-chips .rb-chip[aria-pressed=true] .rb-id-chip-dot { background:var(--rb-ok,#5db872); }
+.rb-id-chips .rb-chip { display:inline-flex; align-items:center; gap:8px; height:40px; box-shadow:none; }
+/* 跟身份走（未按下）：与卡片同色的淡底、虚线描边、弱化文字、空心圆点——明度上低于“留在工作区” */
+.rb-id-chips .rb-chip[aria-pressed=false] { background:transparent; border:1px dashed var(--rb-hairline-strong,#d9d0c2); color:var(--rb-muted,#6c6a64); }
+.rb-id-chips .rb-chip[aria-pressed=false]:hover:not(:disabled) { background:color-mix(in srgb,var(--rb-canvas,#faf9f5) 45%,transparent); color:var(--rb-body,#3d3d3a); }
+.rb-id-chip-dot { width:8px; height:8px; box-sizing:border-box; border-radius:50%; border:1.5px solid var(--rb-muted,#6c6a64); background:transparent; }
+/* 留在工作区（按下）：canvas 白底、实线发丝描边、墨色文字、实心绿点 */
+.rb-id-chips .rb-chip[aria-pressed=true] { background:var(--rb-canvas,#faf9f5); border:1px solid var(--rb-hairline-strong,#d9d0c2); color:var(--rb-ink,#141413); box-shadow:var(--rb-shadow-chip,0 1px 2px rgba(20,20,19,.06)); }
+.rb-id-chips .rb-chip[aria-pressed=true] .rb-id-chip-dot { border-color:var(--rb-ok,#2f7d47); background:var(--rb-ok,#2f7d47); }
+/* 强制锁定（共享开启时的会话历史）：保持留在工作区的白底与绿点，文字降为弱化色、虚线外框、禁止指针；不用整体透明度，保证可读 */
+.rb-id-chips .rb-chip[data-forced] { opacity:1; cursor:not-allowed; border-style:dashed; color:var(--rb-muted,#6c6a64); box-shadow:none; }
+.rb-id-chips .rb-chip[data-forced]::after { content:''; width:9px; height:7px; margin-left:2px; border-radius:1.5px; background:var(--rb-muted,#6c6a64); box-shadow:0 -3px 0 -1px var(--rb-canvas,#faf9f5),0 -4px 0 0 var(--rb-muted,#6c6a64); }
+/* 整体忙碌禁用时：沿用 rb.css 的 .5 透明度，仍可辨认两态 */
+.rb-id-policy-lock { margin:10px 0 0; font-size:12px; }
 
 /* ----- 更多工具分段：子面板沿用旧结构，去掉旧斜纹隔带与左右内边距 ----- */
 .rb-id-tools { padding-top:12px; }

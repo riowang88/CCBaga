@@ -1,0 +1,121 @@
+/**
+ * [INPUT]: docs/DESIGN.md 奶油/珊瑚视觉规范与四张已认可效果图（Main/Network/Identity/Browser）的实测 CSS 数值；src/fonts 内嵌 OFL 字体。
+ * [OUTPUT]: --rb-* 色板/字体变量与共享类契约：rb-page/h1/sub/card(.line/.dark)/label/btn(.primary/.danger)/link/chip/seg/row/mono/muted/ok/warn/err；禁用、键盘焦点与减弱动态。
+ * [POS]: 全部页面共用的设计基础；由 index.css 引入，页面专属布局仍归 style.css；类名与变量名是跨会话契约，改名须同步所有页面。
+ * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+ */
+@font-face { font-family: 'Cormorant Garamond'; font-style: normal; font-weight: 500; font-display: swap; src: url('./fonts/cormorant-garamond-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 400; font-display: swap; src: url('./fonts/inter-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 500; font-display: swap; src: url('./fonts/inter-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 400; font-display: swap; src: url('./fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 500; font-display: swap; src: url('./fonts/jetbrains-mono-latin-500-normal.woff2') format('woff2'); }
+
+:root {
+  --rb-canvas: #faf9f5;
+  --rb-surface-soft: #f5f0e8;
+  --rb-card: #efe9de;
+  --rb-cream-strong: #e8e0d2;
+  --rb-dark: #181715;
+  --rb-dark-elevated: #252320;
+  --rb-ink: #141413;
+  --rb-body: #3d3d3a;
+  --rb-muted: #6c6a64;
+  --rb-hairline: #e6dfd8;
+  --rb-hairline-strong: #d9d0c2;
+  --rb-primary: #cc785c;
+  --rb-primary-active: #a9583e;
+  --rb-on-dark: #faf9f5;
+  --rb-on-dark-soft: #a09d96;
+  --rb-ok: #2f7d47;
+  --rb-warn: #8a6500;
+  --rb-err: #b03a3a;
+  --rb-ok-on-dark: #7fd093;
+  --rb-warn-on-dark: #e8a55a;
+  --rb-serif: 'Cormorant Garamond', 'Noto Serif SC', 'Songti SC', 'STSong', 'SimSun', serif;
+  --rb-sans: 'Inter', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  --rb-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* 效果图中重复出现、但不属于公开色板的派生值 */
+  --rb-primary-edge: #b5664b;
+  --rb-chip-edge: #e0d8ca;
+  --rb-dark-line: #2e2c28;
+  --rb-shadow-btn: 0 1px 0 rgba(20,20,19,.04), 0 1px 3px rgba(20,20,19,.1);
+  --rb-shadow-primary: inset 0 1px 0 rgba(255,255,255,.24), 0 2px 4px rgba(169,88,62,.4);
+  --rb-shadow-chip: 0 1px 2px rgba(20,20,19,.06);
+  --rb-focus: 0 0 0 2px var(--rb-canvas), 0 0 0 4px var(--rb-primary);
+}
+
+/* ── 页面骨架 ── */
+.rb-page { display: flex; flex-direction: column; gap: 16px; padding: 32px 36px; box-sizing: border-box; min-width: 0; font-family: var(--rb-sans); font-size: 14px; line-height: 1.55; color: var(--rb-ink); }
+.rb-page > * { flex-shrink: 0; }
+.rb-h1 { margin: 0; font: 500 36px/1.15 var(--rb-serif); letter-spacing: -.02em; color: var(--rb-ink); }
+.rb-sub { margin: 4px 0 0; color: var(--rb-muted); font-size: 14px; line-height: 1.55; }
+
+/* ── 卡片 ── */
+.rb-card { border-radius: 12px; background: var(--rb-card); padding: 22px 24px; color: var(--rb-ink); min-width: 0; box-sizing: border-box; }
+.rb-card.line { background: var(--rb-canvas); border: 1px solid var(--rb-hairline); }
+.rb-card.dark { background: var(--rb-dark); color: var(--rb-on-dark); }
+.rb-label { margin: 0 0 14px; font-size: 12px; font-weight: 500; letter-spacing: 1.5px; line-height: 1.4; color: var(--rb-muted); }
+
+/* ── 按钮三级 ── */
+.rb-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 18px; box-sizing: border-box; border-radius: 8px; border: 1px solid var(--rb-hairline-strong); background: var(--rb-canvas); color: var(--rb-ink); font: 500 14px var(--rb-sans); white-space: nowrap; box-shadow: var(--rb-shadow-btn); cursor: pointer; transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease, transform .15s ease; }
+.rb-btn:hover:not(:disabled) { background: var(--rb-surface-soft); }
+.rb-btn:active:not(:disabled) { transform: translateY(1px); box-shadow: none; }
+.rb-btn.primary { background: var(--rb-primary); border-color: var(--rb-primary-edge); color: #fff; box-shadow: var(--rb-shadow-primary); }
+.rb-btn.primary:hover:not(:disabled) { background: #c06d52; }
+.rb-btn.primary:active:not(:disabled) { background: var(--rb-primary-active); box-shadow: inset 0 1px 2px rgba(20,20,19,.2); }
+.rb-btn.danger { border-color: #c64545; color: #a83232; }
+.rb-btn.danger:hover:not(:disabled) { background: #fbefec; }
+.rb-link { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 6px; border: 0; border-radius: 6px; background: none; color: var(--rb-primary-active); font: 500 14px var(--rb-sans); white-space: nowrap; cursor: pointer; }
+.rb-link:hover:not(:disabled) { text-decoration: underline; text-underline-offset: 3px; }
+
+/* ── 胶囊与分段 ── */
+.rb-chip { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 16px; box-sizing: border-box; border-radius: 9999px; border: 1px solid var(--rb-chip-edge); background: var(--rb-canvas); color: var(--rb-body); font: 500 14px var(--rb-sans); white-space: nowrap; box-shadow: var(--rb-shadow-chip); cursor: pointer; transition: background-color .15s ease, border-color .15s ease, color .15s ease; }
+.rb-chip:hover:not(:disabled):not([aria-pressed="true"]) { background: var(--rb-surface-soft); }
+.rb-chip[aria-pressed="true"] { background: var(--rb-dark); border-color: var(--rb-dark); color: var(--rb-on-dark); }
+.rb-seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 8px; background: var(--rb-card); }
+.rb-seg > button { height: 34px; padding: 0 14px; border: 0; border-radius: 6px; background: none; color: var(--rb-muted); font: 500 14px var(--rb-sans); white-space: nowrap; cursor: pointer; }
+.rb-seg > button[aria-pressed="true"], .rb-seg > button[aria-selected="true"], .rb-seg > button.on { background: var(--rb-canvas); color: var(--rb-ink); }
+
+/* ── 行 ── */
+.rb-row { display: flex; align-items: center; gap: 16px; padding: 12px 0; border-top: 1px solid var(--rb-hairline); min-width: 0; }
+.rb-row > .k { flex: 0 0 120px; color: var(--rb-muted); }
+.rb-row > .v { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+
+/* ── 文字工具 ── */
+.rb-mono { font-family: var(--rb-mono); font-size: 13px; }
+.rb-muted { color: var(--rb-muted); font-size: 13px; }
+.rb-ok { color: var(--rb-ok); }
+.rb-warn { color: var(--rb-warn); }
+.rb-err { color: var(--rb-err); }
+
+/* ── 深色卡内部自动换色 ── */
+.rb-card.dark .rb-label, .rb-card.dark .rb-muted, .rb-card.dark .rb-sub, .rb-card.dark .rb-row > .k { color: var(--rb-on-dark-soft); }
+.rb-card.dark .rb-row { border-top-color: var(--rb-dark-line); }
+.rb-card.dark .rb-ok { color: var(--rb-ok-on-dark); }
+.rb-card.dark .rb-warn { color: var(--rb-warn-on-dark); }
+.rb-card.dark .rb-err { color: #f08a8a; }
+.rb-card.dark .rb-btn { background: var(--rb-dark-elevated); border-color: var(--rb-dark-elevated); color: var(--rb-on-dark); box-shadow: none; }
+.rb-card.dark .rb-btn:hover:not(:disabled) { background: #34322d; }
+.rb-card.dark .rb-btn.primary { background: var(--rb-primary); border-color: var(--rb-primary); color: #fff; box-shadow: var(--rb-shadow-primary); }
+.rb-card.dark .rb-btn.danger { border-color: #c64545; color: #f08a8a; }
+.rb-card.dark .rb-link { color: var(--rb-warn-on-dark); }
+.rb-card.dark .rb-chip { background: var(--rb-dark-elevated); border-color: var(--rb-dark-line); color: var(--rb-on-dark); box-shadow: none; }
+.rb-card.dark .rb-chip[aria-pressed="true"] { background: var(--rb-on-dark); border-color: var(--rb-on-dark); color: var(--rb-ink); }
+.rb-card.dark .rb-seg { background: var(--rb-dark-elevated); }
+.rb-card.dark .rb-seg > button { color: var(--rb-on-dark-soft); }
+.rb-card.dark .rb-seg > button[aria-pressed="true"], .rb-card.dark .rb-seg > button[aria-selected="true"], .rb-card.dark .rb-seg > button.on { background: #34322d; color: var(--rb-on-dark); }
+
+/* ── 勾选（效果图 .ck） ── */
+.rb-check { display: inline-flex; align-items: center; gap: 8px; color: var(--rb-body); cursor: pointer; }
+.rb-check input { width: 16px; height: 16px; margin: 0; accent-color: var(--rb-primary); }
+.rb-card.dark .rb-check { color: var(--rb-on-dark); }
+
+/* ── 禁用 / 焦点 / 减弱动态 ── */
+.rb-btn:disabled, .rb-link:disabled, .rb-chip:disabled, .rb-seg > button:disabled, .rb-check:has(input:disabled) { opacity: .5; cursor: default; }
+.rb-btn:disabled, .rb-chip:disabled { box-shadow: none; }
+.rb-btn:focus-visible, .rb-link:focus-visible, .rb-chip:focus-visible, .rb-seg > button:focus-visible, .rb-check input:focus-visible { outline: none; box-shadow: var(--rb-focus); }
+.rb-card.dark :is(.rb-btn, .rb-link, .rb-chip, .rb-seg > button):focus-visible { box-shadow: 0 0 0 2px var(--rb-dark), 0 0 0 4px var(--rb-primary); }
+@media (prefers-reduced-motion: reduce) {
+  .rb-btn, .rb-chip { transition: none; }
+  .rb-btn:active:not(:disabled) { transform: none; }
+}

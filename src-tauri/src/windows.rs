@@ -643,6 +643,7 @@ fn snapshot() -> Value {
         "timezones": timezones(),
         "automatic_timezone": null,
         "languages": [ui_display_language()],
+        "locale": locale(),
         "location_enabled": location_enabled(),
         "accessibility": false
     })

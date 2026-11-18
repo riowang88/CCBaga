@@ -1,5 +1,5 @@
 <!--
-[INPUT]: 原创项目 MIT 授权、现有 Chromium 许可与本地 UI 与 AI SVG 来源记录。
+[INPUT]: 原创项目 MIT 授权、现有 Chromium 许可与本地 UI、AI SVG 与内嵌 OFL 字体来源记录。
 [OUTPUT]: 英文第三方归属和分发边界；未发现的许可不推断为 MIT。
 [POS]: LICENSE 的第三方补充说明，供 README 和发布包引用。
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -21,6 +21,10 @@ The browser bundle contains Chromium and additional dependencies with their own 
 ## AI tool icons
 
 The five SVG icons in `assets/ai-icons` are unchanged graphics from [LobeHub lobe-icons](https://github.com/lobehub/lobe-icons), pinned to commit `c385b2b8d1f9e19aa86e628d4e23c91ee1111a47`. They identify General (LobeHub mark), Codex, Cursor, OpenCode and GitHub Copilot. The upstream MIT notice is retained in [LICENSE.lobehub.txt](assets/ai-icons/LICENSE.lobehub.txt) and bundled in the app's license resources. Brand marks remain the property of their owners and do not imply endorsement.
+
+## Bundled fonts
+
+The interface embeds Latin subsets (WOFF2, from the `@fontsource` 5.3.0 npm packages) of [Cormorant Garamond](https://github.com/CatharsisFonts/Cormorant) 500, [Inter](https://github.com/rsms/inter) 400/500 and [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) 400/500 in `src/fonts`. All three are licensed under the SIL Open Font License 1.1; the full texts are kept beside the files as `src/fonts/OFL-*.txt`. Chinese text is not embedded: it uses a locally installed Noto Serif SC / Noto Sans SC when present and otherwise the system Songti / PingFang fonts.
 
 ## Application dependencies
 

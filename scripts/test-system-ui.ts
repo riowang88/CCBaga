@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 隔离 Playwright 引擎、Vite 与电脑环境页虚构 IPC（tests/system.html）。
- * [OUTPUT]: 电脑环境页基本回归：真实外壳下页面内距与无横向溢出、13 项地区、「同步本机 B 浏览器指纹」标签与说明（aria-describedby）、勾选后命令顺序（B 运行时先换指纹再重开）、英文界面。
+ * [OUTPUT]: 电脑环境页基本回归：真实外壳下页面内距与无横向溢出、13 项地区、「同时更换 B 浏览器指纹」标签与说明（aria-describedby）、勾选后命令顺序（B 运行时先换指纹再重开）、英文界面。
  * [POS]: 共用 UI 回归的一部分，不截图、不修改本机、不访问外部服务。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -22,11 +22,11 @@ export async function testSystemUi(browser:Browser,base:string) {
   assert.equal(await chips.count(),13);
   await page.getByRole('button',{name:'新加坡',exact:true,pressed:true}).waitFor();
   // ----- 勾选项说明对象 -----
-  const sync=page.getByRole('checkbox',{name:'同步本机 B 浏览器指纹'});
+  const sync=page.getByRole('checkbox',{name:'同时更换 B 浏览器指纹'});
   assert.equal(await sync.isChecked(),false);
-  assert.equal(await page.getByRole('checkbox',{name:'同步浏览器指纹',exact:true}).count(),0);
+  assert.equal(await page.getByRole('checkbox',{name:/同步/}).count(),0);
   const note=await sync.getAttribute('aria-describedby');
-  assert.match(await page.locator('#'+note).innerText(),/换新指纹.*语言时区.*先退出再重开/s);
+  assert.match(await page.locator('#'+note).innerText(),/新的随机指纹.*语言和时区.*先退出再重开/s);
   // ----- B 运行中：设置地区 → 读 B → 换指纹 → 重开 B -----
   await page.evaluate(()=>{(window as any).systemFixture.browserRunning=true;});
   await sync.check();
@@ -38,7 +38,7 @@ export async function testSystemUi(browser:Browser,base:string) {
   assert.deepEqual(commands[2].args,{region:'jp'});
   // ----- 英文界面 -----
   await page.evaluate(()=>(window as any).systemFixture.language('en'));
-  await page.getByRole('checkbox',{name:'Sync the local B browser fingerprint'}).waitFor();
+  await page.getByRole('checkbox',{name:'Also change the B browser fingerprint'}).waitFor();
   assert.deepEqual(errors,[]);
   return 6;
  } finally {await context.close();}

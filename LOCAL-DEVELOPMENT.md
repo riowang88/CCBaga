@@ -44,3 +44,14 @@
 
 
 2026-10-28 发布返修：用户明确 GitHub Releases 下载交付，CI 显式 CC_MACOS_SIGNING_MODE=adhoc。Apple 公证不再是本模式前提，更新签名、安装包完整性和跨平台验收仍必需；安装说明公开未公证和首次打开可能被系统拦截。完整 UI 旧名称/按钮/悬停断言已按既有契约修正，75项全部通过。发布装配4项、凭据隔离/模式回归、既有签名与安装边界通过，前端构建与单元测试通过。此次无应用业务逻辑变化，macOS Apple 公证结果明确未验证/未请求，Windows/Linux实际安装交CI发布验收。
+
+## RioBaga 界面重构收尾验证（2026-11-18）
+
+范围：傻瓜设置删除、侧栏改为电脑环境→网络环境→Claude 身份→浏览器环境→使用说明、网络页纯检测（含 WebRTC/UDP，固定公共 STUN）、身份页重排、导出跳过本机符号链接与导入冲突前移、奶油/珊瑚视觉（docs/DESIGN.md，1040×820）、产品显示名 RioBaga-A/B 之后的收尾清理：YAML 删除 306 条无引用旧键（1714→1407，zh/en 键集合一致）、删除未引用的 assets/ai-icons 及其许可登记、更新各层 CLAUDE.md 与 README/使用说明。
+
+验证：`bun run build` 通过；`bun test src` 34 通过；`bun run test:identities` 111 项通过（修复开发服务器监听后连续 5 次全部通过）；`cargo test --locked --manifest-path src-tauri/Cargo.toml --features custom-protocol` 235 通过、6 忽略、0 失败。
+
+偶发失败根因：`scripts/test-identities-ui.ts` 内嵌的 Vite 开发服务器监听整个仓库，测试期间仓库内任何文件（含 README/docs 等非模块文件）变动都会触发页面整页重载，打断进行中的点击与计数断言（受控实验：测试中 touch README.md 必失败，关闭监听与 HMR 后同样操作通过）。已对该脚本与 test-identity-regressions.ts 设置 `watch:null,hmr:false`。
+
+已知未验证/未处理：未做真实窗口人工视觉验收；未在 Windows/Linux 实机运行；YAML 死键判定基于静态搜索，动态拼接键拿不准则保留，英文界面完整性只静态核对了 `t('字面量')` 调用，未逐页点击实测；scripts/test-identity-regressions.ts 有 4 组（policy/selection/status-labels/client-materials）因身份页重排后的旧选择器失败，该脚本不在 `bun run test:identities` 与 CI 内，本轮未修复。
+

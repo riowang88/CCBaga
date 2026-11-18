@@ -83,7 +83,6 @@ def main():
             assert len(pages)==1,'Expected exactly one embedded browser page'
             verify_browser_ui(pages[0].parent)
             assert any(folder.rglob('browser.ico')),'Missing companion icon'
-            assert any(folder.rglob('LICENSE.lobehub.txt')),'Missing icon license'
             return engine
         def assets():
             assert profile.read_bytes()==b'keep-profile'

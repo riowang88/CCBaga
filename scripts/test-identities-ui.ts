@@ -22,7 +22,8 @@ import {testClaudeResidue} from './test-claude-residue.ts';
 import {testIdentityTransfer} from './test-identity-transfer.ts';
 import {testIdentityOperation} from './test-identity-operation.ts';
 const engine=process.platform==='darwin'?'Browser.app/Contents/MacOS/Chromium':process.platform==='win32'?'WindowsBrowser/chrome.exe':'LinuxBrowser/chrome';
-const server=await createServer({server:{host:'127.0.0.1',port:0,strictPort:false,watch:{ignored:['**/src-tauri/**','**/browser-runtime/**','**/releases/**','**/dist/**']}},optimizeDeps:{include:['@tauri-apps/api/mocks']}});
+// 关闭文件监听与 HMR：测试期间仓库内任何文件（含文档）变动都会让开发服务器整页重载，打断进行中的点击/计数断言。
+const server=await createServer({server:{host:'127.0.0.1',port:0,strictPort:false,watch:null,hmr:false},optimizeDeps:{include:['@tauri-apps/api/mocks']}});
 await server.listen();
 const address=server.httpServer!.address() as {port:number};
 const base=`http://127.0.0.1:${address.port}`;

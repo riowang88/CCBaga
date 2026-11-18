@@ -18,10 +18,6 @@ The browser bundle contains Chromium and additional dependencies with their own 
 
 `vendor/cromma-ui` is a local copy of Cromma UI, including its Pika icon subset. The copied tree does not currently contain an independent upstream license notice. Confirm its redistribution terms and restore any required notices before publishing these components. The top-level MIT declaration is not evidence of permission from other copyright holders.
 
-## AI tool icons
-
-The five SVG icons in `assets/ai-icons` are unchanged graphics from [LobeHub lobe-icons](https://github.com/lobehub/lobe-icons), pinned to commit `c385b2b8d1f9e19aa86e628d4e23c91ee1111a47`. They identify General (LobeHub mark), Codex, Cursor, OpenCode and GitHub Copilot. The upstream MIT notice is retained in [LICENSE.lobehub.txt](assets/ai-icons/LICENSE.lobehub.txt) and bundled in the app's license resources. Brand marks remain the property of their owners and do not imply endorsement.
-
 ## Bundled fonts
 
 The interface embeds Latin subsets (WOFF2, from the `@fontsource` 5.3.0 npm packages) of [Cormorant Garamond](https://github.com/CatharsisFonts/Cormorant) 500, [Inter](https://github.com/rsms/inter) 400/500 and [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) 400/500 in `src/fonts`. All three are licensed under the SIL Open Font License 1.1; the full texts are kept beside the files as `src/fonts/OFL-*.txt`. Chinese text is not embedded: it uses a locally installed Noto Serif SC / Noto Sans SC when present and otherwise the system Songti / PingFang fonts.

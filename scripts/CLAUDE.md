@@ -75,3 +75,5 @@ test-identity-regressions.ts 新增受控登录的显式确认/取消/结果与�
 test-identity-regressions.ts 覆盖CLI/App名称、CLI订阅说明、登录前进程列表/未知/刷新为空，保留显式授权、取消和单端备份范围。
 
 test-desktop-sessions.ts: 虚构 IPC 验证默认关闭、开启保留历史/持久化、显式同步数量、失败与关闭后保留历史、英文显示；由 test-identities-ui.ts 调用。
+
+test-identities-ui.ts / test-identity-regressions.ts: 内嵌 Vite 开发服务器设置 watch:null、hmr:false；否则测试期间仓库内任何文件变动都会整页重载并打断断言。test-identity-regressions.ts 的 policy/selection/status-labels/client-materials 四组仍用重排前的选择器（不在 test:identities 与 CI 内），待单独修复。

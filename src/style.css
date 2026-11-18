@@ -9,9 +9,6 @@
   /* Cromma 色板映射在 index.css；此处只保留页面几何/细线令牌，颜色取自 --rb-* */
   --landing-band: 16px;
   --landing-line: var(--rb-hairline);
-  --landing-hatch-line: color-mix(in srgb, var(--rb-ink) 12%, transparent);
-  --landing-hatch: repeating-linear-gradient(-45deg, transparent 0 5px, var(--landing-hatch-line) 5px 6px);
-  --landing-dots: radial-gradient(color-mix(in srgb, var(--rb-muted) 20%, transparent) 1px, transparent 1px);
   --panel-header-height: 48px;
   --panel-header-title-size: 13px;
   --panel-header-title-weight: 600;

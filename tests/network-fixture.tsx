@@ -17,7 +17,7 @@ let mode='success';
 let release=()=>{};
 const commands:{command:string;args:unknown}[]=[];
 const browser:BrowserState={ui_language:'zh',exit_services:[],region:{id:'us',label:'美国',country:'US',language:'en-US',locale:'en_US',timezone:'America/New_York'},config:{seed:123,proxy:'',follow_machine:true,language:'en-US',timezone:'America/New_York',native_graphics:true},machine:{platform:'macos',version:'fixture',cores:8,timezone:'America/New_York',languages:['en-US'],locale:'en_US',locale_country:'US',location_enabled:false,timezones:['America/New_York']},engine_version:'fixture',engine_ready:true,running:false,profile:'/fixture/profiles/current',identity_linked:true,cache:[],cache_error:'',report:null,report_received_at:null,machine_exit:null,dns_last:null,
- checks:[{title:'时区一致',status:'ok',detail:'本机：America/New_York；浏览器：待测；出口：待测'},{title:'目标语言与系统区域',status:'mismatch',detail:'fixture mismatch'},{title:'DNS / WebRTC 泄漏',status:'pending',detail:'fixture pending'}]};
+ checks:[{title:'时区一致',status:'ok',detail:'本机：America/New_York；浏览器：待测；出口：待测'},{title:'目标语言与系统区域',status:'mismatch',detail:'fixture mismatch'},{title:'WebRTC / UDP 出口',status:'pending',detail:'fixture pending'}]};
 
 // 视觉核对用：填入与真实机器同量级的数据（12 项一致性、6 个解析器、长运营商名），再跑一次检测。
 function demo(){

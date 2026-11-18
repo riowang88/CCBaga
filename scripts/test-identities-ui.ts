@@ -1,6 +1,6 @@
 /**
  * [INPUT]: Node.js 标准管道、已锁定 playwright-core、固定引擎、Vite 与 tests/ 的虚构 Tauri IPC。
- * [OUTPUT]: 桌面会话共享开关/同步、工牌、浏览器/网络与全清理确认、残留清理与真实 Channel 阶段动画的 DOM 验收，覆盖双语、默认取消及失败重扫。
+ * [OUTPUT]: 桌面会话共享开关/同步、工牌、浏览器/网络与全清理确认、残留清理与真实 Channel 阶段动画的 DOM 验收，覆盖双语、默认取消及失败重扫；身份页卡片「···」菜单与「更多工具」分段键盘可达、常驻策略切换片与恢复时策略写回本机。
  * [POS]: 发布前无头行为回归；无截图、无真实账号/文件修改，不加载原生宿主，不允许外网请求。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -41,23 +41,34 @@ try{
  const page=await context.newPage();page.setDefaultTimeout(10000);
  const errors:string[]=[];page.on('console',message=>{if(message.type()==='error')console.error(message.text());});page.on('pageerror',error=>{errors.push(error.message);console.error(error.message);});
  await page.goto(base+'/tests/identities.html');
- await page.getByText('登录与备份').waitFor();
- await page.getByText('查看本机数据',{exact:true}).click();
- assert.match(await page.locator('.identity-client-status').innerText(),/发现数据不代表已经登录/);
+ await page.getByRole('tab',{name:'分端登录与更新',exact:true}).waitFor();
+ // 「查看本机数据」折叠块已删除；分端登录段直接显示「数据不代表登录」提示。
+ assert.equal(await page.getByText('查看本机数据',{exact:true}).count(),0);
+ assert.match(await page.locator('.rb-id-clients').innerText(),/发现数据不代表已经登录/);
  const cards=page.locator('.identity-card');
  await page.locator('.identity-card-rail').getByText('fixture@example.invalid',{exact:true}).waitFor();
  // 用量在工牌内：只有页头一个「刷新」，点击后先读本地状态再读每个账号用量；已过重置时间显示「已重置」。
  assert.equal(await page.locator('.identity-usage').count(),0);
  assert.equal(await page.getByRole('button',{name:/^刷新/}).count(),1);
  assert.equal(await page.locator('.identity-card:not(.empty) .card-usage').count(),await cards.count()-1);
- await page.locator('.cleanup-title').getByRole('button',{name:'刷新'}).click();
+ await page.locator('.rb-id-head').getByRole('button',{name:'刷新'}).click();
  const savedCard=page.locator('.identity-card:not(.empty):not(.current)').first();
  await savedCard.locator('.card-usage-meter').first().waitFor();
  assert.match(await savedCard.locator('.card-usage').innerText(),/已重置[\s\S]*41%/);
  await page.locator('.identity-card.current .card-usage-meter').first().waitFor();
- await page.locator('.cleanup-title').getByRole('button',{name:'刷新'}).and(page.locator(':not([disabled])')).waitFor();
+ await page.locator('.rb-id-head').getByRole('button',{name:'刷新'}).and(page.locator(':not([disabled])')).waitFor();
  assert.equal(await cards.count(),41);assert.equal(await cards.first().getByRole('heading').innerText(),'空身份');
  assert.equal(await page.locator('.identity-switcher').count(),0);
+ // 「···」菜单与「更多工具」分段均可键盘操作：Enter 打开菜单、Esc 关闭；方向键切换分段且一次只显示一段。
+ const menuTrigger=page.locator('.identity-card.current').getByRole('button',{name:/^更多操作/});
+ await menuTrigger.focus();await page.keyboard.press('Enter');await page.getByRole('menuitem',{name:'直接删除',exact:true}).waitFor();
+ await page.keyboard.press('Escape');await page.getByRole('menu').waitFor({state:'detached'});
+ await page.waitForFunction(()=>document.activeElement?.getAttribute('aria-haspopup')==='menu');
+ const firstTab=page.getByRole('tab',{name:'分端登录与更新',exact:true});
+ await firstTab.focus();await page.keyboard.press('ArrowRight');
+ assert.equal(await page.getByRole('tab',{selected:true}).count(),1);assert.equal(await firstTab.getAttribute('aria-selected'),'false');
+ assert.equal(await page.getByRole('tabpanel').count(),1);
+ await page.keyboard.press('Home');assert.equal(await firstTab.getAttribute('aria-selected'),'true');checks++;
  assert.equal(await page.getByText('上次使用',{exact:true}).count(),0);
  // 已保存的当前档案保留原名称，并且只出现一次，不能再生成一张暂存卡。
  assert.equal(await cards.filter({has:page.getByRole('heading',{name:'Identity 1',exact:true})}).count(),1);
@@ -65,15 +76,15 @@ try{
  assert.match(await cards.first().innerText(),/清空本地登录身份/);checks++;
  const geometry=await cards.evaluateAll(nodes=>nodes.slice(0,3).map(node=>{const r=node.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};}));
  assert.equal(geometry[0].y,geometry[2].y);assert(geometry[2].x+geometry[2].width<1040-150);assert(Math.abs(geometry[0].width/geometry[0].height-54/85.6)<.01);checks++;
- assert.equal(await page.getByRole('checkbox',{name:'联动浏览器',exact:true}).isChecked(),true);
- await page.getByRole('checkbox',{name:'联动浏览器',exact:true}).click();
+ assert.equal(await page.getByRole('checkbox',{name:'浏览器资料随身份切换',exact:true}).isChecked(),true);
+ await page.getByRole('checkbox',{name:'浏览器资料随身份切换',exact:true}).click();
  let linking=page.getByRole('dialog');await linking.waitFor();
  await linking.getByRole('button',{name:'取消',exact:true}).click();
- assert.equal(await page.getByRole('checkbox',{name:'联动浏览器',exact:true}).isChecked(),true);
- await page.getByRole('checkbox',{name:'联动浏览器',exact:true}).click();
+ assert.equal(await page.getByRole('checkbox',{name:'浏览器资料随身份切换',exact:true}).isChecked(),true);
+ await page.getByRole('checkbox',{name:'浏览器资料随身份切换',exact:true}).click();
  await page.getByRole('dialog').getByRole('button',{name:'确认',exact:true}).click();
  await page.waitForFunction(()=>(window as any).identityFixture.state.browser.enabled===false);
- await page.getByRole('checkbox',{name:'联动浏览器',exact:true}).click();
+ await page.getByRole('checkbox',{name:'浏览器资料随身份切换',exact:true}).click();
  linking=page.getByRole('dialog');
  assert.equal(await linking.getByRole('checkbox',{name:'将现有浏览器资料关联给当前身份'}).isChecked(),false);
  await linking.getByRole('button',{name:'确认',exact:true}).click();
@@ -91,7 +102,7 @@ try{
  await rail.evaluate(node=>{node.scrollLeft=0;});
  await page.waitForFunction(()=>document.querySelector('.identity-card-rail')!.scrollLeft<1);
  await page.mouse.move(10,10);
- await current.getByRole('button',{name:'直接删除',exact:true}).click();
+ await current.getByRole('button',{name:/^更多操作/}).click();await page.getByRole('menuitem',{name:'直接删除',exact:true}).click();
   let dialog=page.getByRole('alertdialog');await dialog.waitFor();
  assert.match(await dialog.innerText(),/不可撤销/);assert.equal(await dialog.getByRole('button',{name:'确认直接删除'}).isEnabled(),false);
  assert.equal(await dialog.getByRole('button',{name:'取消'}).evaluate(node=>node===document.activeElement),true);
@@ -111,8 +122,9 @@ try{
  await dialog.getByRole('button',{name:'确认保存备份',exact:true}).click();
  await page.waitForFunction(()=>((window as any).identityFixture.commands as any[]).some(row=>row.command==='identities_save'));
  assert.equal(await page.evaluate(()=>(window as any).identityFixture.state.current.present),true);checks++;
- await page.getByText('切换账号时保持不变的内容',{exact:true}).click();
- await page.getByRole('checkbox',{name:'Skills 与命令'}).uncheck();
+ // 保留策略常驻卡片下方，不再需要展开；切换片用 aria-pressed 表示留在工作区。
+ const skills=page.getByRole('button',{name:'Skills 与命令',exact:true});
+ assert.equal(await skills.getAttribute('aria-pressed'),'true');await skills.click();assert.equal(await skills.getAttribute('aria-pressed'),'false');
  await cards.first().getByRole('button',{name:'使用空身份'}).click();
  dialog=page.getByRole('dialog');await dialog.waitFor();
  assert.equal(await dialog.getByLabel('首次保存当前身份为').count(),0);
@@ -127,16 +139,16 @@ try{
  await page.getByRole('dialog').getByRole('button',{name:'保存当前身份并切换'}).click();await page.locator('.identity-card-rail').getByText('Fixture team',{exact:true}).waitFor();checks++;
  assert.equal(await target.count(),0);checks++;
  const bound=cards.filter({has:page.getByRole('heading',{name:'Identity 1',exact:true})});
- await bound.getByRole('button',{name:'删除',exact:true}).click();
+ await bound.getByRole('button',{name:/^更多操作/}).click();await page.getByRole('menuitem',{name:'删除',exact:true}).click();
  const browserDeletion=page.getByRole('alertdialog');
  assert.equal(await browserDeletion.getByRole('checkbox',{name:'同时永久删除关联浏览器资料'}).isChecked(),false);
  await browserDeletion.getByRole('button',{name:'取消',exact:true}).click();checks++;
  const other=page.locator('.identity-card:not(.current)').filter({has:page.getByRole('heading',{name:'Identity 4',exact:true})});
- await other.getByRole('button',{name:'重命名',exact:true}).click();
+ await other.getByRole('button',{name:/^更多操作/}).click();await page.getByRole('menuitem',{name:'重命名',exact:true}).click();
  await page.getByRole('dialog').getByRole('textbox',{name:'身份名称'}).fill('Renamed fixture');
  await page.getByRole('dialog').getByRole('button',{name:'保存',exact:true}).click();
  const renamed=cards.filter({has:page.getByRole('heading',{name:'Renamed fixture',exact:true})});await renamed.waitFor();
- await renamed.getByRole('button',{name:'删除',exact:true}).click();dialog=page.getByRole('alertdialog');
+ await renamed.getByRole('button',{name:/^更多操作/}).click();await page.getByRole('menuitem',{name:'删除',exact:true}).click();dialog=page.getByRole('alertdialog');
  await dialog.getByRole('checkbox',{name:'我知道此操作无法撤销'}).check();
  await dialog.getByRole('button',{name:'确认直接删除'}).click();await renamed.waitFor({state:'detached'});
  assert.equal(await page.evaluate(()=>(window as any).identityFixture.state.current.present),true);checks++;
@@ -146,16 +158,19 @@ try{
  await cards.first().getByRole('button',{name:'Use empty identity'}).click();
  await page.getByRole('dialog').getByRole('button',{name:'Save current identity & switch'}).click();
  await page.getByText(/fixture operation failed/).first().waitFor();assert.equal(await page.evaluate(()=>(window as any).identityFixture.state.current.present),true);checks++;
- await page.evaluate(()=>{(window as any).identityFixture.recover();});
+ await page.evaluate(()=>{const f=(window as any).identityFixture;f.recover();const r=f.state.records.find((row:any)=>row.id===f.state.recovery);r.policy={...r.policy,skills:true,cache:true,history:true};});
  await page.getByRole('button',{name:'Refresh',exact:true}).click();
  await page.getByRole('button',{name:'Restore previous identity',exact:true}).click();
+ // 恢复采用旧档案策略时同步写回本机持久化，重开页面不会回到旧选择。
+ const [stored,recorded]=await page.evaluate(()=>{const f=(window as any).identityFixture.state;return [JSON.parse(localStorage.getItem('ccbaga.identity-policy.v1')!),f.records.find((r:any)=>r.id===f.recovery).policy];});
+ assert.deepEqual(stored,recorded);checks++;
  await page.getByRole('dialog').getByRole('button',{name:'Restore'}).click();
  await page.waitForFunction(()=>(window as any).identityFixture.state.recovery===null);checks++;
  await page.emulateMedia({reducedMotion:'reduce'});
  await page.mouse.move(10,10);await page.waitForTimeout(250);
  const before=await current.getAttribute('style');await current.hover();await page.waitForTimeout(150);
  assert.equal(await current.getAttribute('style'),before);checks++;
- await current.getByRole('button',{name:'Delete permanently',exact:true}).click();dialog=page.getByRole('alertdialog');
+ await current.getByRole('button',{name:/^More actions/}).click();await page.getByRole('menuitem',{name:'Delete permanently',exact:true}).click();dialog=page.getByRole('alertdialog');
  await dialog.getByRole('checkbox',{name:'I understand this cannot be undone'}).check();
  const count=await page.evaluate(()=>(window as any).identityFixture.state.records.length);
  await dialog.getByRole('button',{name:'Confirm deletion',exact:true}).click();

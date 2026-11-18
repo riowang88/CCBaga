@@ -24,6 +24,7 @@ export async function testClaudeResidue(browser:Browser,base:string) {
  let checks=0;
  try {
   await page.goto(base+'/tests/identities.html');
+  await page.getByRole('tab',{name:'文件残留',exact:true}).click();
   const panel=page.locator('.claude-residue');
   const scan=()=>panel.getByRole('button',{name:/^(检查残留|重新检查)$/});
   const clean=()=>panel.getByRole('button',{name:'清理所选',exact:true});

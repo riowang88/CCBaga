@@ -1212,7 +1212,12 @@
 "我会妥善保管迁移文件和密码": "I will keep the transfer file and password private"
 
 "迁移身份元数据无效。": "Invalid identity transfer metadata."
-"此账号已在身份保险库中；未覆盖现有身份。": "This account already exists in the vault. The existing identity was not overwritten."
+"已保存身份「{v0}」是同一账号；未覆盖，导入已停止。可删除该身份后重新导入，或直接使用它。": "The saved identity \"{v0}\" is the same account. Nothing was overwritten and the import stopped. Delete that identity and import again, or use it directly."
+"迁移包的浏览器指纹种子已被已保存身份「{v0}」使用；未覆盖，导入已停止。可删除该身份后重新导入，或直接使用它。": "The browser fingerprint seed in this package is already used by the saved identity \"{v0}\". Nothing was overwritten and the import stopped. Delete that identity and import again, or use it directly."
+"迁移包的浏览器指纹种子已被本机另一份浏览器资料使用；未覆盖，导入已停止。": "The browser fingerprint seed in this package is already used by another local browser profile. Nothing was overwritten and the import stopped."
+"正在检查本机是否已有同账号或同浏览器指纹。": "Checking for an existing identity with the same account or browser fingerprint."
+"本机没有同账号或同浏览器指纹。": "No identity with the same account or browser fingerprint exists on this computer."
+"检查重复身份": "Check for duplicates"
 "无法读取迁移浏览器配置。": "Cannot read browser settings for transfer."
 "迁移浏览器配置无效。": "Invalid browser settings for transfer."
 "迁移浏览器绑定无效。": "Invalid browser transfer binding."

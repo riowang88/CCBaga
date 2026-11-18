@@ -12,16 +12,17 @@ export async function testDesktopSessions(browser:Browser,base:string){
  const page=await context.newPage();page.setDefaultTimeout(10000);
  try{
   await page.goto(base+'/tests/identities.html');
-  await page.locator('.identity-policy summary').click();
+  await page.getByRole('tab',{name:'桌面会话共享',exact:true}).click();
   const share=page.getByRole('checkbox',{name:'跨账号共享桌面 Code 会话',exact:true});
-  const history=page.getByRole('checkbox',{name:'会话历史',exact:true});
+  const history=page.getByRole('button',{name:'会话历史',exact:true});
+  const pressed=async()=>await history.getAttribute('aria-pressed')==='true';
   const sync=page.getByRole('button',{name:'同步桌面会话',exact:true});
   assert.equal(await share.isChecked(),false);assert.equal(await sync.isDisabled(),true);
-  await share.click();assert.equal(await history.isChecked(),true);assert.equal(await history.isDisabled(),true);
+  await share.click();assert.equal(await pressed(),true);assert.equal(await history.isDisabled(),true);
   assert.equal(await page.evaluate(()=>(window as any).identityFixture.commands.length),0);
   await sync.click();await page.getByRole('status').filter({hasText:'新增 3 个入口，更新 2 个会话'}).waitFor();
   assert.equal(await page.evaluate(()=>(window as any).identityFixture.commands.filter((r:any)=>r.command==='identities_sync_desktop_sessions').length),1);
-  await page.reload();await page.locator('.identity-policy summary').click();assert.equal(await share.isChecked(),true);
+  await page.reload();await page.getByRole('tab',{name:'桌面会话共享',exact:true}).click();assert.equal(await share.isChecked(),true);
   await page.evaluate(()=>(window as any).identityFixture.setFailure('identities_sync_desktop_sessions'));
   await sync.click();await page.getByRole('alert').filter({hasText:'fixture operation failed'}).waitFor();
   assert.equal(await page.getByRole('status').filter({hasText:'新增 3 个入口'}).count(),0);
@@ -44,8 +45,8 @@ export async function testDesktopSessions(browser:Browser,base:string){
   await page.waitForFunction(()=>(window as any).identityFixture.sessionConflict===false);
   assert.equal(await page.evaluate(()=>(window as any).identityFixture.commands.filter((r:any)=>r.command==='identities_switch').at(-1).args.sessionChoices[0].cli_id),'branch-b');
   await page.getByRole('status').filter({hasText:'身份切换完成。'}).waitFor();
-  await share.click();assert.equal(await history.isChecked(),true);assert.equal(await history.isDisabled(),false);assert.equal(await sync.isDisabled(),true);
-  await page.reload();await page.locator('.identity-policy summary').click();assert.equal(await share.isChecked(),false);
+  await share.click();assert.equal(await pressed(),true);assert.equal(await history.isDisabled(),false);assert.equal(await sync.isDisabled(),true);
+  await page.reload();await page.getByRole('tab',{name:'桌面会话共享',exact:true}).click();assert.equal(await share.isChecked(),false);
   await page.evaluate(()=>(window as any).identityFixture.language('en'));
   await page.getByRole('checkbox',{name:'Share desktop Code sessions across accounts',exact:true}).waitFor();
   return 12;

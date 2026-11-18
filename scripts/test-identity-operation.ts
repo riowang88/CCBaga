@@ -71,6 +71,7 @@ export async function testIdentityOperation(browser:Browser,base:string) {
   await page.waitForFunction(()=>(window as any).identityFixture.state.current.present);checks++;
 
   // ----- 清理和复查共用同一进度块；清理返回不等于整项操作已完成 -----
+  await page.getByRole('tab',{name:'文件残留',exact:true}).click();
   const residue=page.locator('.claude-residue');
   await residue.getByRole('button',{name:'检查残留',exact:true}).click();
   await residue.getByRole('checkbox',{name:/^虚构缓存 · /}).waitFor();

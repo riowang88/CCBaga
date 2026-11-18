@@ -21,10 +21,10 @@ export async function testIdentityTransfer(browser:Browser,base:string){
   await current.getByRole('button',{name:'更新备份',exact:true}).click();
   let dialog=page.getByRole('dialog');await dialog.getByText('进程状态未知；执行前将重新核验。',{exact:true}).waitFor();
   assert.equal(await dialog.getByText('未检测到 Claude 进程。',{exact:true}).count(),0);await dialog.getByRole('button',{name:'取消',exact:true}).click();checks++;
-  await current.getByRole('button',{name:'导出保存备份',exact:true}).click();dialog=page.getByRole('dialog');await dialog.getByText('备份时间',{exact:true}).waitFor();assert.equal(await dialog.getByText('此备份未关联浏览器配置。',{exact:true}).count(),1);await dialog.getByRole('button',{name:'取消',exact:true}).click();checks++;
+  await current.getByRole('button',{name:/^更多操作/}).click();await page.getByRole('menuitem',{name:'导出保存备份',exact:true}).click();dialog=page.getByRole('dialog');await dialog.getByText('备份时间',{exact:true}).waitFor();assert.equal(await dialog.getByText('此备份未关联浏览器配置。',{exact:true}).count(),1);await dialog.getByRole('button',{name:'取消',exact:true}).click();checks++;
   await page.evaluate(()=>{(window as any).identityFixture.state.browser.bound_ids.push('00000000000000000000000000000002');});await page.getByRole('button',{name:'刷新',exact:true}).click();
   const saved=page.locator('.identity-card').filter({has:page.getByRole('heading',{name:'Identity 2',exact:true})});
-  await saved.getByRole('button',{name:'导出身份 Identity 2',exact:true}).click();dialog=page.getByRole('dialog');
+  await saved.getByRole('button',{name:/^更多操作/}).click();await page.getByRole('menuitem',{name:'导出身份 Identity 2',exact:true}).click();dialog=page.getByRole('dialog');
   const submit=dialog.getByRole('button',{name:'加密导出',exact:true});assert.equal(await submit.isEnabled(),false);
   await page.evaluate(()=>{(window as any).identityFixture.transfer.cancel=true;});
   await dialog.getByRole('button',{name:'选择保存位置',exact:true}).click();assert.equal(await dialog.getByText('尚未选择文件',{exact:true}).count(),1);

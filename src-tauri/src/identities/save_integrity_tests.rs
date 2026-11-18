@@ -211,7 +211,8 @@ fn stashed_history_returns_to_workspace_when_policy_becomes_keep() {
     f.write(".claude/projects/p/same.jsonl", b"same");
     f.write(".claude/projects/q/other.jsonl", b"live only");
     f.write(".claude/history.jsonl", b"live prompts");
-    let keep = Policy { history: true, desktop_sessions: true, ..Policy::default() };
+    // 历史并回由 history 驱动；桌面会话共享按契约仅 macOS 可开启，其他平台只验证保留历史这条路径。
+    let keep = Policy { history: true, desktop_sessions: cfg!(target_os = "macos"), ..Policy::default() };
     s.switch(&a, "empty", &keep, &r).unwrap();
     let read = |p: &str| fs::read(f.home.join(p)).unwrap();
     assert_eq!(read(".claude/projects/p/body.jsonl"), b"A history");
@@ -271,7 +272,8 @@ fn history_left_in_superseded_archive_is_rescued_before_resave() {
     f.write(".claude/projects/p/grown.jsonl", b"old");
     s.switch("empty", "A", &Policy::default(), &r).unwrap();
     let a = s.records()[0].id.clone();
-    let keep = Policy { history: true, desktop_sessions: true, ..Policy::default() };
+    // 历史并回由 history 驱动；桌面会话共享按契约仅 macOS 可开启，其他平台只验证保留历史这条路径。
+    let keep = Policy { history: true, desktop_sessions: cfg!(target_os = "macos"), ..Policy::default() };
     s.switch(&a, "empty", &keep, &r).unwrap();
     // 旧版本切回后的状态：身份已激活，历史仍只在归档里；其中一条会话之后又有新内容。
     fs::remove_file(f.home.join(".claude/projects/p/body.jsonl")).unwrap();

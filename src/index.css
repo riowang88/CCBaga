@@ -20,7 +20,7 @@
   --card-foreground: var(--rb-ink);
   --popover: var(--rb-canvas);
   --popover-foreground: var(--rb-ink);
-  --primary: var(--rb-primary);
+  --primary: var(--rb-primary-fill);
   --primary-foreground: #fff;
   --secondary: var(--rb-cream-strong);
   --secondary-foreground: var(--rb-ink);

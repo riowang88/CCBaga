@@ -137,18 +137,7 @@ export function VpsPanel() {
                 <p className="network-dark-note">{t('只读连通性探测：不携带认证、不跟随重定向；连接对端不代表出口 IP。')}</p>
             </section>
 
-            <section className="rb-card dark network-consistency" aria-labelledby="consistency-title">
-                <h2 id="consistency-title" className="rb-label">{t('环境一致性 · {v0}',{v0:t(state?.region?.label||'自定义环境')})}</h2>
-                <p className="network-dark-note">{state?.report_received_at?t('已连接 · 回报 {v0}',{v0:time(state.report_received_at)}):state?.running?t('等待浏览器回报'):t('浏览器未运行')}</p>
-                <ul className="network-check-list">{(state?.checks||[]).map(check=><li key={check.title} className={`rb-row network-check check-${check.status}`}>
-                    <div><strong>{t(check.title)}</strong><p>{t(check.detail)}</p></div>
-                    <span className={check.status==='ok'?'rb-ok':check.status==='mismatch'?'rb-err':'rb-warn'} aria-label={t(check.status==='ok'?'已核验':check.status==='mismatch'?'存在冲突':'尚未核验')}>{t(check.status==='ok'?'已核验':check.status==='mismatch'?'存在冲突':'尚未核验')}</span>
-                </li>)}</ul>
-                {state?.report?.error&&<p className="network-dark-note">{t('浏览器出口检测：')}{t(state.report.error)}</p>}
-            </section>
-        </div>
-
-        <div className="network-grid">
+            <div className="network-stack">
             <section className="rb-card line network-dns" aria-labelledby="network-dns-title" data-dns={dnsState}>
                 <div className="network-card-head"><h2 id="network-dns-title" className="rb-label">{t('DNS 泄露')}</h2>
                     <button type="button" className="rb-link" disabled={!!action||!state?.engine_ready} onClick={()=>void inBrowser('browser_launch')}>{action==='browser_launch'?t('正在打开实测页'):state?.running?t('在 B 中检测'):t('打开 B 并检测')} →</button></div>
@@ -173,7 +162,18 @@ export function VpsPanel() {
                 {webrtc?.error&&<p className="rb-muted network-small">{t(webrtc.error)}</p>}
                 <p className="rb-muted network-small">{t('未知与已禁用不代表通过；B 已限制未代理 UDP，未取到候选不能证明没有泄露。')}</p>
             </section>
+            </div>
         </div>
+
+        <section className="rb-card dark network-consistency" aria-labelledby="consistency-title">
+            <div className="network-consistency-head"><h2 id="consistency-title" className="rb-label">{t('环境一致性 · {v0}',{v0:t(state?.region?.label||'自定义环境')})}</h2>
+            <p className="network-dark-note">{state?.report_received_at?t('已连接 · 回报 {v0}',{v0:time(state.report_received_at)}):state?.running?t('等待浏览器回报'):t('浏览器未运行')}</p></div>
+        <ul className="network-check-list">{(state?.checks||[]).map(check=><li key={check.title} className={`rb-row network-check check-${check.status}`}>
+                <div><strong>{t(check.title)}</strong><p>{t(check.detail)}</p></div>
+                <span className={check.status==='ok'?'rb-ok':check.status==='mismatch'?'rb-err':'rb-warn'} aria-label={t(check.status==='ok'?'已核验':check.status==='mismatch'?'存在冲突':'尚未核验')}>{t(check.status==='ok'?'已核验':check.status==='mismatch'?'存在冲突':'尚未核验')}</span>
+            </li>)}</ul>
+            {state?.report?.error&&<p className="network-dark-note">{t('浏览器出口检测：')}{t(state.report.error)}</p>}
+        </section>
         <p className="rb-muted network-small network-foot">{t('IP 信任评分、VPN/代理标记与住宅/机房属性不在此显示，也不自行推算；需要时在 B 中打开完整报告查看。')}</p>
     </section>;
 }

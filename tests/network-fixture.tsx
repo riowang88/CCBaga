@@ -4,14 +4,15 @@
  * [POS]: 无真实连接、密钥或外部导航的 GUI 回归样本。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
+import '../src/index.css';
+import '../src/style.css';
 import {createRoot} from 'react-dom/client';
 import {mockIPC} from '@tauri-apps/api/mocks';
 import {MotionRoot,TooltipProvider} from 'cromma-ui';
 import {VpsPanel} from '../src/vps';
 import {setLocale} from '../src/i18n';
 import type {BrowserState} from '../src/browser-model';
-import '../src/index.css';
-import '../src/style.css';
+import {FixtureShell} from './fixture-shell';
 let mode='success';
 let release=()=>{};
 const commands:{command:string;args:unknown}[]=[];
@@ -33,4 +34,4 @@ mockIPC((command,args)=>{
  };});
 });
 setLocale('zh');
-createRoot(document.getElementById('fixture')!).render(<MotionRoot><TooltipProvider><VpsPanel/></TooltipProvider></MotionRoot>);
+createRoot(document.getElementById('fixture')!).render(<MotionRoot><TooltipProvider><FixtureShell page="vps"><VpsPanel/></FixtureShell></TooltipProvider></MotionRoot>);

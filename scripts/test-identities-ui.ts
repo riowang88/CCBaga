@@ -17,6 +17,7 @@ import {testBrowserDns} from './test-browser-dns.ts';
 import {testBrowserProfiles} from './test-browser-profiles.ts';
 import {testBrowserCleanup} from './test-browser-cleanup.ts';
 import {testNetworkDiagnostics} from './test-network-diagnostics.ts';
+import {testSystemUi} from './test-system-ui.ts';
 import {testClaudeResidue} from './test-claude-residue.ts';
 import {testIdentityTransfer} from './test-identity-transfer.ts';
 import {testIdentityOperation} from './test-identity-operation.ts';
@@ -75,7 +76,7 @@ try{
  assert.equal(await page.locator('.identity-card.current').getByRole('heading').innerText(),'Identity 1');
  assert.match(await cards.first().innerText(),/清空本地登录身份/);checks++;
  const geometry=await cards.evaluateAll(nodes=>nodes.slice(0,3).map(node=>{const r=node.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};}));
- assert.equal(geometry[0].y,geometry[2].y);assert(geometry[2].x+geometry[2].width<1040-150);assert(Math.abs(geometry[0].width/geometry[0].height-54/85.6)<.01);checks++;
+ assert.equal(geometry[0].y,geometry[2].y);assert(geometry[2].x+geometry[2].width<1040-40);/* 夹具现为真实外壳（212px 侧栏 + 页面内距）：前三张卡完整可见 */assert(Math.abs(geometry[0].width/geometry[0].height-54/85.6)<.01);checks++;
  assert.equal(await page.getByRole('checkbox',{name:'浏览器资料随身份切换',exact:true}).isChecked(),true);
  await page.getByRole('checkbox',{name:'浏览器资料随身份切换',exact:true}).click();
  let linking=page.getByRole('dialog');await linking.waitFor();
@@ -180,9 +181,10 @@ try{
  checks+=await testBrowserDoh(browser,base)+await testBrowserDns(browser,base);
  checks+=await testBrowserCleanup(browser,base);
  checks+=await testNetworkDiagnostics(browser,base);
+ checks+=await testSystemUi(browser,base);
  checks+=await testClaudeResidue(browser,base);
  checks+=await testIdentityOperation(browser,base);
  checks+=await testIdentityTransfer(browser,base);
  checks+=await testBrowserProfiles(resolve('browser-runtime',engine),base,temporary,env);
- console.log(`${checks} identity, browser and network UI simulation checks passed; no native commands or user data used.`);
+ console.log(`${checks} identity, browser, network and system UI simulation checks passed; no native commands or user data used.`);
 }finally{await browser.close();await server.close();await rm(temporary,{recursive:true,force:true});}

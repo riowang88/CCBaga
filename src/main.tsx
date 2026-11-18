@@ -1,9 +1,11 @@
 /**
  * [INPUT]: rb.css 奶油/珊瑚设计基础、Cromma UI 运行时、共享 YAML 界面语言、电脑/网络/身份/浏览器/说明页面与官方签名更新组件。
  * [OUTPUT]: 奶油侧栏（--rb-surface-soft 底、选中项 --rb-cream-strong）：电脑环境 → 网络环境 → Claude 身份 → 浏览器环境 ｜分隔｜ 使用说明；底部当前版本号、检查更新与语言切换。
- * [POS]: 单窗口编排层；默认打开电脑环境；高级页面或更新运行时锁定导航，页面各自在聚焦/完成后读回快照。
+ * [POS]: 单窗口编排层；index.css/style.css 最先引入，保证各页面 CSS 在其后加载、覆盖旧外壳规则；默认打开电脑环境；高级页面或更新运行时锁定导航，页面各自在聚焦/完成后读回快照。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
+import './index.css';
+import './style.css';
 import { MotionRoot, TooltipProvider } from 'cromma-ui';
 import { Fragment, useState } from 'react';
 import {useI18n} from "./i18n";
@@ -16,8 +18,6 @@ import { VpsPanel } from './vps';
 import { LanguageSwitch } from './language-switch';
 import { AppUpdate } from './app-update';
 import { HelpPanel } from './help';
-import './index.css';
-import './style.css';
 type Page = 'system' | 'vps' | 'cleaner' | 'browser' | 'help';
 const order: readonly Page[] = ['system', 'vps', 'cleaner', 'browser', 'help'];
 const titles: Record<Page, string> = { system: '电脑环境', vps: '网络环境', cleaner: 'Claude 身份', browser: '浏览器环境', help: '使用说明' };

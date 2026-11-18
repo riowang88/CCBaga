@@ -4,6 +4,8 @@
  * [POS]: 独立测试入口；没有原生命令、真实目录、账号或网络，生产 rollup 不包含此入口。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
+import '../src/index.css';
+import '../src/style.css';
 import {createRoot} from 'react-dom/client';
 import {mockIPC} from '@tauri-apps/api/mocks';
 import {MotionRoot,TooltipProvider} from 'cromma-ui';
@@ -14,8 +16,7 @@ import {defaultPolicy,type IdentityState} from '../src/identity-model';
 import type {Scan,CleanResult} from '../src/cleaner-model';
 import type {Progress} from '../src/cleaner-activity';
 import {setLocale} from '../src/i18n';
-import '../src/index.css';
-import '../src/style.css';
+import {FixtureShell} from './fixture-shell';
 const id=(number:number)=>number.toString(16).padStart(32,'0');
 const user={present:true,display_name:'Fixture user',email:'fixture@example.invalid',organization:'Fixture team',plan:'Pro',auth_status:'local_unexpired',expires_at:Date.now()+3600000,unavailable:false};
 const summaries=Object.fromEntries(Array.from({length:40},(_,n)=>[id(n+1),{email:`user${n+1}@example.invalid`,organization:`Org ${n+1}`,plan:n%2===0?'Max 20x':'Pro',auth_status:'local_unexpired',expires_at:Date.now()+3600000}]));
@@ -124,4 +125,4 @@ function execute(command:string,args:any){
  }
  throw Error(`Unexpected fixture command: ${command}`);
 }
-createRoot(document.getElementById('fixture')!).render(<MotionRoot><TooltipProvider><div style={{width:740,height:752,margin:'20px auto',border:'1px solid #ddd'}}>{browserMode?<BrowserPanel onBusy={value=>{fixture.browserBusy=value;}}/>:<IdentityPanel/>}</div></TooltipProvider></MotionRoot>);
+createRoot(document.getElementById('fixture')!).render(<MotionRoot><TooltipProvider><FixtureShell page={browserMode?'browser':'cleaner'}>{browserMode?<BrowserPanel onBusy={value=>{fixture.browserBusy=value;}}/>:<IdentityPanel/>}</FixtureShell></TooltipProvider></MotionRoot>);

@@ -21,6 +21,9 @@ export async function testSystemUi(browser:Browser,base:string) {
   const chips=page.getByRole('group',{name:'国家地区'}).getByRole('button');
   assert.equal(await chips.count(),13);
   await page.getByRole('button',{name:'新加坡',exact:true,pressed:true}).waitFor();
+  // 新加坡目标同时认可简体中文：夹具的 zh-Hans-SG / zh_SG 不得被判为不一致（与原生 regions.rs 的 matching 同一条例外）。
+  assert.equal(await page.getByText('与所选地区不一致',{exact:true}).count(),0);
+  assert.equal(await page.getByText('与所选地区一致',{exact:true}).count(),3);
   // ----- 勾选项说明对象 -----
   const sync=page.getByRole('checkbox',{name:'同时更换 B 浏览器指纹'});
   assert.equal(await sync.isChecked(),false);

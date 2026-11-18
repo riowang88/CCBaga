@@ -29,8 +29,18 @@ const languages: Record<string, string> = { 'zh-Hans': '简体中文', 'zh-Hant'
 function languageChoice(code: string) { return Object.keys(languages).find(key => code === key || code.startsWith(key + '-')); }
 // ----- 三平台格式不同（en-US / en_US.UTF-8 / en_US@rg=…），只比较语言标签与区域标识本身 -----
 const tag = (value: string) => value.split(/[.@]/)[0].replaceAll('_', '-');
-export function languageMatches(current: string | undefined, target: string) { if (!current) return false; const value = tag(current); return value === target || value.startsWith(target + '-'); }
-export function localeMatches(current: string | undefined, target: string) { return !!current && tag(current) === tag(target); }
+// 与原生 regions.rs 的 matching 同一条例外：新加坡目标同时认可简体中文（zh-Hans-SG / zh_SG），其余地区仍按目录值。
+const ALSO_ACCEPTED: Record<string, { languages: string[]; locales: string[] }> = { sg: { languages: ['zh-Hans-SG'], locales: ['zh_SG', 'zh_Hans_SG'] } };
+export function languageMatches(current: string | undefined, target: string, regionId?: string) {
+    if (!current) return false;
+    const value = tag(current);
+    return value === target || value.startsWith(target + '-') || (ALSO_ACCEPTED[regionId ?? '']?.languages ?? []).some(extra => value === tag(extra));
+}
+export function localeMatches(current: string | undefined, target: string, regionId?: string) {
+    if (!current) return false;
+    const value = tag(current);
+    return value === tag(target) || (ALSO_ACCEPTED[regionId ?? '']?.locales ?? []).some(extra => value === tag(extra));
+}
 function offset(zone: string) {
     try {
         const part = new Intl.DateTimeFormat('en-US', { timeZone: zone, timeZoneName: 'shortOffset' }).formatToParts(new Date()).find(p => p.type === 'timeZoneName')?.value;
@@ -81,7 +91,7 @@ export function SystemPanel({ onBusy }: {
     useEffect(() => {
         if (chosen.current || !regions.length || !state)
             return;
-        const best = regions.find(r => r.timezone === state.timezone && languageMatches(state.languages[0], r.language)) || regions.find(r => r.timezone === state.timezone) || regions[0];
+        const best = regions.find(r => r.timezone === state.timezone && languageMatches(state.languages[0], r.language, r.id)) || regions.find(r => r.timezone === state.timezone) || regions[0];
         setRegionId(best.id);
     }, [regions, state]);
     const region = regions.find(r => r.id === regionId);
@@ -258,7 +268,7 @@ export function SystemPanel({ onBusy }: {
         <button type="button" className="rb-link" disabled={busy !== null} onClick={() => void open('timezone')}>{t("系统设置")}</button>
         <p className="rb-muted">{state.automatic_timezone === null ? t("自动时区状态未知") : state.automatic_timezone ? t("按位置自动设置：开启") : t("手动时区")} · {t(windows ? "需要时请完成系统授权。" : "需要管理员授权。")}</p>
       </div>}
-      <div className="rb-row"><span className="k">{t("首选语言")}</span><span className="v rb-mono" title={state?.languages.join(' → ')}>{state ? state.languages[0] || t("未设置") : t("读取中…")}</span>{state && region && match(languageMatches(state.languages[0], region.language))}<button type="button" className="rb-link" aria-expanded={editing === 'language'} disabled={disabled} onClick={() => edit('language')}>{editing === 'language' ? t("收起") : t("修改")}</button></div>
+      <div className="rb-row"><span className="k">{t("首选语言")}</span><span className="v rb-mono" title={state?.languages.join(' → ')}>{state ? state.languages[0] || t("未设置") : t("读取中…")}</span>{state && region && match(languageMatches(state.languages[0], region.language, region.id))}<button type="button" className="rb-link" aria-expanded={editing === 'language'} disabled={disabled} onClick={() => edit('language')}>{editing === 'language' ? t("收起") : t("修改")}</button></div>
       {editing === 'language' && state && <div className="system-rb-edit">
         <Select aria-label={t("目标语言")} size="small" value={language} onValueChange={value => { if (value)
             setLanguage(value); }} items={Object.entries(languages).map(([value, label]) => ({ value, label: t(label) }))} disabled={disabled}/>
@@ -266,7 +276,7 @@ export function SystemPanel({ onBusy }: {
         <button type="button" className="rb-link" disabled={busy !== null} onClick={() => void open('language')}>{t("系统设置")}</button>
         <p className="rb-muted">{t("应用重启后生效；系统完整切换可能需要注销。")}</p>
       </div>}
-      <div className="rb-row"><span className="k">{t("区域格式")}</span><span className="v rb-mono">{!state ? t("读取中…") : state.locale || t("未知")}</span>{state?.locale && region ? match(localeMatches(state.locale, region.locale)) : null}<span className="rb-muted">{t("随地区一键设置")}</span></div>
+      <div className="rb-row"><span className="k">{t("区域格式")}</span><span className="v rb-mono">{!state ? t("读取中…") : state.locale || t("未知")}</span>{state?.locale && region ? match(localeMatches(state.locale, region.locale, region.id)) : null}<span className="rb-muted">{t("随地区一键设置")}</span></div>
       <div className="rb-row"><span className="k">{t("定位服务")}</span><span className="v">{!state ? t("读取中…") : state.location_enabled === null ? t("尚未核验") : state.location_enabled ? t("已开启") : t("已关闭")}{state?.location_enabled && !windows && !state.accessibility ? <span className="rb-muted system-rb-note">{t("需要辅助功能权限，或在系统设置中手动关闭。")}</span> : null}</span><button type="button" className="rb-link" disabled={busy !== null} onClick={() => void open('location')}>{t("系统设置")}</button><button type="button" className="rb-btn" disabled={disabled || state?.location_enabled === false} aria-busy={busy === 'location'} onClick={() => void apply('location')}>{state?.location_enabled === false ? t("已关闭") : t("关闭")}</button></div>
     </div>
     <footer className="system-rb-footer">

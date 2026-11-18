@@ -364,6 +364,7 @@ fn country_checks_follow_region_instead_of_assuming_america() {
         browser_version: "148".into(),
         geolocation: "denied".into(),
         error: String::new(),
+        webrtc: None,
         exit: Some(network::Exit {
             ip: "203.0.113.1".into(),
             country: "JP".into(),
@@ -455,6 +456,7 @@ fn linux_platform_and_unknown_location_cannot_be_misreported_as_mac_or_disabled(
         browser_version: "148".into(),
         geolocation: "denied".into(),
         error: String::new(),
+        webrtc: None,
         exit: None,
     };
     let checks = network::checks(&m, &Config::default(), Some(&report), None, "148");
@@ -510,6 +512,7 @@ fn distinct_iana_timezones_remain_conflicts_on_every_platform() {
         browser_version: "148".into(),
         geolocation: "denied".into(),
         error: String::new(),
+        webrtc: None,
         exit: Some(network::Exit {
             ip: "203.0.113.2".into(),
             country: "DE".into(),
@@ -554,6 +557,7 @@ fn windows_report_requires_real_platform_cpu_and_version() {
         browser_version: "148".into(),
         geolocation: "denied".into(),
         error: String::new(),
+        webrtc: None,
         exit: None,
     };
     let result = |r: &network::Report| {
@@ -592,6 +596,7 @@ fn follow_machine_taiwan_preserves_language_script_and_checks_actual_country() {
         browser_version: "148".into(),
         geolocation: "denied".into(),
         error: String::new(),
+        webrtc: None,
         exit: Some(network::Exit {
             ip: "203.0.113.1".into(),
             country: "TW".into(),
@@ -726,4 +731,60 @@ fn doh_malformed_local_state_and_restore_marker_are_not_overwritten() {
     fs::write(&path,br#"{"dns_over_https":"bad"}"#).unwrap();assert!(profile::preferences(&root,&c,&machine()).is_err());
     fs::write(&path,b"{}").unwrap();fs::write(root.join("CCBaga-DNS.json"),b"broken marker").unwrap();assert!(profile::preferences(&root,&Config::default(),&machine()).is_err());assert_eq!(fs::read(&path).unwrap(),b"{}");
     fs::remove_dir_all(root).unwrap();
+}
+#[test]
+fn webrtc_check_only_passes_on_match_and_rejects_invalid_reports() {
+    let report = |webrtc: Option<network::WebRtc>| network::Report {
+        language: "en-US".into(),
+        languages: vec!["en-US".into()],
+        timezone: "America/New_York".into(),
+        platform: "MacIntel".into(),
+        cores: 8,
+        user_agent: "fixture".into(),
+        platform_version: "fixture".into(),
+        browser_version: "148".into(),
+        geolocation: "denied".into(),
+        error: String::new(),
+        webrtc,
+        exit: Some(network::Exit {
+            ip: "203.0.113.1".into(),
+            country: "US".into(),
+            city: String::new(),
+            timezone: "America/New_York".into(),
+            isp: String::new(),
+        }),
+    };
+    let webrtc = |status: &str, ips: &[&str]| network::WebRtc {
+        status: status.into(),
+        udp_ips: ips.iter().map(|x| x.to_string()).collect(),
+        error: String::new(),
+    };
+    let status = |r: &network::Report| {
+        let checks = network::checks(&machine(), &Config::default(), Some(r), None, "148");
+        let item = checks.into_iter().find(|x| x.title == "WebRTC / UDP 出口").unwrap();
+        (item.status, item.detail)
+    };
+    assert_eq!(status(&report(Some(webrtc("match", &["203.0.113.1"])))).0, "ok");
+    let (state, detail) = status(&report(Some(webrtc("mismatch", &["198.51.100.7"]))));
+    assert_eq!(state, "mismatch");
+    assert!(detail.contains("198.51.100.7") && detail.contains("203.0.113.1"));
+    for value in [Some(webrtc("unknown", &[])), Some(webrtc("disabled", &[])), None] {
+        assert_eq!(status(&report(value)).0, "pending");
+    }
+    assert!(report(Some(webrtc("match", &["203.0.113.1"]))).valid());
+    assert!(report(None).valid());
+    for bad in [
+        webrtc("passed", &[]),
+        webrtc("mismatch", &[]),
+        webrtc("match", &["not-an-ip"]),
+        webrtc("match", &["192.0.2.1"; 9]),
+    ] {
+        assert!(!report(Some(bad)).valid());
+    }
+    // 旧页面不带 webrtc 字段仍可反序列化；未知字段继续拒绝。
+    let mut json = serde_json::to_value(report(None)).unwrap();
+    json.as_object_mut().unwrap().remove("webrtc");
+    assert!(serde_json::from_value::<network::Report>(json.clone()).is_ok());
+    json["webrtc"] = serde_json::json!({"status":"match","udp_ips":[],"error":"","extra":1});
+    assert!(serde_json::from_value::<network::Report>(json).is_err());
 }

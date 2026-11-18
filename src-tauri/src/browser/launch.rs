@@ -1,5 +1,5 @@
 // [INPUT]: 当前身份的浏览器资料、配置、原生引擎与进度通道；调用方已持有 Browser gate。
-// [OUTPUT]: 唯一启动过程；只使用已提交的 browser.active，核验实际 user-data-dir，不一致或缺失外部应用时停止且不新建槽位。验证实际进程和回环会话，失败不冒充成功。
+// [OUTPUT]: 唯一启动过程（用户显式 WebRTC 检测时仅本次实测页附 #webrtc）；只使用已提交的 browser.active，核验实际 user-data-dir，不一致或缺失外部应用时停止且不新建槽位。验证实际进程和回环会话，失败不冒充成功。
 // [POS]: 身份联动和手动启动共用的同步核心，避免重复锁和不同资料路径。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use super::*;
@@ -26,6 +26,10 @@ pub(super) fn confirm_started(
     Err("浏览器未使用身份库中的当前资料启动，已停止，未改用空白资料。".into())
 }
 pub(super) fn launch_locked(app: &tauri::AppHandle, log: &Reporter) -> Result<Snapshot, String> {
+    launch_page(app, log, false)
+}
+/// webrtc=true 仅来自用户显式点击「在 B 中检测」：本次打开的实测页带 #webrtc 片段，页面才会发起 STUN；自动带起与身份切换不带。
+pub(super) fn launch_page(app: &tauri::AppHandle, log: &Reporter, webrtc: bool) -> Result<Snapshot, String> {
     let state = app.state::<Browser>();
     let root = root(app)?;
     let running = workspaces::running_profiles(&root)?;
@@ -66,6 +70,7 @@ pub(super) fn launch_locked(app: &tauri::AppHandle, log: &Reporter) -> Result<Sn
     }
     *state.host.lock().unwrap() = None;
     let page = open_session(app, &config, &machine, version(&engine))?;
+    let page = if webrtc { format!("{page}#webrtc") } else { page };
     let file = fs::OpenOptions::new()
         .create(true)
         .append(true)

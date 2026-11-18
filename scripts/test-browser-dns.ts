@@ -6,8 +6,10 @@
  */
 import {strict as assert} from 'node:assert';
 import type {Browser} from 'playwright-core';
+import {stubWebRtc} from './test-webrtc-stub.ts';
 export async function testBrowserDns(browser:Browser,base:string) {
  const context=await browser.newContext({locale:'en-US',timezoneId:'America/Los_Angeles'});
+ await stubWebRtc(context);
  const page=await context.newPage();page.setDefaultTimeout(15000);
  let mode:'success'|'empty'|'failure'|'stale'='success',round=0,reads=0,images=0,language='zh',disconnected=false;
  let release!:()=>void,ready!:()=>void;

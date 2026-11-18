@@ -1,4 +1,4 @@
-// [INPUT]: Skill 的 providers.json 固定配置、资源编号与系统 URL 打开工具。
+// [INPUT]: Skill 目录内 providers.json 固定配置（仅供应商，已无界面入口）、资源编号与系统 URL 打开工具。
 // [OUTPUT]: 固定资源导航与四域名只读连通性诊断；重定向仅认可官方 HTTPS 目标且不跟随，下载探针验证有界版本正文，不输出正文或冒充出口核验。
 // [POS]: 应用网络页原生接口；不读取密钥、不执行 SSH、不接收任意 URL，诊断不上传凭据。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -20,11 +20,6 @@ pub struct DomainCheckResult {
 }
 
 fn provider_url(provider: &str) -> Result<String, String> {
-    if provider == "skill" {
-        return Ok(
-            "https://github.com/liseami/CCBaga/tree/main/skills/ccbaga-network#installation".into(),
-        );
-    }
     if !["webshare", "dmit"].contains(&provider) {
         return Err("无效的供应商入口。".into());
     }
@@ -283,10 +278,7 @@ mod tests {
             provider_url("webshare").unwrap(),
             "https://www.webshare.io/?referral_code=qlm1mt9xibc9"
         );
-        assert_eq!(
-            provider_url("skill").unwrap(),
-            "https://github.com/liseami/CCBaga/tree/main/skills/ccbaga-network#installation"
-        );
+        assert!(provider_url("skill").is_err());
         assert!(provider_url("https://example.com").is_err());
     }
 

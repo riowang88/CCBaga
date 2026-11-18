@@ -15,9 +15,10 @@ export async function testBrowserDoh(browser:Browser,base:string) {
   const choose=async(name:string,option:string)=>{await page.getByRole('combobox',{name,exact:true}).click();await page.getByRole('option',{name:option,exact:true}).click();};
   assert.match(await page.locator('.browser-dns-settings').innerText(),/沿用现有解析.*原有自动模式可能回退普通 DNS/s);
   assert.equal(await page.getByRole('combobox',{name:'DoH 服务商',exact:true}).count(),0);
-  await page.getByRole('checkbox',{name:'语言与时区跟随机器',exact:true}).uncheck();
+  await page.getByRole('radiogroup',{name:'语言与时区',exact:true}).getByRole('radio',{name:'手动指定',exact:true}).click();
   await choose('浏览器语言','zh-Hans-SG');
-  await choose('DNS 解析方式','指定 DoH');
+  const mode=(name:string)=>page.getByRole('radiogroup',{name:'DNS 解析方式',exact:true}).getByRole('radio',{name,exact:true}).click();
+  await mode('指定 DoH');
   assert.match(await page.locator('.browser-doh-endpoint').innerText(),/https:\/\/cloudflare-dns.com\/dns-query/);
   await choose('DoH 服务商','Google Public DNS');assert.match(await page.locator('.browser-doh-endpoint').innerText(),/dns.google/);
   await choose('DoH 服务商','Quad9（恶意域名过滤）');assert.match(await page.locator('.browser-doh-endpoint').innerText(),/dns.quad9.net/);
@@ -29,12 +30,12 @@ export async function testBrowserDoh(browser:Browser,base:string) {
   const config=await page.evaluate(()=>(window as any).identityFixture.browser.config);
   assert.equal(config.language,'zh-Hans-SG');assert.deepEqual(config.dns,{mode:'secure',provider:'custom',custom_url:'https://resolver.example/dns-query{?dns}'});
   assert(await save.isDisabled());
-  await choose('DNS 解析方式','沿用现有解析');await save.click();
+  await mode('沿用现有解析');await save.click();
   assert.equal(await page.evaluate(()=>(window as any).identityFixture.browser.config.dns.mode),'inherit');
   // 非 DNS 编辑仍保留停用时的自定义地址，切回严格模式可继续编辑。
-  await choose('DNS 解析方式','指定 DoH');assert.equal(await address.inputValue(),'https://resolver.example/dns-query{?dns}');
+  await mode('指定 DoH');assert.equal(await address.inputValue(),'https://resolver.example/dns-query{?dns}');
   await page.evaluate(()=>(window as any).identityFixture.browser.running=true);await page.getByRole('button',{name:'刷新状态',exact:true}).click();
-  assert(await page.getByRole('combobox',{name:'DNS 解析方式',exact:true}).isDisabled());assert(await address.isDisabled());assert(await save.isDisabled());
+  assert(await page.getByRole('radiogroup',{name:'DNS 解析方式',exact:true}).getByRole('radio',{name:'沿用现有解析',exact:true}).isDisabled());assert(await address.isDisabled());assert(await save.isDisabled());
   await page.evaluate(()=>(window as any).identityFixture.language('en'));
   assert.match(await page.locator('.browser-dns-settings').innerText(),/Strict DoH.*do not automatically fall back/s);
   await page.getByText('Scope and fallback',{exact:true}).click();

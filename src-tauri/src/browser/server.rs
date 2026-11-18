@@ -1,5 +1,5 @@
 // [INPUT]: 只读有界身份显示摘要、打包的起始页、一次启动的随机令牌、独立 DNS 测试轮次、机器上下文、共享界面语言、共用出口服务目录和浏览器实测。
-// [OUTPUT]: 仅 127.0.0.1 的起始页、绑定身份/有效国家/机器上下文与观测接口；A 读取 DNS 结果、B 触发解析；32 个并发请求、请求头与正文共用读取截止，响应前复核会话令牌；资源限定在打包目录。
+// [OUTPUT]: 仅 127.0.0.1 的起始页、绑定身份/有效国家/机器上下文与观测接口；A 读取 DNS 结果、B 触发解析，每次结果（含空与失败）存为会话 dns_last 并通知 A；32 个并发请求、请求头与正文共用读取截止，响应前复核会话令牌；资源限定在打包目录。
 // [POS]: Chromium 与工具箱之间的窄桥；不提供文件写入、脚本执行或 Tauri 命令。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use super::{network::Report, Browser, Context};
@@ -336,6 +336,13 @@ fn handle_dns(app:&tauri::AppHandle,stream:&mut TcpStream,token:&str,path:&str,c
     let mut session=browser.session.lock().unwrap();
     let Some(run)=session.as_mut().filter(|s|s.token==token).and_then(|s|s.dns.as_mut()).filter(|r|r.id==id) else {dns_error(stream,"410 Gone","本地检测会话已失效。");return;};
     run.in_flight=false;
+    // 同会话保留最近一轮结果供 A 网络页只读呈现；空结果与失败如实保存，不改判为通过。
+    let at=std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as u64;
+    if let Some(current)=session.as_mut() {
+        current.dns_last=Some(super::DnsLast::new(result.as_ref().ok().cloned(),result.as_ref().err().cloned().unwrap_or_default(),at));
+    }
+    drop(session);
+    let _ = app.emit("browser-report", ());
     match result {
         Ok(result)=>answer(stream,"200 OK","application/json",&serde_json::to_vec(&result).unwrap()),
         Err(e)=>dns_error(stream,"502 Bad Gateway",&e),
@@ -411,6 +418,7 @@ mod tests {
         client.join().unwrap();
         let session = Some(super::super::Session {
             dns: None,
+            dns_last: None,
             token: "new".into(),
             received_at: None,
             report: None,

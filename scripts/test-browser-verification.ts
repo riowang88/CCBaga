@@ -1,20 +1,22 @@
 /**
  * [INPUT]: 现有隔离 Playwright 引擎、Vite 本机地址与虚构出口/宿主响应。
- * [OUTPUT]: 顶部身份卡顺序/双语/联动/不匹配/空身份与真实 browser.html 的黄波纹/绿通过/红失败、图片解码、紧凑宽度/高度、未知目标单项黄色待测、区域来源、DNS 独立观测区不混入基础通过项数、逐项配置说明/重启语义、DNS 只读路径说明、重测与双语 DOM 回归。
+ * [OUTPUT]: 横幅三态语义色（奶油页面底）；WebRTC 四态经 STUN 替身回报且不影响 12 项通过；顶部身份卡顺序/双语/联动/不匹配/空身份与真实 browser.html 的黄波纹/绿通过/红失败、图片解码、紧凑宽度/高度、未知目标单项黄色待测、区域来源、DNS 独立观测区不混入基础通过项数、逐项配置说明/重启语义、DNS 只读路径说明、重测与双语 DOM 回归。
  * [POS]: 身份 UI 回归共用引擎的伴生页验证，不截图、不调用真实宿主或外网。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 import {strict as assert} from 'node:assert';
 import type {Browser} from 'playwright-core';
+import {stubWebRtc} from './test-webrtc-stub.ts';
 export async function testBrowserVerification(browser:Browser,base:string) {
  const context=await browser.newContext({locale:'en-US',timezoneId:'America/Los_Angeles'});
+ await stubWebRtc(context);
  await context.addInitScript(()=>{
   const query=navigator.permissions.query.bind(navigator.permissions);
   navigator.permissions.query=(options:PermissionDescriptor)=>options.name==='geolocation'?Promise.resolve({state:'denied'} as PermissionStatus):query(options);
  });
  const page=await context.newPage();page.setDefaultTimeout(10000);
  let release!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;});
- let first=true, failure=false, unknown=false, language='zh', reports=0;
+ let first=true, failure=false, unknown=false, language='zh', reports=0, lastReport:any=null;
  let identity={linked:true,status:'linked',name:'Fixture identity',email:'fixture@example.invalid' as string|null,organization:'Fixture team' as string|null};
  await context.route('**/*',async route=>{
   const url=route.request().url();
@@ -28,7 +30,7 @@ export async function testBrowserVerification(browser:Browser,base:string) {
    return route.fulfill({json:{identity,ui_language:language,exit_services:[base+'/fixture-exit'],region:unknown?null:{id:'us-la',label:'United States',country:'US',language:'en-US',locale:'en_US',timezone:'America/Los_Angeles'},config:{follow_machine:false,language:'en-US',timezone:'America/Los_Angeles'},machine:{platform:observed.platform,version:observed.version,cores:observed.cores,timezone:'America/Los_Angeles',languages:['en-US'],locale:'en_US',locale_country:'US',location_enabled:false},engine_version:observed.engine}});
   }
   if(url===base+'/fixture-exit')return route.fulfill({json:{ip:'203.0.113.1',country_code:failure?'JP':'US',city:'Fixture',timezone:'America/Los_Angeles'}});
-  if(url===base+'/report'){reports++;return route.fulfill({json:{ok:true}});}
+  if(url===base+'/report'){reports++;lastReport=route.request().postDataJSON();return route.fulfill({json:{ok:true}});}
   return route.continue();
  });
  try{
@@ -55,13 +57,35 @@ export async function testBrowserVerification(browser:Browser,base:string) {
   await page.waitForFunction(()=>{const img=document.querySelector('.verification-brand img') as HTMLImageElement;return img?.complete&&img.naturalWidth>0;});
   assert(await page.locator('.verification-banner').evaluate(node=>node.getBoundingClientRect().height<=150));
   assert(await page.locator('.browser-start').evaluate(node=>node.getBoundingClientRect().width>=window.innerWidth-40));
-  await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-verification]')!).backgroundColor==='rgb(228, 245, 233)');
+  await page.waitForFunction(()=>getComputedStyle(document.querySelector('.verification-banner')!).backgroundColor==='rgb(226, 239, 227)');
+  // ----- WebRTC/UDP：固定 STUN、与同轮 HTTP 出口比对，单独列示不影响 12 项通过 -----
+  const webrtc=page.locator('.verification-webrtc');
+  // 自动打开的实测页不连接 STUN；用户点「重新实测」才发起。
+  assert.equal(await webrtc.getAttribute('data-webrtc'),'idle');
+  assert.deepEqual(await page.evaluate(()=>(window as any).__webrtcFixture.servers),[]);
+  await page.getByRole('button',{name:'重新实测',exact:true}).click();
+  await page.locator('.verification-webrtc[data-webrtc="match"]').waitFor();
+  assert.match(await webrtc.innerText(),/一致.*UDP 出口：203\.0\.113\.1.*HTTP 出口：203\.0\.113\.1/s);
+  for(let i=0;i<100&&lastReport?.webrtc?.status!=='match';i++)await page.waitForTimeout(50);
+  assert.equal(lastReport.webrtc.status,'match');assert.deepEqual(lastReport.webrtc.udp_ips,['203.0.113.1']);
+  assert.deepEqual(await page.evaluate(()=>(window as any).__webrtcFixture.servers.at(-1)),[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun.cloudflare.com:3478'}]);
+  for(const [mode,state,text] of [['mismatch','mismatch',/不一致（可能泄露）.*198\.51\.100\.7/s],['none','unknown',/未知.*未取到 STUN 候选/s],['disabled','disabled',/已禁用.*浏览器策略禁用/s]] as const){
+   await page.evaluate(mode=>{(window as any).__webrtcFixture.mode=mode;},mode);
+   await page.getByRole('button',{name:'重新实测',exact:true}).click();
+   await page.locator(`.verification-webrtc[data-webrtc="${state}"]`).waitFor();
+   assert.match(await webrtc.innerText(),text);
+   for(let i=0;i<100&&lastReport?.webrtc?.status!==state;i++)await page.waitForTimeout(50);
+   assert.equal(lastReport.webrtc.status,state);
+   assert.equal(await page.locator('[data-verification]').getAttribute('data-verification'),'passed');
+   assert.equal(await page.locator('.verification-check').count(),12);
+  }
+  await page.evaluate(()=>{(window as any).__webrtcFixture.mode='match';});
   failure=true;
   await page.getByRole('button',{name:'重新实测',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('[data-verification]')?.getAttribute('data-verification')==='failed');
   const country=page.locator('.verification-check.failed').filter({has:page.getByRole('heading',{name:'出口国家',exact:true})});
   assert.match(await country.innerText(),/JP/);assert.match(await country.innerText(),/US/);
-  await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-verification]')!).backgroundColor==='rgb(255, 241, 240)');
+  await page.waitForFunction(()=>getComputedStyle(document.querySelector('.verification-banner')!).backgroundColor==='rgb(248, 227, 221)');
   failure=false;unknown=true;
   await page.getByRole('button',{name:'重新实测',exact:true}).click();
   await page.locator('.verification-check.pending').filter({has:page.getByRole('heading',{name:'出口国家',exact:true})}).waitFor();

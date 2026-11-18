@@ -1,5 +1,5 @@
 // [INPUT]: 会话独立随机 token、B 触发的 Net.Coffee DNS 记录、配置/系统代理。
-// [OUTPUT]: 有界解析器 IP/归属地与真实失败；每轮最多三次取数、一次在途、两分钟过期。
+// [OUTPUT]: 有界解析器 IP/归属地与真实失败（Observation 可克隆供会话保存最近一轮）；每轮最多三次取数、一次在途、两分钟过期。
 // [POS]: A 只读固定 HTTPS 结果服务，不触发 DNS 测试，不伪造来源/携带 Cookie，不回退直连。
 // 测试服务器显式清除 Windows 继承的非阻塞模式，覆盖延迟请求头读取。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -49,7 +49,7 @@ impl Resolver {
         Self {ip,country_code:String::new(),country:String::new(),city:String::new(),isp:String::new(),geo_error:Some(error)}
     }
 }
-#[derive(Serialize, Debug)]
+#[derive(Clone, Serialize, Debug)]
 pub(super) struct Observation {
     pub id: String,
     pub resolvers: Vec<Resolver>,

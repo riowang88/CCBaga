@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 原生只读检测命令：browser_read/browser_check（本机出口与环境一致性）、network_diagnose_domains（四域名探针）、browser_launch（让 B 重新实测与 DNS）、browser_open_report（固定报告页）；browser-report 事件与 YAML 文案。
- * [OUTPUT]: 网络环境检测页：本机出口 IP/所在地/运营商、深色 Claude 可用性四域名卡（含延迟）、环境一致性网格、DNS 最近一轮结果与「在 B 中检测」、WebRTC/UDP 最近一轮四态（一致/不一致/未知/已禁用）与「在 B 中检测」、「在 B 中打开完整报告」三级链接。
+ * [OUTPUT]: 网络环境检测页（照 Network.dc.html 顺序：出口三张矮卡 → 深色 Claude 可用性 | 环境一致性（列表在卡内滚动，不撑长页面）→ 细线 DNS | WebRTC；DNS 一行结论含是否均在出口地区，解析器明细收进 details）：本机出口 IP/所在地/运营商、深色 Claude 可用性四域名卡（含延迟）、环境一致性网格、DNS 最近一轮结果与「在 B 中检测」、WebRTC/UDP 最近一轮四态（一致/不一致/未知/已禁用）与「在 B 中检测」、「在 B 中打开完整报告」三级链接。
  * [POS]: 纯检测页；不修改系统、浏览器或代理设置，不自算 IP 信任评分/代理标记/住宅属性；DNS 由 B 触发，A 只读同会话最近一轮结果。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -111,13 +111,13 @@ export function VpsPanel() {
         {stateError&&<p role="alert" className="rb-err network-feedback">{t(stateError)}</p>}
 
         <section className="network-exit" aria-label={t('本机出口')} data-status={exitChecking?'checking':exitError?'failed':exit?'observed':'idle'}>
-            <div className="rb-card"><p className="rb-label">{t('本机出口 IP')}</p><p className="network-big rb-mono">{exitChecking?t('检测中'):exit?.ip||'—'}</p></div>
-            <div className="rb-card"><p className="rb-label">{t('所在地')}</p><p className="network-big">{exit?[exit.country,exit.city].filter(Boolean).join(' · '):'—'}</p></div>
-            <div className="rb-card"><p className="rb-label">{t('运营商')}</p><p className="network-big network-isp">{exit?.isp||'—'}</p></div>
+            <div className="rb-card"><p className="rb-label">{t('本机出口 IP')}</p><p className="network-big rb-mono" title={exit?.ip}>{exitChecking?t('检测中'):exit?.ip||'—'}</p></div>
+            <div className="rb-card"><p className="rb-label">{t('所在地')}</p><p className="network-big" title={exit?[exit.country,exit.city].filter(Boolean).join(' · '):undefined}>{exit?[exit.country,exit.city].filter(Boolean).join(' · '):'—'}</p></div>
+            <div className="rb-card"><p className="rb-label">{t('运营商')}</p><p className="network-big network-isp" title={exit?.isp||undefined}>{exit?.isp||'—'}</p></div>
         </section>
         <p className="rb-muted network-note">{exitError?<span className="rb-err" role="alert">{t(exitError)}</span>:exit?t('由 A 按系统代理检测；出口数据库给出的时区：{v0}',{v0:exit.timezone||'—'}):t('尚未检测本机出口。')}{browserExit&&<> · {t('B 浏览器出口：{v0}',{v0:`${browserExit.ip} · ${browserExit.country}`})}</>}</p>
 
-        <div className="network-grid">
+        <div className="network-grid network-dark-row">
             <section className="rb-card dark domain-diagnostics" aria-labelledby="diagnostics-title" data-status={phase} aria-busy={diagnosing}>
                 <h2 id="diagnostics-title" className="rb-label">{t('Claude 可用性')}</h2>
                 <div className={`domain-outcome ${phase}`} role="status" aria-live="polite">
@@ -136,8 +136,18 @@ export function VpsPanel() {
                 })}</ul>
                 <p className="network-dark-note">{t('只读连通性探测：不携带认证、不跟随重定向；连接对端不代表出口 IP。')}</p>
             </section>
+            <section className="rb-card dark network-consistency" aria-labelledby="consistency-title">
+                <div className="network-consistency-head"><h2 id="consistency-title" className="rb-label">{t('环境一致性 · {v0}',{v0:t(state?.region?.label||'自定义环境')})}</h2>
+                <p className="network-dark-note">{state?.report_received_at?t('已连接 · 回报 {v0}',{v0:time(state.report_received_at)}):state?.running?t('等待浏览器回报'):t('浏览器未运行')}</p></div>
+            <ul className="network-check-list">{(state?.checks||[]).map(check=><li key={check.title} className={`rb-row network-check check-${check.status}`}>
+                    <div><strong>{t(check.title)}</strong><p>{t(check.detail)}</p></div>
+                    <span className={check.status==='ok'?'rb-ok':check.status==='mismatch'?'rb-err':'rb-warn'} aria-label={t(check.status==='ok'?'已核验':check.status==='mismatch'?'存在冲突':'尚未核验')}>{t(check.status==='ok'?'已核验':check.status==='mismatch'?'存在冲突':'尚未核验')}</span>
+                </li>)}</ul>
+                {state?.report?.error&&<p className="network-dark-note">{t('浏览器出口检测：')}{t(state.report.error)}</p>}
+            </section>
+        </div>
 
-            <div className="network-stack">
+        <div className="network-grid">
             <section className="rb-card line network-dns" aria-labelledby="network-dns-title" data-dns={dnsState}>
                 <div className="network-card-head"><h2 id="network-dns-title" className="rb-label">{t('DNS 泄露')}</h2>
                     <button type="button" className="rb-link" disabled={!!action||!state?.engine_ready} onClick={()=>void inBrowser('browser_launch')}>{action==='browser_launch'?t('正在打开实测页'):state?.running?t('在 B 中检测'):t('打开 B 并检测')} →</button></div>
@@ -145,8 +155,8 @@ export function VpsPanel() {
                     :dnsState==='idle'?<span className="rb-muted">{t('尚未检测 DNS')}</span>
                     :dnsState==='failed'?<span className="rb-err">{t('DNS 检测未完成')} · {t(dns!.error)}</span>
                     :dnsState==='empty'?<span className="rb-warn">{t('未取得解析器结果，无法判断 DNS 状态；空结果不代表安全或已加密。')}</span>
-                    :<span>{t('共观测到 {v0} 个解析器 · {v1}',{v0:resolvers!.length,v1:time(dns!.observation!.observed_at)})}{dnsCountries.length>0&&<span className="rb-muted"> · {dnsCountries.join(' / ')}</span>}</span>}</p>
-                {!!resolvers?.length&&<table className="network-dns-table"><thead><tr><th>{t('DNS 解析器 IP')}</th><th>{t('国家 / 城市')}</th><th>{t('运营商')}</th></tr></thead><tbody>{resolvers.map(row=><tr key={row.ip}><td className="rb-mono">{row.ip}</td><td>{row.geo_error?<span title={t(row.geo_error)}>{t('归属地未取得')}</span>:[row.country_code,row.country,row.city].filter(Boolean).join(' · ')}</td><td>{row.isp||t('未知')}</td></tr>)}</tbody></table>}
+                    :<span>{t('共观测到 {v0} 个解析器 · {v1}',{v0:resolvers!.length,v1:time(dns!.observation!.observed_at)})}{dnsCountries.length>0&&<span className="rb-muted"> · {dnsCountries.join(' / ')}</span>}{exit?.country&&dnsCountries.length>0&&<span className="rb-muted"> · {t(dnsCountries.every(code=>code===exit.country)?'均在出口地区':'含出口地区以外的解析器')}</span>}</span>}</p>
+                {!!resolvers?.length&&<details className="network-dns-details"><summary>{t('查看解析器明细')}</summary><table className="network-dns-table"><thead><tr><th>{t('DNS 解析器 IP')}</th><th>{t('国家 / 城市')}</th><th>{t('运营商')}</th></tr></thead><tbody>{resolvers.map(row=><tr key={row.ip}><td className="rb-mono">{row.ip}</td><td>{row.geo_error?<span title={t(row.geo_error)}>{t('归属地未取得')}</span>:[row.country_code,row.country,row.city].filter(Boolean).join(' · ')}</td><td>{row.isp||t('未知')}</td></tr>)}</tbody></table></details>}
                 <p className="rb-muted network-small">{t('解析器地区与出口不同不自动等于泄露；结果不构成安全保证。')}</p>
             </section>
             <section className="rb-card line network-webrtc" aria-labelledby="network-webrtc-title" data-webrtc={webrtcState}>
@@ -162,18 +172,7 @@ export function VpsPanel() {
                 {webrtc?.error&&<p className="rb-muted network-small">{t(webrtc.error)}</p>}
                 <p className="rb-muted network-small">{t('未知与已禁用不代表通过；B 已限制未代理 UDP，未取到候选不能证明没有泄露。')}</p>
             </section>
-            </div>
         </div>
-
-        <section className="rb-card dark network-consistency" aria-labelledby="consistency-title">
-            <div className="network-consistency-head"><h2 id="consistency-title" className="rb-label">{t('环境一致性 · {v0}',{v0:t(state?.region?.label||'自定义环境')})}</h2>
-            <p className="network-dark-note">{state?.report_received_at?t('已连接 · 回报 {v0}',{v0:time(state.report_received_at)}):state?.running?t('等待浏览器回报'):t('浏览器未运行')}</p></div>
-        <ul className="network-check-list">{(state?.checks||[]).map(check=><li key={check.title} className={`rb-row network-check check-${check.status}`}>
-                <div><strong>{t(check.title)}</strong><p>{t(check.detail)}</p></div>
-                <span className={check.status==='ok'?'rb-ok':check.status==='mismatch'?'rb-err':'rb-warn'} aria-label={t(check.status==='ok'?'已核验':check.status==='mismatch'?'存在冲突':'尚未核验')}>{t(check.status==='ok'?'已核验':check.status==='mismatch'?'存在冲突':'尚未核验')}</span>
-            </li>)}</ul>
-            {state?.report?.error&&<p className="network-dark-note">{t('浏览器出口检测：')}{t(state.report.error)}</p>}
-        </section>
         <p className="rb-muted network-small network-foot">{t('IP 信任评分、VPN/代理标记与住宅/机房属性不在此显示，也不自行推算；需要时在 B 中打开完整报告查看。')}</p>
     </section>;
 }

@@ -1,10 +1,10 @@
 # tests/
 > L2 | 父级: ../CLAUDE.md
-fixture-shell.tsx: 与 main.tsx 同结构的外壳（侧栏 + main.workspace > .cleaner-slot，默认铺满视口），所有夹具共用，使内距/滚动/宽度与真实应用一致；各夹具在组件之前引入 index.css/style.css，保持与应用相同的级联顺序。
+fixture-shell.tsx: 与 main.tsx 同结构的外壳（侧栏 + main.workspace > .cleaner-slot，默认铺满视口；视觉核对一律用真实窗口 1040×820，并补 760×640），所有夹具共用，使内距/滚动/宽度与真实应用一致；各夹具在组件之前引入 index.css/style.css，保持与应用相同的级联顺序。
 network.html: 网络页独立 Vite 测试入口，不进入生产构建。
 system.html / system-fixture.tsx: 电脑环境页夹具；真实 SystemPanel + mockIPC，13 项地区取自 regions.rs，系统/浏览器命令只记审计。
 help.html / help-fixture.tsx: 使用说明页可视核对夹具，无 IPC。
-network-fixture.tsx: 真实 VpsPanel 与可显式释放的虚构诊断 IPC；成功/部分失败/异常/空返回，虚构浏览器快照（本机出口、checks、B 运行、DNS 最近一轮）与命令审计，无真实联网或导航。
+network-fixture.tsx: networkFixture.demo() 填入真实量级数据（12 项一致性、6 个解析器、长运营商名）供视觉核对；真实 VpsPanel 与可显式释放的虚构诊断 IPC；成功/部分失败/异常/空返回，虚构浏览器快照（本机出口、checks、B 运行、DNS 最近一轮）与命令审计，无真实联网或导航。
 identities.html: 独立 Vite 测试入口，生产 rollup 只含 index/browser，不打包本页。
 identities-fixture.tsx: 真实 IdentityPanel 或 query panel=browser 的 BrowserPanel/Cromma/Motion/TooltipProvider + Tauri 官方 mockIPC；40 个虚构账号与有界进程/本地期限元数据、残留清单及可延期命令，官方 runCallback 发送有序 Channel 事件验证真实进度；浏览器模式从无缓存条目的资料开始，覆盖全清理默认取消/强制勾选/精确参数/任务锁与失败；一次性迁移文件选择/导入导出仅内存模拟；覆盖不完整统计、部分失败、命令审计与切换/删除/恢复/双语，不读取本机账号或文件。
 执行入口 ../scripts/test-identities-ui.ts 使用 Node.js 原生管道及临时 HOME/XDG/浏览器上下文、阻止外网、保留真实 DOM 输入；不采集截图或用户目录。

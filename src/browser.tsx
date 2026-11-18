@@ -126,8 +126,7 @@ export function BrowserPanel({ onBusy }: {
         <p className="rb-muted browser-hint">{t("修改步骤：正常退出 B → 调整并保存设置 → 由 A 打开浏览器并实测。仅重新打开实测页不会重新加载语言、时区或代理。")}</p>
         <details className="browser-hint browser-more"><summary>{t("语言与时区如何生效")}</summary><p className="rb-muted">{t("跟随机器时，语言与时区取自系统；关闭跟随后可手动选择。这里只显示配置目标，实际生效值以 B 实测为准。")}</p></details>
       </div>
-      <fieldset className="rb-row browser-row-wrap browser-dns-settings" disabled={locked}>
-       <legend className="browser-row-label">{t('DNS 解析设置')}</legend>
+      <div className="rb-row browser-row-top"><span className="browser-row-label" id="browser-dns-label">{t('DNS 解析设置')}</span><fieldset className="browser-dns-settings" disabled={locked} aria-labelledby="browser-dns-label">
        <Segment label={t('DNS 解析方式')} value={dns.mode} disabled={locked} onChange={v=>editDns({mode:v})} options={[{value:'inherit' as const,label:t('沿用现有解析')},{value:'secure' as const,label:t('指定 DoH')}]}/>
        {dns.mode==='inherit'?<p className="rb-muted browser-hint">{t('保留当前资料原有的安全 DNS。若此前由 A 指定 DoH，下次从 A 启动 B 时恢复接管前设置；原有自动模式可能回退普通 DNS。')}</p>:<div className="browser-doh">
         <Select aria-label={t('DoH 服务商')} value={dns.provider} disabled={locked} onValueChange={v=>{if(v)editDns({provider:v as DnsConfig['provider']});}} items={[...DOH_PROVIDERS.map(p=>({value:p.id,label:p.id==='quad9'?t('Quad9（恶意域名过滤）'):p.name})),{value:'custom',label:t('自定义地址')}]}/>
@@ -136,7 +135,7 @@ export function BrowserPanel({ onBusy }: {
         <p className="rb-muted browser-hint">{t('严格 DoH：浏览器自行解析的网站域名在该服务失败时解析失败，不自动回退普通 DNS，也不切换其他服务商。')}</p>
        </div>}
        <details className="browser-hint browser-more"><summary>{t('生效边界与回退')}</summary><p className="rb-muted">{t('仅作用于当前身份的 B 浏览器资料；正常退出 B、保存后，从 A 重新启动生效。不会修改系统 DNS、TUN 或代理服务器的 DNS。')}</p><p className="rb-muted">{t("指定 DoH 时，A 每次全新启动 B 都会应用此配置；在 B 设置页手动修改，可能在下次启动时被覆盖。切回沿用会恢复 A 首次接管前的两项安全 DNS 设置。")}</p><p className="rb-muted">{t('HTTP/SOCKS 代理代为解析的域名不受浏览器 DoH 控制。DoH 服务自身域名的启动解析可能使用现有 DNS；该选项不强制 DoH 连接走代理，企业策略或家长控制也可能覆盖设置。请以重启后的 DNS 实测和必要的网络日志核对。')}</p></details>
-      </fieldset>
+      </fieldset></div>
       <div className="rb-row"><span className="browser-row-label">{t("设备指纹")}</span><Segment label={t("设备指纹")} value={draft?.native_graphics || false} disabled={locked} onChange={v => edit('native_graphics', v)} options={[{value:true,label:t("使用真实设备指纹")},{value:false,label:t("使用种子生成")}]}/><span className="browser-spacer"/><button type="button" className="rb-btn primary" disabled={locked || !changed || !!dnsError} aria-busy={busy === 'browser_save'} onClick={() => draft && void act('browser_save', { config: draft })}>{t("保存设置")}</button></div>
     </section>
     <section className="rb-card browser-data" aria-labelledby="browser-data-title">

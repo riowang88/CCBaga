@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 隔离 Playwright 引擎、Vite 与网络页虚构 IPC。
- * [OUTPUT]: 网络环境检测页回归：真实外壳下页面内距/无横向溢出/深色卡无浅色汇总块与白边表格、无 Skill/提示词入口、Claude 可用性四域名待测/检测中/成功/失败与延迟、本机出口、一致性网格、DNS 最近一轮三态与「在 B 中检测」、WebRTC 如实未检测、完整报告链接仅 B 运行时可用、双语 DOM。
+ * [OUTPUT]: 网络环境检测页回归：真实外壳（1040×820）下页面内距/无横向溢出/深色卡无浅色汇总块与白边表格、无 Skill/提示词入口、Claude 可用性四域名待测/检测中/成功/失败与延迟、本机出口、一致性网格、DNS 最近一轮三态与「在 B 中检测」、WebRTC 如实未检测、完整报告链接仅 B 运行时可用、双语 DOM。
  * [POS]: 共用 UI 回归的功能证明，不截图或访问外部服务。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -17,7 +17,7 @@ export async function testNetworkDiagnostics(browser:Browser,base:string) {
   await page.goto(base+'/tests/network.html');
   await page.getByRole('heading',{name:'Claude 可用性',exact:true}).waitFor();
   // ----- 外壳：与真实应用同容器，页面根有内距、自己滚动、主按钮和卡片不超出窗口 -----
-  await page.setViewportSize({width:1200,height:800});
+  await page.setViewportSize({width:1040,height:820});
   const layout=await page.evaluate(()=>{const root=document.querySelector('.network-page') as HTMLElement;const s=getComputedStyle(root);const right=Math.max(...[...root.querySelectorAll('*')].map(e=>e.getBoundingClientRect().right));return {pad:parseFloat(s.paddingLeft),overflow:s.overflowY,right,width:window.innerWidth,outcomeBg:getComputedStyle(document.querySelector('.domain-outcome')!).backgroundColor,listBorder:getComputedStyle(document.querySelector('.domain-diagnostics-list')!).borderTopWidth};});
   assert.ok(layout.pad>=24,`page padding ${layout.pad}`);assert.equal(layout.overflow,'auto');assert.ok(layout.right<=layout.width,`content right ${layout.right} > ${layout.width}`);
   assert.equal(layout.outcomeBg,'rgba(0, 0, 0, 0)');assert.equal(layout.listBorder,'0px');
@@ -80,6 +80,9 @@ export async function testNetworkDiagnostics(browser:Browser,base:string) {
   await page.locator('.network-dns[data-dns="observed"]').waitFor();
   assert.equal(await dns.locator('tbody tr').count(),2);
   assert.match(await dns.innerText(),/共观测到 2 个解析器/);
+  // 默认只显示一行结论，明细收在折叠区；展开后才看到逐行归属地
+  assert.equal(await dns.locator('details.network-dns-details').getAttribute('open'),null);
+  await dns.getByText('查看解析器明细',{exact:true}).click();
   assert.match(await dns.innerText(),/归属地未取得/);
   assert.match(await dns.innerText(),/不自动等于泄露/);
   await fixture(`window.networkFixture.browser.dns_last={observation:{id:'a'.repeat(48),resolvers:[],observed_at:1780000000000},error:'',at:1780000000000};window.networkFixture.refresh();`);

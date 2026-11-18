@@ -17,7 +17,7 @@ import {testBrowserDns} from './test-browser-dns.ts';
 import {testBrowserProfiles} from './test-browser-profiles.ts';
 import {testBrowserCleanup} from './test-browser-cleanup.ts';
 import {testNetworkDiagnostics} from './test-network-diagnostics.ts';
-import {testSystemUi} from './test-system-ui.ts';
+import {testSystemUi,testLayoutBudget} from './test-system-ui.ts';
 import {testClaudeResidue} from './test-claude-residue.ts';
 import {testIdentityTransfer} from './test-identity-transfer.ts';
 import {testIdentityOperation} from './test-identity-operation.ts';
@@ -182,6 +182,7 @@ try{
  checks+=await testBrowserCleanup(browser,base);
  checks+=await testNetworkDiagnostics(browser,base);
  checks+=await testSystemUi(browser,base);
+ checks+=await testLayoutBudget(browser,base);
  checks+=await testClaudeResidue(browser,base);
  checks+=await testIdentityOperation(browser,base);
  checks+=await testIdentityTransfer(browser,base);

@@ -1,77 +1,79 @@
 /*
  * [INPUT]: rb.css 共享变量（--rb-*）与 .rb-page/.rb-card(.dark/.line)/.rb-label 契约；缺失时使用同值回退。
- * [OUTPUT]: 网络环境检测页专属布局（照 Network.dc.html）：页头、出口三卡（衬线 28px / 等宽 22px 大字）、深色 Claude 可用性（一行状态文字 + 无边框发丝线行：等宽域名、延迟、语义色状态文字）、DNS/WebRTC 细线卡竖排在右、全宽深色环境一致性两栏列表。
- * [POS]: 仅由 vps.tsx 引入，在 index.css/style.css 之后加载；不定义通用按钮/卡片，旧 style.css 网络规则已删除，不再依赖覆盖顺序。
+ * [OUTPUT]: 网络环境检测页专属布局（照 Network.dc.html，按真实窗口 1040×820 一屏放下）：页头、出口三张等高矮卡（单行省略，title 给全称）、深色 Claude 可用性 | 环境一致性并排（一致性列表 flex-basis 0 在卡内滚动，行高跟随可用性卡）、细线 DNS（一行结论 + 可展开紧凑明细表，IP 不折行）| WebRTC 并排。
+ * [POS]: 仅由 vps.tsx 引入，在 index.css/style.css 之后加载；不定义通用按钮/卡片。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
-.network-page{gap:14px}
-.network-head{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
-.network-head>div{flex:1;min-width:220px}
+.network-head{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap}
+.network-head>div{flex:1;min-width:200px}
 .network-feedback{margin:0;font-size:13px}
-.network-page h2.rb-label{margin:0 0 8px}
+.network-page h2.rb-label{margin:0 0 6px}
 
-/* ----- 出口三卡 ----- */
-.network-exit{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
-.network-exit .rb-card{padding:18px 22px}
-.network-exit .rb-label{margin:0 0 8px}
-.network-big{margin:0;font:500 28px/1.2 var(--rb-serif,'Cormorant Garamond','Noto Serif SC',serif);letter-spacing:-.01em;color:var(--rb-ink,#141413);overflow-wrap:anywhere}
-.network-big.rb-mono{font:500 22px/1.3 var(--rb-mono,'JetBrains Mono',monospace);letter-spacing:0}
-.network-note{margin:-4px 0 0;font-size:13px;color:var(--rb-muted,#6c6a64)}
+/* ----- 出口三张矮卡 ----- */
+.network-exit{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.network-exit .rb-card{padding:10px 16px}
+.network-exit .rb-label{margin:0 0 2px}
+.network-big{margin:0;font:500 20px/1.3 var(--rb-serif,'Cormorant Garamond','Noto Serif SC',serif);letter-spacing:-.01em;color:var(--rb-ink,#141413);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.network-big.rb-mono{font:500 17px/1.5 var(--rb-mono,'JetBrains Mono',monospace);letter-spacing:0}
+.network-note{margin:-6px 0 0;font-size:12px;color:var(--rb-muted,#62605a);overflow-wrap:anywhere}
 
-/* ----- 网格：第一行 可用性 | DNS+WebRTC；第二行 一致性全宽 ----- */
-.network-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
-.network-stack{display:flex;flex-direction:column;gap:14px;min-width:0}
-.network-page .rb-card.dark{padding:18px 22px 10px}
-.network-dark-note{margin:0 0 8px;font-size:13px;color:var(--rb-on-dark-soft,#a09d96)}
-.network-small{font-size:12px;margin:8px 0 0}
-.network-foot{margin-top:4px}
+/* ----- 网格 ----- */
+.network-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
+.network-dark-row{align-items:stretch}
+.network-page .rb-card.dark{padding:12px 16px 8px;display:flex;flex-direction:column;min-height:0}
+.network-dark-note{margin:0 0 4px;font-size:12px;color:var(--rb-on-dark-soft,#a09d96)}
+.network-small{font-size:12px;margin:6px 0 0}
+.network-foot{margin-top:0}
 
 /* ----- 深色卡：Claude 可用性 ----- */
-.domain-outcome{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:0 0 8px;font-size:13px;color:var(--rb-on-dark-soft,#a09d96)}
-.domain-outcome strong{font-weight:500;color:var(--rb-on-dark,#faf9f5)}
+.domain-outcome{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin:0 0 4px;font-size:12px;color:var(--rb-on-dark-soft,#a09d96)}
+.domain-outcome strong{font-weight:500;font-size:13px;color:var(--rb-on-dark,#faf9f5)}
 .domain-outcome.passed strong{color:var(--rb-ok-on-dark,#7fd093)}
-.domain-outcome.failed strong,.domain-outcome p{color:var(--rb-warn-on-dark,#e8a55a)}
-.domain-outcome.checking strong{color:var(--rb-warn-on-dark,#e8a55a)}
+.domain-outcome.failed strong,.domain-outcome p,.domain-outcome.checking strong{color:var(--rb-warn-on-dark,#e8a55a)}
 .domain-outcome p{margin:0;flex-basis:100%;overflow-wrap:anywhere}
 .domain-diagnostics-list,.network-check-list{list-style:none;margin:0;padding:0}
-.network-page .rb-card.dark .rb-row{padding:9px 0;gap:14px;border-top:1px solid var(--rb-dark-line,#2e2c28)}
+.network-page .rb-card.dark .rb-row{padding:6px 0;gap:10px;border-top:1px solid var(--rb-dark-line,#2e2c28)}
 .domain-diagnostics-item{display:flex;align-items:center}
-.domain-item-info{flex:1;min-width:0;display:flex;flex-wrap:wrap;column-gap:8px;row-gap:1px}
+.domain-item-info{flex:1;min-width:0;display:flex;flex-wrap:wrap;column-gap:8px}
 .domain-item-info>.domain-name{flex-basis:100%}
-.domain-name{font:400 13px/1.5 var(--rb-mono,'JetBrains Mono',monospace);color:var(--rb-on-dark,#faf9f5);overflow-wrap:anywhere}
-.domain-detail{font-size:12px;line-height:1.5;color:var(--rb-on-dark-soft,#a09d96);overflow-wrap:anywhere}
-.domain-ip{font:400 12px/1.5 var(--rb-mono,'JetBrains Mono',monospace);color:var(--rb-on-dark-soft,#a09d96)}
-.domain-latency{font:400 13px var(--rb-mono,'JetBrains Mono',monospace);color:var(--rb-on-dark-soft,#a09d96);white-space:nowrap}
+.domain-name{font:400 13px/1.45 var(--rb-mono,'JetBrains Mono',monospace);color:var(--rb-on-dark,#faf9f5);overflow-wrap:anywhere}
+.domain-detail{font-size:11.5px;line-height:1.45;color:var(--rb-on-dark-soft,#a09d96);overflow-wrap:anywhere}
+.domain-ip{font:400 11.5px/1.45 var(--rb-mono,'JetBrains Mono',monospace);color:var(--rb-on-dark-soft,#a09d96)}
+.domain-latency{font:400 12px var(--rb-mono,'JetBrains Mono',monospace);color:var(--rb-on-dark-soft,#a09d96);white-space:nowrap}
 .domain-badge{min-width:4em;text-align:right;font-size:13px;font-weight:500;white-space:nowrap;color:var(--rb-on-dark-soft,#a09d96)}
 .domain-badge.passed{color:var(--rb-ok-on-dark,#7fd093)}
 .domain-badge.failed{color:var(--rb-warn-on-dark,#e8a55a)}
 .domain-badge.checking{color:var(--rb-on-dark,#faf9f5);animation:network-pulse 1.2s ease-in-out infinite}
-.domain-diagnostics .network-dark-note:last-child{margin:8px 0 4px;font-size:12px}
+.domain-diagnostics .network-dark-note:last-child{margin:4px 0 2px;font-size:11.5px}
 
-/* ----- 深色卡：环境一致性（全宽两栏） ----- */
-.network-consistency-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+/* ----- 深色卡：环境一致性（列表不参与行高，在卡内滚动） ----- */
+.network-consistency-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
 .network-consistency-head .rb-label{flex:1}
-.network-consistency-head .network-dark-note{margin:0 0 8px}
-.network-check-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:28px}
+.network-check-list{flex:1 1 0;min-height:96px;overflow-y:auto;margin-right:-8px;padding-right:8px;scrollbar-width:thin;scrollbar-color:#4a4741 transparent}
 .network-check{display:flex;align-items:flex-start}
 .network-check>div{flex:1;min-width:0}
-.network-check strong{display:block;font-weight:500;font-size:13px;line-height:1.5;color:var(--rb-on-dark,#faf9f5)}
-.network-check p{margin:1px 0 0;font-size:12px;line-height:1.5;color:var(--rb-on-dark-soft,#a09d96);overflow-wrap:anywhere}
-.network-check>span{font-size:13px;font-weight:500;line-height:1.5;white-space:nowrap}
+.network-check strong{display:block;font-weight:500;font-size:13px;line-height:1.45;color:var(--rb-on-dark,#faf9f5)}
+.network-check p{margin:0;font-size:11.5px;line-height:1.45;color:var(--rb-on-dark-soft,#a09d96);overflow-wrap:anywhere}
+.network-check>span{font-size:12.5px;font-weight:500;line-height:1.45;white-space:nowrap}
 .rb-card.dark .network-check .rb-ok{color:var(--rb-ok-on-dark,#7fd093)}
 .rb-card.dark .network-check .rb-warn{color:var(--rb-warn-on-dark,#e8a55a)}
 .rb-card.dark .network-check .rb-err{color:#f08a8a}
 
 /* ----- 细线卡：DNS / WebRTC ----- */
-.network-card-head{display:flex;align-items:center;gap:12px}
+.network-grid>.rb-card.line{padding:12px 16px}
+.network-card-head{display:flex;align-items:center;gap:10px}
 .network-card-head h2{flex:1}
-.network-card-head .rb-link{height:28px;padding:0 4px;margin:-6px -4px 0 0}
+.network-card-head .rb-link{height:24px;padding:0 2px;margin:-6px -2px 0 0}
 .network-dns p,.network-webrtc p{margin:0}
-.network-dns [role=status],.network-webrtc [role=status]{font-size:14px;overflow-wrap:anywhere}
-.network-dns-table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12px}
-.network-dns-table th{text-align:left;font-weight:500;color:var(--rb-muted,#6c6a64);padding:4px 8px 4px 0}
-.network-dns-table td{padding:6px 8px 6px 0;border-top:1px solid var(--rb-hairline,#e6dfd8);overflow-wrap:anywhere}
+.network-dns [role=status],.network-webrtc [role=status]{font-size:13px;overflow-wrap:anywhere}
+.network-dns-details{margin-top:4px;font-size:12px}
+.network-dns-details>summary{width:fit-content;cursor:pointer;color:var(--rb-link,#984c34);font-weight:500}
+.network-dns-table{width:100%;border-collapse:collapse;margin-top:4px;font-size:12px}
+.network-dns-table th{text-align:left;font-weight:500;color:var(--rb-muted,#62605a);padding:2px 8px 2px 0;white-space:nowrap}
+.network-dns-table td{padding:3px 8px 3px 0;border-top:1px solid var(--rb-hairline,#e6dfd8);line-height:1.4;overflow-wrap:anywhere}
+.network-dns-table td:first-child{white-space:nowrap;overflow-wrap:normal}
 
 @keyframes network-pulse{50%{opacity:.45}}
 @media (prefers-reduced-motion:reduce){.domain-badge.checking{animation:none}}
-@media (max-width:900px){.network-exit,.network-grid,.network-check-list{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:900px){.network-exit{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:620px){.network-exit,.network-grid{grid-template-columns:minmax(0,1fr)}.network-check-list{flex:none;max-height:240px}}

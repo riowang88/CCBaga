@@ -32,6 +32,14 @@ export async function testIdentityTransfer(browser:Browser,base:string){
   assert.equal(await dialog.getByRole('checkbox',{name:'包含浏览器指纹配置（不含网页登录资料）',exact:true}).isChecked(),false);
   await dialog.getByLabel('迁移密码（至少 12 个字符）',{exact:true}).fill('short');await dialog.getByLabel('确认迁移密码',{exact:true}).fill('short');
   await dialog.getByRole('checkbox',{name:'我会妥善保管迁移文件和密码',exact:true}).check();assert.equal(await submit.isEnabled(),false);checks++;
+  // 禁用原因就地可见：不足 12 字符标红并提示差几个，页脚列出仍缺的项
+  const password=dialog.getByLabel('迁移密码（至少 12 个字符）',{exact:true});
+  assert.equal(await password.getAttribute('aria-invalid'),'true');
+  assert.match(await dialog.locator('#identity-transfer-password-hint').innerText(),/还差 7 个字符/);
+  assert.match(await dialog.locator('.identity-transfer-missing').innerText(),/还需：密码不足 12 个字符/);
+  await password.fill('synthetic-transfer-password');
+  assert.match(await dialog.locator('.identity-transfer-missing').innerText(),/两次密码不一致/);
+  assert.equal(await dialog.getByLabel('确认迁移密码',{exact:true}).getAttribute('aria-invalid'),'true');checks++;
   await dialog.getByLabel('迁移密码（至少 12 个字符）',{exact:true}).fill('synthetic-transfer-password');await dialog.getByLabel('确认迁移密码',{exact:true}).fill('synthetic-transfer-password');
   await page.evaluate(()=>{(window as any).identityFixture.transfer.cancel=true;});await dialog.getByRole('button',{name:'选择保存位置',exact:true}).click();
   await dialog.getByText('尚未选择文件',{exact:true}).waitFor();assert.equal(await submit.isEnabled(),false);assert.equal(await dialog.getByRole('checkbox',{name:'我会妥善保管迁移文件和密码',exact:true}).isChecked(),false);checks++;

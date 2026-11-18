@@ -248,7 +248,13 @@ h3 { margin: 0; font-size: 13px; font-weight: 500; }
 /* ----- 伴生页身份工牌：检测区上方，展示本地绑定而非网站认证 ----- */
 .identity-transfer-file { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid var(--landing-line); }
 .identity-transfer-file > span { min-width:0; overflow-wrap:anywhere; font:12px ui-monospace,monospace; }
-.identity-transfer > label { margin-bottom:-10px; }
+.identity-transfer { gap:10px; }
+.identity-transfer > label { margin-bottom:-6px; font-weight:500; color:var(--rb-ink); }
+.identity-transfer .identity-confirm-target, .identity-transfer .identity-confirm-keep { padding-top:8px; }
+.identity-transfer-file { padding:6px 0; }
+.identity-transfer input[aria-invalid="true"] { border-color:var(--rb-err); box-shadow:0 0 0 2px color-mix(in srgb,var(--rb-err) 18%,transparent); }
+.identity-transfer .identity-transfer-hint { margin:-4px 0 0; color:var(--rb-err); font-size:12px; }
+.identity-transfer-missing { flex:1 1 220px; align-self:center; margin:0; color:var(--rb-warn); font-size:12px; line-height:1.45; }
 /* 工牌内用量：会话/本周两条细进度，深色当前卡与浅色暂存卡共用；已重置窗口清空进度 */
 .card-usage { display:grid; gap:6px; margin-top:8px; padding-top:8px; border-top:1px dashed #d8d8d1; }
 .current .card-usage { border-top-color:#ffffff26; }
@@ -280,28 +286,29 @@ h3 { margin: 0; font-size: 13px; font-weight: 500; }
 .system-rb { flex: 1; min-height: 0; overflow: auto; }
 .system-rb > header { display: block; }
 .system-rb-error { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.system-rb-regions { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; }
-.system-rb-regions .rb-chip { min-width: 0; padding: 0 12px; }
+.system-rb-regions { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; }
+.system-rb-regions .rb-chip { min-width: 0; height: 32px; padding: 0 8px; }
 .system-rb-regions .rb-chip > span { overflow: hidden; text-overflow: ellipsis; }
-.system-rb-apply { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin-top: 18px; }
-.system-rb-sync { align-items: flex-start; max-width: 340px; }
+.system-rb-apply { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; margin-top: 12px; }
+.system-rb-sync { align-items: flex-start; flex: 1 1 260px; max-width: 420px; }
 .system-rb-apply > .rb-btn.primary { margin-left: auto; }
 .system-rb-sync input { margin-top: 3px; flex-shrink: 0; }
 .system-rb-sync > span { display: flex; flex-direction: column; gap: 2px; }
-.system-rb-sync small { font-size: 12px; line-height: 1.45; }
-.system-rb-target { flex: 1 1 100%; min-width: 0; color: var(--rb-muted); overflow-wrap: anywhere; }
+.system-rb-sync small { font-size: 11.5px; line-height: 1.4; }
+.system-rb-target { flex: 1 1 100%; min-width: 0; font-size: 13px; color: var(--rb-muted); overflow-wrap: anywhere; }
 .system-rb-target .rb-mono { color: var(--rb-ink); user-select: text; }
-.system-rb-current { padding-bottom: 8px; }
-.system-rb-current-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: -10px 0 4px; }
+.system-rb-current { padding-bottom: 6px; }
+.system-rb-current-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: -6px 0 0; }
 .system-rb-current-head .rb-label { margin: 0; }
+.system-rb-current .rb-row { min-height: 50px; box-sizing: border-box; }
 .system-rb-current .rb-row > .v { user-select: text; }
 .system-rb-current .rb-row > .rb-muted { flex-shrink: 0; }
 .system-rb-note { display: block; margin-top: 2px; }
-.system-rb-edit { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 4px 0 14px 136px; }
+.system-rb-edit { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 2px 0 10px 116px; }
 .system-rb-edit > p { flex-basis: 100%; margin: 0; }
 .system-rb-edit > input { flex: 1 1 160px; }
 .system-rb-edit > button[role="combobox"] { flex: 1.4 1 200px; }
-.system-rb-edit > button[role="combobox"], .system-rb-edit > input { min-width: 0; height: 40px; border-radius: 8px; }
+.system-rb-edit > button[role="combobox"], .system-rb-edit > input { min-width: 0; height: 34px; border-radius: 8px; }
 .system-rb-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: auto; }
 .system-rb-spacer { flex: 1; }
 .system-rb > .cleanup-activity { margin: 0; }

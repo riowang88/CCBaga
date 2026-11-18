@@ -1,50 +1,56 @@
 /*
  * [INPUT]: rb.css 共享变量与 .rb-card/.rb-row/.rb-seg/.rb-btn；缺失时使用同值回退。
- * [OUTPUT]: 浏览器环境配置页专属排版：深色状态条（主状态/弱化第二行 + 右侧操作）、设置行（120px 标签列）、输入框与可读禁用态、13px 主说明与「更多」折叠（文字链色 summary）、分段控件选中态、数据清理区与缓存折叠；全部文字 ≥4.5:1。
+ * [OUTPUT]: 浏览器环境配置页专属排版（1040×820 一屏放下）：紧凑深色状态条（主状态/弱化第二行 + 右侧操作）、统一 104px 标签列设置行（DNS 与其他行同一布局）、canvas 底输入框与可读禁用态、12px 主说明与「更多」折叠（文字链色 summary）、分段控件选中态、数据清理区与缓存折叠；全部文字 ≥4.5:1。
  * [POS]: 仅由 browser.tsx 引入；不覆盖共享组件的基础样式。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
-.browser-page{display:flex;flex-direction:column;gap:14px}
 .browser-head{display:flex;align-items:flex-end;gap:12px}
 .browser-head>div{flex:1}
-.browser-feedback{margin:0;font-size:13px}
-.browser-page h2.rb-label{margin:0 0 8px}
+.browser-feedback{margin:0;font-size:12.5px}
+.browser-page h2.rb-label{margin:0 0 2px}
 
-.browser-status{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 22px}
-.browser-status-text{flex:1;min-width:220px;display:flex;flex-direction:column;gap:2px}
+.browser-status{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 16px}
+.browser-status-text{flex:1;min-width:200px;display:flex;flex-direction:column;gap:0}
 .browser-status-main{font-weight:500;color:var(--rb-on-dark,#faf9f5)}
 .browser-status-text .rb-ok{color:var(--rb-ok-on-dark,#7fd093)}
-.browser-status-meta{font-size:13px;color:var(--rb-on-dark-soft,#a09d96)}
+.browser-status-meta{font-size:12px;color:var(--rb-on-dark-soft,#a09d96)}
 .browser-status .rb-link{color:var(--rb-warn-on-dark,#e8a55a)}
 .browser-status .rb-link:disabled{color:var(--rb-on-dark-soft,#a09d96)}
 
-.browser-settings .rb-row{display:flex;align-items:center;gap:16px;padding:10px 0;border-top:1px solid var(--rb-hairline,#e6dfd8)}
-.browser-settings .rb-row>label,.browser-row-label{width:120px;flex:none;color:var(--rb-muted,#6c6a64);padding:0}
-.browser-row-wrap{flex-wrap:wrap}
-.browser-row-wrap>.browser-hint,.browser-row-wrap>.browser-manual,.browser-row-wrap>.browser-doh,.browser-row-wrap>details{flex-basis:100%;margin:0 0 0 136px}
-fieldset.browser-dns-settings{margin:0;min-width:0;border:0;border-top:1px solid var(--rb-hairline,#e6dfd8)}
-fieldset.browser-dns-settings>legend{float:left}
-.browser-input{flex:1;min-width:0;height:40px;box-sizing:border-box;border:1px solid #d9d0c2;border-radius:8px;background:var(--rb-canvas,#faf9f5);color:var(--rb-ink,#141413);padding:0 14px;font-size:13px}
-.browser-input:disabled{background:var(--rb-surface-soft,#f5f0e8);border-color:var(--rb-hairline,#e6dfd8);color:var(--rb-body,#3d3d3a);cursor:not-allowed}
+/* 设置行：统一 104px 标签列 + 内容；补充说明从内容列起排（104 + 12 间距） */
+.browser-settings{padding:12px 18px 6px}
+.browser-settings .rb-row{display:flex;align-items:center;gap:12px;padding:7px 0;border-top:1px solid var(--rb-hairline,#e6dfd8)}
+.browser-settings .rb-row>label,.browser-row-label{width:104px;flex:none;color:var(--rb-muted,#62605a);padding:0}
+.browser-row-wrap{flex-wrap:wrap;row-gap:4px!important}
+.browser-row-wrap>.browser-hint,.browser-row-wrap>.browser-manual,.browser-row-wrap>details{flex-basis:100%;margin:0 0 0 116px}
+.browser-row-top{align-items:flex-start!important}
+.browser-row-top>.browser-row-label{line-height:34px}
+fieldset.browser-dns-settings{flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;margin:0;padding:0;border:0}
+fieldset.browser-dns-settings>.browser-hint,fieldset.browser-dns-settings>.browser-doh,fieldset.browser-dns-settings>details{flex-basis:100%}
+.browser-input{flex:1;min-width:0;height:34px;box-sizing:border-box;border:1px solid var(--rb-hairline-strong,#d9d0c2);border-radius:8px;background:var(--rb-canvas,#faf9f5);color:var(--rb-ink,#141413);padding:0 12px;font-size:13px}
+.browser-input:disabled{background:var(--rb-canvas,#faf9f5);border-color:var(--rb-hairline,#e6dfd8);color:var(--rb-body,#3d3d3a);cursor:not-allowed}
 .browser-input::placeholder{color:#76736c}
 .browser-input[aria-invalid=true]{border-color:var(--rb-err,#c64545)}
-.browser-hint{margin:0;font-size:13px;line-height:1.55}
-.browser-more>summary{width:fit-content;cursor:pointer;color:var(--rb-link,#984c34);font-weight:500;font-size:13px}
-.browser-more>p{margin:6px 0 0}
+.browser-hint{margin:0;font-size:12px;line-height:1.5}
+.browser-more>summary{width:fit-content;cursor:pointer;color:var(--rb-link,#984c34);font-weight:500;font-size:12px}
+.browser-more>p{margin:4px 0 0}
 .browser-more>p+p{margin-top:4px}
-.browser-summary{flex:1;min-width:180px;font-size:13px}
-.browser-manual,.browser-doh{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.browser-doh>label{flex-basis:100%;font-size:13px;color:var(--rb-muted,#6c6a64)}
-.browser-doh>.browser-hint{flex-basis:100%}
+.browser-summary{flex:1;min-width:160px;font-size:12px}
+.browser-manual,.browser-doh{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+.browser-manual>*{flex:1 1 180px;min-width:0}
+.browser-doh>button[role=combobox]{flex:0 1 220px;min-width:160px}
+.browser-doh>.browser-doh-endpoint{flex:1 1 200px;flex-basis:auto}
+.browser-doh>label{flex-basis:100%;font-size:12px;color:var(--rb-muted,#62605a)}
+.browser-doh>.browser-hint:not(.browser-doh-endpoint){flex-basis:100%}
 .browser-doh-endpoint{overflow-wrap:anywhere}
 .browser-spacer{flex:1}
 .browser-page .rb-seg button[aria-checked=true]{background:var(--rb-canvas,#faf9f5);color:var(--rb-ink,#141413)}
 
-
-.browser-data-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.browser-data-text{flex:1;min-width:240px}
-.browser-data-text p{margin:4px 0 0;font-size:13px;color:var(--rb-body,#3d3d3a)}
-.browser-cache{margin-top:10px;font-size:12px}
-.browser-cache>div{display:flex;justify-content:space-between;gap:12px;padding:4px 0;border-top:1px solid var(--rb-hairline,#e6dfd8)}
+.browser-data{padding:12px 18px}
+.browser-data-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.browser-data-text{flex:1;min-width:220px}
+.browser-data-text p{margin:2px 0 0;font-size:12px;color:var(--rb-body,#3d3d3a)}
+.browser-cache{margin-top:6px;font-size:12px}
+.browser-cache>div{display:flex;justify-content:space-between;gap:12px;padding:3px 0;border-top:1px solid var(--rb-hairline,#e6dfd8)}
 .browser-cache span{overflow-wrap:anywhere}
-@media (max-width:760px){.browser-row-wrap>.browser-hint,.browser-row-wrap>.browser-manual,.browser-row-wrap>.browser-doh,.browser-row-wrap>details{margin-left:0}.browser-settings .rb-row{flex-wrap:wrap}}
+@media (max-width:760px){.browser-row-wrap>.browser-hint,.browser-row-wrap>.browser-manual,.browser-row-wrap>details{margin-left:0}.browser-settings .rb-row{flex-wrap:wrap}}

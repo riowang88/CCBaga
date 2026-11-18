@@ -1,7 +1,7 @@
 /**
  * [INPUT]: docs/DESIGN.md 奶油/珊瑚视觉规范与四张已认可效果图（Main/Network/Identity/Browser）的实测 CSS 数值；src/fonts 内嵌 OFL 字体。
  * [OUTPUT]: --rb-* 色板/字体变量与共享类契约：rb-page/h1/sub/card(.line/.dark)/label/btn(.primary/.danger)/link/chip/seg/row/mono/muted/ok/warn/err；对比度修正令牌 --rb-primary-fill（主按钮实底）/--rb-link（文字链）与加深的 --rb-muted，保证正文与可交互文字 ≥4.5:1；禁用态用明确配色而非透明度；键盘焦点与减弱动态。
- * [POS]: 全部页面共用的设计基础；由 index.css 引入，页面专属布局仍归 style.css；类名与变量名是跨会话契约，改名须同步所有页面。
+ * [POS]: 全部页面共用的设计基础；密度按真实窗口 1040×820（最小 760×640）定：页面内距 20/24px、h1 28px、正文 13px、按钮/胶囊 34px、卡片内距 14×18、间距 12px、行内距 8px；由 index.css 引入，页面专属布局仍归 style.css；类名与变量名是跨会话契约，改名须同步所有页面。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 @font-face { font-family: 'Cormorant Garamond'; font-style: normal; font-weight: 500; font-display: swap; src: url('./fonts/cormorant-garamond-latin-500-normal.woff2') format('woff2'); }
@@ -47,19 +47,19 @@
 }
 
 /* ── 页面骨架 ── */
-.rb-page { display: flex; flex-direction: column; gap: 16px; padding: 32px 36px; box-sizing: border-box; min-width: 0; font-family: var(--rb-sans); font-size: 14px; line-height: 1.55; color: var(--rb-ink); }
+.rb-page { display: flex; flex-direction: column; gap: 12px; padding: 20px 24px 24px; box-sizing: border-box; min-width: 0; font-family: var(--rb-sans); font-size: 13px; line-height: 1.55; color: var(--rb-ink); }
 .rb-page > * { flex-shrink: 0; }
-.rb-h1 { margin: 0; font: 500 36px/1.15 var(--rb-serif); letter-spacing: -.02em; color: var(--rb-ink); }
-.rb-sub { margin: 4px 0 0; color: var(--rb-muted); font-size: 14px; line-height: 1.55; }
+.rb-h1 { margin: 0; font: 500 28px/1.15 var(--rb-serif); letter-spacing: -.02em; color: var(--rb-ink); }
+.rb-sub { margin: 2px 0 0; color: var(--rb-muted); font-size: 13px; line-height: 1.5; }
 
 /* ── 卡片 ── */
-.rb-card { border-radius: 12px; background: var(--rb-card); padding: 22px 24px; color: var(--rb-ink); min-width: 0; box-sizing: border-box; }
+.rb-card { border-radius: 12px; background: var(--rb-card); padding: 14px 18px; color: var(--rb-ink); min-width: 0; box-sizing: border-box; }
 .rb-card.line { background: var(--rb-canvas); border: 1px solid var(--rb-hairline); }
 .rb-card.dark { background: var(--rb-dark); color: var(--rb-on-dark); }
-.rb-label { margin: 0 0 14px; font-size: 12px; font-weight: 500; letter-spacing: 1.5px; line-height: 1.4; color: var(--rb-muted); }
+.rb-label { margin: 0 0 8px; font-size: 12px; font-weight: 500; letter-spacing: 1.5px; line-height: 1.4; color: var(--rb-muted); }
 
 /* ── 按钮三级 ── */
-.rb-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 18px; box-sizing: border-box; border-radius: 8px; border: 1px solid var(--rb-hairline-strong); background: var(--rb-canvas); color: var(--rb-ink); font: 500 14px var(--rb-sans); white-space: nowrap; box-shadow: var(--rb-shadow-btn); cursor: pointer; transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease, transform .15s ease; }
+.rb-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 34px; padding: 0 14px; box-sizing: border-box; border-radius: 8px; border: 1px solid var(--rb-hairline-strong); background: var(--rb-canvas); color: var(--rb-ink); font: 500 13px var(--rb-sans); white-space: nowrap; box-shadow: var(--rb-shadow-btn); cursor: pointer; transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease, transform .15s ease; }
 .rb-btn:hover:not(:disabled) { background: var(--rb-surface-soft); }
 .rb-btn:active:not(:disabled) { transform: translateY(1px); box-shadow: none; }
 .rb-btn.primary { background: var(--rb-primary-fill); border-color: var(--rb-primary-active); color: #fff; box-shadow: var(--rb-shadow-primary); }
@@ -67,20 +67,20 @@
 .rb-btn.primary:active:not(:disabled) { background: var(--rb-primary-active); box-shadow: inset 0 1px 2px rgba(20,20,19,.2); }
 .rb-btn.danger { border-color: #c64545; color: #a83232; }
 .rb-btn.danger:hover:not(:disabled) { background: #fbefec; }
-.rb-link { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 6px; border: 0; border-radius: 6px; background: none; color: var(--rb-link); font: 500 14px var(--rb-sans); white-space: nowrap; cursor: pointer; }
+.rb-link { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 4px; border: 0; border-radius: 6px; background: none; color: var(--rb-link); font: 500 13px var(--rb-sans); white-space: nowrap; cursor: pointer; }
 .rb-link:hover:not(:disabled) { text-decoration: underline; text-underline-offset: 3px; }
 
 /* ── 胶囊与分段 ── */
-.rb-chip { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 16px; box-sizing: border-box; border-radius: 9999px; border: 1px solid var(--rb-chip-edge); background: var(--rb-canvas); color: var(--rb-body); font: 500 14px var(--rb-sans); white-space: nowrap; box-shadow: var(--rb-shadow-chip); cursor: pointer; transition: background-color .15s ease, border-color .15s ease, color .15s ease; }
+.rb-chip { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 34px; padding: 0 12px; box-sizing: border-box; border-radius: 9999px; border: 1px solid var(--rb-chip-edge); background: var(--rb-canvas); color: var(--rb-body); font: 500 13px var(--rb-sans); white-space: nowrap; box-shadow: var(--rb-shadow-chip); cursor: pointer; transition: background-color .15s ease, border-color .15s ease, color .15s ease; }
 .rb-chip:hover:not(:disabled):not([aria-pressed="true"]) { background: var(--rb-surface-soft); }
 .rb-chip[aria-pressed="true"] { background: var(--rb-dark); border-color: var(--rb-dark); color: var(--rb-on-dark); }
 .rb-seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 8px; background: var(--rb-card); }
-.rb-seg > button { height: 34px; padding: 0 14px; border: 0; border-radius: 6px; background: none; color: var(--rb-muted); font: 500 14px var(--rb-sans); white-space: nowrap; cursor: pointer; }
+.rb-seg > button { height: 28px; padding: 0 12px; border: 0; border-radius: 6px; background: none; color: var(--rb-muted); font: 500 13px var(--rb-sans); white-space: nowrap; cursor: pointer; }
 .rb-seg > button[aria-pressed="true"], .rb-seg > button[aria-selected="true"], .rb-seg > button.on { background: var(--rb-canvas); color: var(--rb-ink); }
 
 /* ── 行 ── */
-.rb-row { display: flex; align-items: center; gap: 16px; padding: 12px 0; border-top: 1px solid var(--rb-hairline); min-width: 0; }
-.rb-row > .k { flex: 0 0 120px; color: var(--rb-muted); }
+.rb-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--rb-hairline); min-width: 0; }
+.rb-row > .k { flex: 0 0 104px; color: var(--rb-muted); }
 .rb-row > .v { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 
 /* ── 文字工具 ── */
@@ -118,7 +118,7 @@
 .rb-btn:disabled { background: var(--rb-surface-soft); border-color: var(--rb-hairline); color: var(--rb-muted); box-shadow: none; }
 .rb-btn.primary:disabled { background: var(--rb-cream-strong); border-color: var(--rb-hairline-strong); color: #5f5d57; box-shadow: none; }
 .rb-btn.danger:disabled { background: var(--rb-surface-soft); border-color: #e3c3bd; color: #9a3a3a; }
-.rb-link:disabled { color: var(--rb-muted); text-decoration: none; }
+.rb-link:disabled { color: #8a5a4a; text-decoration: none; } /* 仍是珊瑚系文字链（canvas 上 5.6:1），配合 not-allowed 指针表示不可用 */
 .rb-chip:disabled { box-shadow: none; color: var(--rb-muted); }
 .rb-seg > button:disabled { color: var(--rb-muted); }
 .rb-seg:has(> button:disabled) { background: var(--rb-surface-soft); box-shadow: inset 0 0 0 1px var(--rb-hairline); }

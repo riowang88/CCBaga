@@ -1,10 +1,10 @@
 /*
  * [INPUT]: rb.css 设计令牌（--rb-*，此处带回退值，合并前也可读）与身份页子组件的类名。
- * [OUTPUT]: 身份页专属布局与配色：页头、横幅、工牌三态配色（空=canvas 虚线、当前=深色带「当前」标记、已存=奶油）、卡内主操作+「···」菜单、浅色系策略切换片（留在工作区=白底实线墨字绿点；跟身份走=淡底虚线弱化字空心点；锁定=虚线弱化字+锁形标记与原因行）、更多工具分段与分端登录行。
+ * [OUTPUT]: 身份页专属布局与配色：页头、横幅、工牌 196×311（保持 54:85.6 证件竖版，按 1040×820 窗口压低）与三态配色（空=canvas 虚线、当前=深色带「当前」标记、已存=奶油）、卡内主操作+「···」菜单、浅色系策略切换片（留在工作区=白底实线墨字绿点；跟身份走=淡底虚线弱化字空心点；锁定=虚线弱化字+锁形标记与原因行）、更多工具分段与分端登录行。
  * [POS]: 由 identities.tsx 引入，在 style.css 之后加载；style.css 仍保留在用的身份卡几何/动画，这里用 .rb-identity 作用域与新类名覆盖其配色。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
-.identity-page.rb-identity { display:flex; flex-direction:column; gap:14px; padding:32px 28px; box-sizing:border-box; background:var(--rb-canvas,#faf9f5); color:var(--rb-ink,#141413); }
+.identity-page.rb-identity { display:flex; flex-direction:column; gap:12px; padding:20px 24px 24px; box-sizing:border-box; background:var(--rb-canvas,#faf9f5); color:var(--rb-ink,#141413); }
 .identity-page.rb-identity > * { flex-shrink:0; }
 
 /* ----- 页头 ----- */
@@ -21,8 +21,8 @@
 
 /* ----- 工牌轨道与三态配色（几何沿用 style.css 的 222×352 证件比例） ----- */
 .rb-identity .rb-id-library { display:flex; flex-direction:column; gap:0; }
-.rb-identity .identity-card-rail { padding:10px 0 24px; scroll-padding-inline:0; }
-.rb-identity .identity-card { border-radius:12px; background:var(--rb-cream-strong,#efe9de); border-color:var(--rb-hairline,#e6dfd8); box-shadow:0 1px 3px rgba(20,20,19,.08); }
+.rb-identity .identity-card-rail { gap:14px; padding:6px 0 14px; scroll-padding-inline:0; }
+.rb-identity .identity-card { flex-basis:196px; height:311px; padding:18px 13px 12px; border-radius:12px; background:var(--rb-cream-strong,#efe9de); border-color:var(--rb-hairline,#e6dfd8); box-shadow:0 1px 3px rgba(20,20,19,.08); }
 .rb-identity .identity-card:hover { box-shadow:0 10px 24px -12px rgba(20,20,19,.28); }
 .rb-identity .identity-card.empty { background:var(--rb-canvas,#faf9f5); border:1px dashed var(--rb-hairline-strong,#cfc5b4); }
 .rb-identity .identity-card.empty.selected { border-style:solid; border-color:var(--rb-ink,#141413); }
@@ -44,11 +44,11 @@
 .rb-id-menu-item.danger { color:var(--rb-err,#b53333); }
 
 /* ----- 保留策略条 ----- */
-.rb-id-policy-head { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
-.rb-id-policy-head > h2 { margin:0; font-size:16px; font-weight:500; }
-.rb-id-policy-head > p { margin:0; font-size:13px; }
-.rb-id-chips { display:flex; gap:8px; flex-wrap:wrap; }
-.rb-id-chips .rb-chip { display:inline-flex; align-items:center; gap:8px; height:40px; box-shadow:none; }
+.rb-id-policy-head { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
+.rb-id-policy-head > h2 { margin:0; font-size:14px; font-weight:500; }
+.rb-id-policy-head > p { margin:0; font-size:12px; }
+.rb-id-chips { display:flex; gap:6px; flex-wrap:wrap; }
+.rb-id-chips .rb-chip { display:inline-flex; align-items:center; gap:7px; height:32px; box-shadow:none; }
 /* 跟身份走（未按下）：与卡片同色的淡底、虚线描边、弱化文字、空心圆点——明度上低于“留在工作区” */
 .rb-id-chips .rb-chip[aria-pressed=false] { background:transparent; border:1px dashed var(--rb-hairline-strong,#d9d0c2); color:var(--rb-muted,#6c6a64); }
 .rb-id-chips .rb-chip[aria-pressed=false]:hover:not(:disabled) { background:color-mix(in srgb,var(--rb-canvas,#faf9f5) 45%,transparent); color:var(--rb-body,#3d3d3a); }
@@ -60,10 +60,10 @@
 .rb-id-chips .rb-chip[data-forced] { opacity:1; cursor:not-allowed; border-style:dashed; color:var(--rb-muted,#6c6a64); box-shadow:none; }
 .rb-id-chips .rb-chip[data-forced]::after { content:''; width:9px; height:7px; margin-left:2px; border-radius:1.5px; background:var(--rb-muted,#6c6a64); box-shadow:0 -3px 0 -1px var(--rb-canvas,#faf9f5),0 -4px 0 0 var(--rb-muted,#6c6a64); }
 /* 整体忙碌禁用时：沿用 rb.css 的 .5 透明度，仍可辨认两态 */
-.rb-id-policy-lock { margin:10px 0 0; font-size:12px; }
+.rb-id-policy-lock { margin:6px 0 0; font-size:12px; }
 
 /* ----- 更多工具分段：子面板沿用旧结构，去掉旧斜纹隔带与左右内边距 ----- */
-.rb-id-tools { padding-top:12px; }
+.rb-id-tools { padding-top:10px; }
 .rb-id-tabs { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:6px; }
 .rb-id-tabs [role=tab][aria-selected=true] { background:var(--rb-card,#efe9de); color:var(--rb-ink,#141413); }
 .rb-id-tab-panel[hidden] { display:none; }

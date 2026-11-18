@@ -1,5 +1,5 @@
 // [INPUT]: rusqlite/内嵌 SQLite、私有保险库目录和脱敏身份元数据与本机加盐的账号索引。
-// [OUTPUT]: SQLite v3 身份/浏览器目录、显式读取的用量显示缓存及恢复事务、读取时计算过期状态的脱敏摘要、原地备份原子提交；备份不改选择指针，互斥提交后才回收空记录。
+// [OUTPUT]: SQLite v3 身份/浏览器目录、显式读取的用量显示缓存及恢复事务、读取时计算过期状态的脱敏摘要、原地备份原子提交；备份不改选择指针，互斥提交后才回收空记录；迁移导入的同账号/同种子冲突检查由预检与提交事务共用同一文案（指明冲突档案名称），另有不建文件的只读打开供认证前提前拒绝。
 // [POS]: 保险库的索引事务；凭据和会话正文仅进入加密归档，不进入数据库。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use rusqlite::{params, Connection, OptionalExtension};
@@ -22,6 +22,15 @@ pub struct Database {
 }
 pub(super) fn error(_: rusqlite::Error) -> String {
     "身份数据库无法读写；未提交身份切换。".into()
+}
+pub(super) fn duplicate_account(name: &str) -> String {
+    format!("已保存身份「{name}」是同一账号；未覆盖，导入已停止。可删除该身份后重新导入，或直接使用它。")
+}
+pub(super) fn duplicate_seed(name: Option<&str>) -> String {
+    match name {
+        Some(name) => format!("迁移包的浏览器指纹种子已被已保存身份「{name}」使用；未覆盖，导入已停止。可删除该身份后重新导入，或直接使用它。"),
+        None => "迁移包的浏览器指纹种子已被本机另一份浏览器资料使用；未覆盖，导入已停止。".into(),
+    }
 }
 impl Database {
     pub fn open(root: &Path) -> Result<Self, String> {
@@ -138,11 +147,8 @@ impl Database {
         if self.get("recovery")?.is_some() {
             return Err("请先恢复未完成的身份切换。".into());
         }
-        if let Some(key) = record.account_key.as_deref().filter(|key| !key.is_empty()) {
-            if self.by_account(key)?.is_some() {
-                return Err("此账号已在身份保险库中；未覆盖现有身份。".into());
-            }
-        }
+        // 预检之后到提交之间仍可能有并发写入；事务内同一检查是最后防线，文案与预检一致。
+        self.import_conflict(record.account_key.as_deref(), browser.map(|(_, seed)| seed))?;
         tx.execute(
             "INSERT INTO identities(id,name,archive,saved_at,bytes,policy,empty,account_key) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",
             params![record.id, record.name, record.archive,
@@ -160,6 +166,44 @@ impl Database {
             .map_err(error)?;
         }
         tx.commit().map_err(error)
+    }
+    /// 迁移导入的只读冲突检查：同账号 HMAC 或同浏览器种子已存在时拒绝，并指明冲突档案名称。
+    /// 预检与 import_record 事务共用，保证两处给出同一条文案；不返回账号 UUID/HMAC。
+    pub(super) fn import_conflict(&self, account: Option<&str>, seed: Option<u32>) -> Result<(), String> {
+        if let Some(key) = account.filter(|key| !key.is_empty()) {
+            if let Some(existing) = self.by_account(key)? {
+                return Err(duplicate_account(&existing.name));
+            }
+        }
+        if let Some(seed) = seed {
+            let owner: Option<Option<String>> = self
+                .connection
+                .query_row(
+                    "SELECT i.name FROM browser_bindings b LEFT JOIN identities i ON i.id=b.identity WHERE b.seed=?1",
+                    [seed],
+                    |r| r.get(0),
+                )
+                .optional()
+                .map_err(error)?;
+            if let Some(name) = owner {
+                return Err(duplicate_seed(name.as_deref()));
+            }
+        }
+        Ok(())
+    }
+    /// 只读打开既有 v3 目录，供迁移包完整认证前的提前拒绝使用；不存在、版本不符或打不开时返回 None，
+    /// 绝不创建数据库、日志文件或执行迁移。
+    pub(super) fn open_read_only(root: &Path) -> Option<Self> {
+        let path = root.join("identities.sqlite");
+        super::private::safe(&path).ok()?;
+        let connection = Connection::open_with_flags(
+            &path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )
+        .ok()?;
+        connection.busy_timeout(Duration::from_secs(1)).ok()?;
+        let version: i64 = connection.query_row("PRAGMA user_version", [], |r| r.get(0)).ok()?;
+        (version == 3).then_some(Self { connection })
     }
     pub fn records(&self) -> Result<Vec<Record>, String> {
         let mut query=self.connection.prepare("SELECT id,name,archive,saved_at,bytes,policy,empty,account_key FROM identities ORDER BY saved_at DESC,id").map_err(error)?;

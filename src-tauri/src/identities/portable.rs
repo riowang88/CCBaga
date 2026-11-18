@@ -1,5 +1,6 @@
 // [INPUT]: 已认证本机身份归档、原生一次性文件选择、ring PBKDF2 与现有 AES-GCM/tar/Zstd 流。
-// [OUTPUT]: 密码保护的单身份 bagapack；兼容默认关闭的桌面共享策略字段，同 OS 验收后重定位并重封存；本机 v2 归档里的符号链接逐个跳过并计数，不跟随、不写入迁移包，导出包始终为 v1。
+// [OUTPUT]: 密码保护的单身份 bagapack；兼容默认关闭的桌面共享策略字段，同 OS 验收后重定位并重封存；本机 v2 归档里的符号链接逐个跳过并计数，不跟随、不写入迁移包，导出包始终为 v1；导出把账号文件放在数据成员最前，密码/目标已存在/记录缺失在解密已保存归档前拒绝。
+// 导入冲突分三层：解包中只读探针（transfer.json 后查种子、账号成员落盘后查账号，只能提前拒绝）→ 完整认证后 transfer_precheck（先于浏览器槽位与重新封存）→ 提交事务内同一检查兜底；三处同一文案、指明冲突档案名称。
 // [POS]: 保险库的显式跨设备边界；不导出主密钥/SQLite，不切换身份或操作钥匙串，不迁移浏览器登录资料。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 use super::{archive::{self, Manifest, Stage}, codec, compression, database::Record, private, store::{problem, Store}};
@@ -126,10 +127,14 @@ pub(crate) async fn identities_transfer_pick(app: tauri::AppHandle, window: taur
         app.state::<Transfers>().issue(path, kind)
     }).transpose()
 }
-fn password_key(password: &str, salt: &[u8; 32]) -> Result<Zeroizing<[u8; 32]>, String> {
+fn check_password(password: &str) -> Result<(), String> {
     if password.chars().count() < 12 || password.len() > 1024 {
         return Err("迁移密码至少 12 个字符，且不超过 1024 个 UTF-8 字节。".into());
     }
+    Ok(())
+}
+fn password_key(password: &str, salt: &[u8; 32]) -> Result<Zeroizing<[u8; 32]>, String> {
+    check_password(password)?;
     let mut key = Zeroizing::new([0; 32]);
     pbkdf2::derive(pbkdf2::PBKDF2_HMAC_SHA256, NonZeroU32::new(ITERATIONS).unwrap(), salt, password.as_bytes(), key.as_mut());
     Ok(key)
@@ -198,14 +203,23 @@ fn append<W: Write>(tar: &mut tar::Builder<W>, name: &Path, bytes: &[u8]) -> Res
     header.set_size(bytes.len() as u64); header.set_mode(0o600); header.set_cksum();
     tar.append_data(&mut header, name, bytes).map_err(problem)
 }
-fn each_data(stage: &Stage, visit: &mut impl FnMut(&Path, &Path, bool) -> Result<(), String>) -> Result<(), String> {
-    for n in 0..stage.manifest.sources.len() { archive::walk(&stage.path.join(format!("data/{n}")), &stage.path, visit)?; }
+/// 账号文件 .claude.json 在 manifest 中的源序号（按 manifest 自身 home 比较，重定位前后序号不变）。
+fn account_source(manifest: &Manifest) -> Option<usize> {
+    manifest.sources.iter().position(|s| s.path == manifest.home.join(".claude.json"))
+}
+/// first 指定的源先写：导出时把账号文件放在数据成员最前，导入端解包到它就能提前查重。
+/// 解包不要求成员顺序，旧版本应用同样能读取。
+fn each_data(stage: &Stage, first: Option<usize>, visit: &mut impl FnMut(&Path, &Path, bool) -> Result<(), String>) -> Result<(), String> {
+    let total = stage.manifest.sources.len();
+    for n in first.filter(|n| *n < total).into_iter().chain((0..total).filter(|n| Some(*n) != first)) {
+        archive::walk(&stage.path.join(format!("data/{n}")), &stage.path, visit)?;
+    }
     Ok(())
 }
 /// 返回（成员数、字节数、跳过的本机链接数）。链接只指向本机路径，不跟随也不写入迁移包。
 fn checked_data(stage: &Stage) -> Result<(usize, u64, usize), String> {
     let (mut count, mut size, mut skipped) = (0usize, 0u64, 0usize);
-    each_data(stage, &mut |path, relative, directory| {
+    each_data(stage, None, &mut |path, relative, directory| {
         if private::link_target(path)?.is_some() { skipped += 1; return Ok(()); }
         private::safe(path)?;
         count += 1;
@@ -217,12 +231,12 @@ fn checked_data(stage: &Stage) -> Result<(usize, u64, usize), String> {
     })?;
     Ok((count, size, skipped))
 }
-fn pack_data<W: Write>(tar: &mut tar::Builder<W>, stage: &Stage, reporter: &Reporter) -> Result<(), String> {
+fn pack_data<W: Write>(tar: &mut tar::Builder<W>, stage: &Stage, first: Option<usize>, reporter: &Reporter) -> Result<(), String> {
     let (total, _, _) = checked_data(stage)?;
     let mut current = 0;
     let mut last = Instant::now();
     reporter.log("transfer_archive", "running", "正在写入迁移文件。", 0, Some(total));
-    each_data(stage, &mut |path, relative, directory| {
+    each_data(stage, first, &mut |path, relative, directory| {
         if private::link_target(path)?.is_some() { return Ok(()); }
         if directory { tar.append_dir(relative, path).map_err(problem)?; }
         else { tar.append_file(relative, &mut fs::File::open(path).map_err(problem)?).map_err(problem)?; }
@@ -238,7 +252,10 @@ fn pack_data<W: Write>(tar: &mut tar::Builder<W>, stage: &Stage, reporter: &Repo
 }
 impl Store {
     pub(super) fn export_pack(&self, path: &Path, password: &str, id: &str, browser: Option<crate::browser::config::Config>, reporter: &Reporter) -> Result<(), String> {
+        // 只靠参数就能判断的拒绝放在解密整个已保存归档之前。
+        check_password(password)?;
         let record = self.record(id)?;
+        if fs::symlink_metadata(path).is_ok() { return Err("导出目标已存在；请选择新文件名。".into()); }
         reporter.log("transfer_validate", "running", "正在验收已保存身份。", 0, None);
         let stage = self.load(&record)?;
         let (_, _, skipped) = checked_data(&stage)?;
@@ -264,7 +281,7 @@ impl Store {
             let seal = codec::Seal::new(output.try_clone().map_err(problem)?, key.as_ref()).map_err(problem)?;
             let mut tar = tar::Builder::new(compression::encode(seal).map_err(problem)?);
             append(&mut tar, Path::new("transfer.json"), &serialized)?;
-            pack_data(&mut tar, &stage, reporter)?;
+            pack_data(&mut tar, &stage, account_source(&stage.manifest), reporter)?;
             reporter.log("transfer_auth", "running", "正在完成迁移包认证与落盘。", 0, None);
             let encoder = tar.into_inner().map_err(problem)?;
             let seal = encoder.finish().map_err(problem)?;
@@ -290,7 +307,26 @@ impl<R: Read> Read for Budget<R> {
     }
 }
 pub(super) struct Imported { pub(super) stage: Stage, name: String, pub(super) browser: Option<BrowserSettings> }
-fn unpack(mut file: fs::File, password: &str, parent: &Path, reporter: &Reporter) -> Result<Imported, String> {
+/// 完整认证前的只读冲突探针：只打开已存在的 key.bin 与 v3 SQLite，不创建或修改保险库任何文件。
+/// 只能用来提前拒绝；探针缺失、出错或未发现冲突都不代表放行，认证后的预检和提交事务仍完整执行。
+pub(super) struct Probe { db: super::database::Database, key: Zeroizing<Vec<u8>> }
+impl Probe {
+    pub(super) fn open(vault: &Path) -> Option<Self> {
+        let key_path = vault.join("key.bin");
+        private::safe(&key_path).ok()?;
+        let key = Zeroizing::new(fs::read(&key_path).ok()?);
+        if key.len() != 32 { return None; }
+        Some(Self { db: super::database::Database::open_read_only(vault)?, key })
+    }
+    fn seed(&self, seed: u32) -> Result<(), String> { self.db.import_conflict(None, Some(seed)) }
+    fn account(&self, file: &Path) -> Result<(), String> {
+        // 读取或解析失败不在这里报错：完整认证与范围检查会给出正式结论。
+        let Ok(bytes) = fs::read(file) else { return Ok(()) };
+        let Ok(value) = serde_json::from_slice::<serde_json::Value>(&bytes) else { return Ok(()) };
+        match super::catalog::account_key(&value, &self.key) { Some(key) => self.db.import_conflict(Some(&key), None), None => Ok(()) }
+    }
+}
+fn unpack(mut file: fs::File, password: &str, parent: &Path, probe: Option<&Probe>, reporter: &Reporter) -> Result<Imported, String> {
     let mut header = [0; 44];
     file.read_exact(&mut header).map_err(|_| invalid())?;
     if &header[..8] != MAGIC || header[8..12] != ITERATIONS.to_be_bytes() { return Err(invalid()); }
@@ -303,6 +339,7 @@ fn unpack(mut file: fs::File, password: &str, parent: &Path, reporter: &Reporter
     private::create_directory(&folder)?;
     let result = (|| {
         let mut metadata = None;
+        let mut account = None;
         let mut members = HashSet::new();
         let (mut count, mut bytes) = (0usize, 0u64);
         let mut last = Instant::now();
@@ -339,6 +376,10 @@ fn unpack(mut file: fs::File, password: &str, parent: &Path, reporter: &Reporter
                     if !value["manifest"]["policy"].as_object().is_some_and(|row| row.keys().all(|key| ["skills", "plugins", "mcp", "settings", "projects", "history", "cache", "desktop_sessions"].contains(&key.as_str()))) { return Err(invalid()); }
                     let parsed: Metadata = serde_json::from_value(value).map_err(|_| invalid())?;
                     validate_metadata(&parsed)?;
+                    // transfer.json 所在的 AES-GCM 帧已逐帧认证（仅完整性/截断待结尾确认）；
+                    // 浏览器种子冲突在解出任何数据成员前提前拒绝。
+                    if let (Some(probe), Some(browser)) = (probe, &parsed.browser) { probe.seed(browser.seed)?; }
+                    account = account_source(&parsed.manifest);
                     metadata = Some(parsed);
                     continue;
                 }
@@ -359,6 +400,11 @@ fn unpack(mut file: fs::File, password: &str, parent: &Path, reporter: &Reporter
                     let mut output = private::create(&destination)?;
                     let written = io::copy(&mut entry, &mut output).map_err(|_| invalid())?;
                     if written != entry.size() { return Err(invalid()); }
+                    drop(output);
+                    // 账号文件一落盘就提前查重，只用于快速失败：未完成结尾认证的内容不能放行或写入任何东西。
+                    if Some(number) == account && parts.next().is_none() && entry.size() <= MAX_METADATA {
+                        if let Some(probe) = probe { probe.account(&destination)?; }
+                    }
                 }
                 if last.elapsed() >= Duration::from_millis(50) {
                     reporter.log("transfer_validate", "running", "已认证迁移包成员。", count - 1, None);
@@ -390,8 +436,26 @@ fn unpack(mut file: fs::File, password: &str, parent: &Path, reporter: &Reporter
     if result.is_err() { let _ = fs::remove_dir_all(folder); }
     result
 }
+/// 认证后的预检结果；import_checked 只接受它，保证写入保险库前一定做过同账号/同种子检查。
+pub(super) struct Checked { account: Option<String> }
 impl Store {
-    pub(super) fn import_pack(&self, mut imported: Imported, browser: Option<(&str, u32)>, reporter: &Reporter) -> Result<Record, String> {
+    /// 完整认证之后、浏览器配置槽位创建与重新封存之前的只读冲突检查。
+    pub(super) fn import_precheck(&self, imported: &Imported, seed: Option<u32>, reporter: &Reporter) -> Result<Checked, String> {
+        reporter.log("transfer_precheck", "running", "正在检查本机是否已有同账号或同浏览器指纹。", 0, None);
+        let account = account_source(&imported.stage.manifest).map(|n| {
+            let file = imported.stage.path.join(format!("data/{n}"));
+            let value = serde_json::from_slice(&fs::read(file).map_err(problem)?).map_err(problem)?;
+            Ok::<_, String>(super::catalog::account_key(&value, &self.key))
+        }).transpose()?.flatten();
+        self.db.import_conflict(account.as_deref(), seed)?;
+        reporter.log("transfer_precheck", "ok", "本机没有同账号或同浏览器指纹。", 1, Some(1));
+        Ok(Checked { account })
+    }
+    pub(super) fn import_pack(&self, imported: Imported, browser: Option<(&str, u32)>, reporter: &Reporter) -> Result<Record, String> {
+        let checked = self.import_precheck(&imported, browser.map(|(_, seed)| seed), reporter)?;
+        self.import_checked(imported, checked, browser, reporter)
+    }
+    pub(super) fn import_checked(&self, mut imported: Imported, checked: Checked, browser: Option<(&str, u32)>, reporter: &Reporter) -> Result<Record, String> {
         let m = &mut imported.stage.manifest;
         let origin = m.home.clone();
         m.home = self.home.clone(); m.id = super::new_id()?;
@@ -399,11 +463,7 @@ impl Store {
             source.path = self.home.join(source.path.strip_prefix(&origin).map_err(|_| invalid())?);
             if !crate::cleaner::identity::allowed(&self.home, source) { return Err(invalid()); }
         }
-        let account = m.sources.iter().position(|s| s.path == self.home.join(".claude.json")).map(|n| {
-            let file = imported.stage.path.join(format!("data/{n}"));
-            let value = serde_json::from_slice(&fs::read(file).map_err(problem)?).map_err(problem)?;
-            Ok::<_, String>(super::catalog::account_key(&value, &self.key))
-        }).transpose()?.flatten();
+        let account = checked.account;
         m.account_key = Some(account.clone().unwrap_or_default());
         let generation = super::new_id()?;
         let pending = self.vault.join(format!(".pending-{generation}"));
@@ -414,7 +474,7 @@ impl Store {
             pending_created = true;
             let seal = codec::Seal::new(output, &self.key).map_err(problem)?;
             let mut tar = tar::Builder::new(compression::encode(seal).map_err(problem)?);
-            pack_data(&mut tar, &imported.stage, reporter)?;
+            pack_data(&mut tar, &imported.stage, None, reporter)?;
             append(&mut tar, Path::new("manifest.json"), &serde_json::to_vec(&imported.stage.manifest).map_err(problem)?)?;
             let seal = tar.into_inner().map_err(problem)?.finish().map_err(problem)?;
             let file = seal.finish().map_err(problem)?; file.sync_all().map_err(problem)?; drop(file);
@@ -472,13 +532,16 @@ pub(crate) async fn identities_import(app: tauri::AppHandle, grant: String, pass
             if Some(stamp(&file)?) != selection.stamp { return Err("所选迁移包已变化，请重新选择。".into()); }
             let parent = worker.path().app_data_dir().map_err(|_| invalid())?;
             private::directory(&parent)?;
-            let imported = unpack(file, &password, &parent, &reporter)?;
+            let vault = super::vault(&worker)?;
+            let imported = unpack(file, &password, &parent, Probe::open(&vault).as_ref(), &reporter)?;
             if Some(stamp(&selected_file(&selection.path)?)?) != selection.stamp { return Err("所选迁移包已变化，请重新选择。".into()); }
-            let store = Store::open_for_transfer(&super::vault(&worker)?, &crate::cleaner::identity::root()?)?;
+            let store = Store::open_for_transfer(&vault, &crate::cleaner::identity::root()?)?;
             let slot = super::new_id()?;
             let browser = imported.browser.as_ref().map(BrowserSettings::config).transpose()?;
+            // 冲突预检先于浏览器槽位创建与重新封存；提交事务内仍有同一检查兜底。
+            let checked = store.import_precheck(&imported, browser.as_ref().map(|c| c.seed), &reporter)?;
             let directory = browser.as_ref().map(|config| crate::browser::portable_prepare(&worker, &slot, config)).transpose()?;
-            let result = store.import_pack(imported, browser.as_ref().map(|c| (slot.as_str(), c.seed)), &reporter);
+            let result = store.import_checked(imported, checked, browser.as_ref().map(|c| (slot.as_str(), c.seed)), &reporter);
             if result.is_err() {
                 if let Some(path) = directory {
                     for name in ["config.json", "seed.owner"] { let _ = fs::remove_file(path.join(name)); }

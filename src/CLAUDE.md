@@ -26,7 +26,7 @@ identity-model.test.ts: 旧摘要/无效期限/真实到期边界与 API 密钥�
 identity-model.ts: 浏览器绑定脱敏状态与 SQLite 受限目录、已保存身份脱敏摘要、有界进程与可重算期限状态、当前显示字段和保留策略契约，Skills/插件/MCP/个人设置/项目记录/历史/缓存逐项由用户选择。
 claude-cli-panel.tsx: 身份页内的 CLI 维护；复用安全进程结束和官方卸载/重装，保护保险库与个人资料。
 claude-residue-panel.tsx: 身份页内用户触发的固定 Claude 文件扫描、路径/字段名/大小/影响预览；仅完整缓存默认勾选，非空/未知锁路径只警告保留而无可执行项，登录/历史/备份独立选择，不完整项禁选。直接清理使用默认取消的 Alert 与勾选确认，成功/失败均复查且清空选择；不访问钥匙串、通用配置或浏览器资料。
-cleaner-activity.tsx: 单次调用隔离的 ActivityController 与身份卡片正下方 IdentityOperationProgress；身份/空身份/残留清理共用真实事件阶段、局部 n/N 与脉冲，不预填步骤或按时间推算百分比，未知总量只显示运行；密码迁移复用实际验收/写入/认证/提交阶段。失败/回滚/完成带警告分开呈现，保留实际耗时和原始日志用于即时切换语言；其他页面沿用 CleanupActivity。
+cleaner-activity.tsx: 单次调用隔离的 ActivityController 与身份卡片正下方 IdentityOperationProgress；身份/空身份/残留清理共用真实事件阶段、局部 n/N 与脉冲，不预填步骤或按时间推算百分比，未知总量只显示运行；密码迁移复用实际验收/重复身份预检/写入/认证/提交阶段。失败/回滚/完成带警告分开呈现，保留实际耗时和原始日志用于即时切换语言；其他页面沿用 CleanupActivity。
 cleaner-model.ts: 文件残留快照类型与选择规则、POSIX/Windows 路径父子去重、子项排除、重扫编号映射与四舍五入进位一致的规模格式化，供预览和执行共享。
 cleaner-model.test.ts: 预设、跨平台父子选择隔离与重扫不扩大选择的回归，不调用清理命令。
 system.tsx: 电脑环境页（照 Main.dc.html，rb 共享类）：顶部 get_regions 13 项地区胶囊、将设置的时区·语言·区域格式、「同时关闭定位」「同步浏览器指纹」与「应用到本机」；按 system_set_region →（勾选且未关闭）system_disable_location →（勾选）browser_rotate，且此前 browser_read 显示 B 运行时再 browser_launch 顺序执行，每步真实结果写入 CleanupActivity，抛错即停并说明已完成的步骤，定位未读回关闭记为提示；下方时区/首选语言行内编辑（搜索+选择+应用）与所选地区一致性、区域格式只读行（system_read.locale）、定位关闭；页尾系统授权与钥匙串（Windows 隐藏）文字链；窗口聚焦读回，页面加载不修改电脑。

@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 隔离浏览器与虚构身份 IPC、原生选择票据和真实 Channel 回调。
- * [OUTPUT]: 导入/导出确认、重选/取消清除来源确认、密码/失败不覆盖、实际进度及到期与进程未知状态回归。
+ * [OUTPUT]: 导入/导出确认、重选/取消清除来源确认、密码/失败不覆盖、实际进度（含重复身份预检阶段与对话框内冲突错误）及到期与进程未知状态回归。
  * [POS]: 身份迁移 GUI 的行为验收，无真实凭据/文件/原生命令或截图。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -72,6 +72,18 @@ export async function testIdentityTransfer(browser:Browser,base:string){
   await page.evaluate(()=>{(window as any).identityFixture.transfer.failAfterImport=true;});await dialog.getByRole('button',{name:'解密导入',exact:true}).click();
   await dialog.getByRole('alert').waitFor();await page.waitForFunction(()=>[...document.querySelectorAll('.identity-card h3')].filter(node=>node.textContent==='Imported fixture').length===2);assert.equal(await page.locator('.identity-card h3').filter({hasText:'Imported fixture'}).count(),2);assert.equal(await page.evaluate(()=>(window as any).identityFixture.state.active),active);
   assert.equal(await page.locator('.identity-operation').getAttribute('data-status'),'error');await dialog.getByRole('button',{name:'取消',exact:true}).click();checks++;
+  // 重复账号在预检阶段失败：真实阶段名显示为「检查重复身份」，不出现写入阶段，错误留在对话框内并指明冲突档案。
+  await page.getByRole('button',{name:'导入',exact:true}).click();dialog=page.getByRole('dialog');
+  await dialog.getByRole('button',{name:'选择文件',exact:true}).click();await dialog.getByLabel('迁移密码（至少 12 个字符）',{exact:true}).fill('synthetic-transfer-password');await dialog.getByRole('checkbox',{name:'我确认备份来源可信，并了解恢复配置或插件可能执行其命令。',exact:true}).check();
+  await page.evaluate(()=>{(window as any).identityFixture.defer('identities_import');});await dialog.getByRole('button',{name:'解密导入',exact:true}).click();
+  await page.waitForFunction(()=>(window as any).identityFixture.pending.includes('identities_import'));
+  await page.evaluate(()=>{const f=(window as any).identityFixture;f.emitProgress('identities_import',{stage:'transfer_validate',status:'ok',message:'迁移包已通过完整认证与范围检查。',current:3,total:3,elapsed_ms:0});f.emitProgress('identities_import',{stage:'transfer_precheck',status:'running',message:'正在检查本机是否已有同账号或同浏览器指纹。',current:0,total:null,elapsed_ms:0});});
+  const precheck=page.locator('.identity-operation [data-stage="transfer_precheck"]');await precheck.waitFor();assert.match(await precheck.innerText(),/检查重复身份/);
+  const duplicate='已保存身份「Imported fixture」是同一账号；未覆盖，导入已停止。可删除该身份后重新导入，或直接使用它。';
+  await page.evaluate(message=>{(window as any).identityFixture.release('identities_import',message);},duplicate);
+  await dialog.getByRole('alert').filter({hasText:'Imported fixture'}).waitFor();assert.match(await dialog.getByRole('alert').innerText(),/已保存身份「Imported fixture」是同一账号/);
+  assert.equal(await page.locator('.identity-operation [data-stage="transfer_archive"]').count(),0);assert.equal(await page.locator('.identity-operation').getAttribute('data-status'),'error');
+  assert.equal(await page.evaluate(()=>(window as any).identityFixture.state.active),active);await dialog.getByRole('button',{name:'取消',exact:true}).click();checks++;
   await page.evaluate(()=>{(window as any).identityFixture.language('en');});await page.getByRole('button',{name:'Import',exact:true}).click();dialog=page.getByRole('dialog');
   await dialog.getByLabel('Transfer password (at least 12 characters)',{exact:true}).waitFor();assert.match(await dialog.innerText(),/Same operating system/);checks++;
   return checks;

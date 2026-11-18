@@ -51,7 +51,7 @@ fn custom_pack(metadata: &serde_json::Value, entries: &[(&str, tar::EntryType, &
 fn read_pack(bytes: &[u8], password: &str, parent: &Path) -> Result<Imported, String> {
     let file = parent.join(format!("{}.bagapack", crate::identities::new_id().unwrap()));
     private::write(&file, bytes).unwrap();
-    unpack(selected_file(&file).unwrap(), password, parent, &Reporter::channel(None))
+    unpack(selected_file(&file).unwrap(), password, parent, None, &Reporter::channel(None))
 }
 
 #[test]
@@ -310,4 +310,197 @@ fn failed_export_returns_the_ticket_and_default_names_are_sanitized() {
     assert_eq!(suggested_name(Some("../../etc/passwd\u{0}")), "etcpasswd.bagapack");
     assert_eq!(suggested_name(Some("///")), "identity.bagapack");
     assert_eq!(suggested_name(None), "identity.bagapack");
+}
+
+// ----- 导入冲突前移：预检/提前查重只拒绝，不写保险库；事务内同一检查兜底 -----
+fn tree(root: &Path) -> std::collections::BTreeSet<PathBuf> {
+    let mut found = std::collections::BTreeSet::new();
+    let mut pending = vec![root.to_path_buf()];
+    while let Some(folder) = pending.pop() {
+        let Ok(entries) = fs::read_dir(&folder) else { continue };
+        for entry in entries {
+            let path = entry.unwrap().path();
+            if path.is_dir() { pending.push(path.clone()); }
+            found.insert(path.strip_prefix(root).unwrap().to_path_buf());
+        }
+    }
+    found
+}
+fn staged(parent: &Path) -> bool {
+    fs::read_dir(parent).unwrap().any(|e| e.unwrap().file_name().to_string_lossy().starts_with(".identity-transfer-"))
+}
+fn stages(reporter: &Reporter) -> Vec<String> { reporter.events().into_iter().map(|e| e.stage().to_owned()).collect() }
+fn exported(store: &Store, record: &Record, folder: &Path, browser: Option<crate::browser::config::Config>) -> Vec<u8> {
+    let path = folder.join(format!("{}.bagapack", crate::identities::new_id().unwrap()));
+    store.export_pack(&path, PASSWORD, &record.id, browser, &Reporter::channel(None)).unwrap();
+    fs::read(path).unwrap()
+}
+fn seeded(seed: u32) -> crate::browser::config::Config {
+    let mut config = crate::browser::config::Config::default();
+    config.seed = seed;
+    config
+}
+/// 已有一个 Portable A 的目标机：返回（夹具、Store、A 的迁移包）。
+fn imported_once(browser: Option<crate::browser::config::Config>) -> (Fixture, Store, Vec<u8>) {
+    let (origin, source, row) = saved();
+    let seed = browser.as_ref().map(|c| c.seed);
+    let bytes = exported(&source, &row, &origin.root, browser);
+    let target = Fixture::new();
+    let store = Store::open(&target.vault, &target.home).unwrap();
+    let slot = crate::identities::new_id().unwrap();
+    let imported = read_pack(&bytes, PASSWORD, &target.root).unwrap();
+    store.import_pack(imported, seed.map(|s| (slot.as_str(), s)), &Reporter::channel(None)).unwrap();
+    (target, store, bytes)
+}
+
+#[test]
+fn duplicate_account_fails_in_precheck_before_resealing_and_leaves_the_vault_untouched() {
+    let (target, store, bytes) = imported_once(None);
+    let before = tree(&target.vault);
+    let imported = read_pack(&bytes, PASSWORD, &target.root).unwrap();
+    let reporter = Reporter::channel(None);
+    let error = store.import_pack(imported, None, &reporter).err().unwrap();
+    assert_eq!(error, super::super::database::duplicate_account("Portable A"));
+    let stages = stages(&reporter);
+    assert!(stages.iter().any(|s| s == "transfer_precheck"));
+    assert!(!stages.iter().any(|s| s == "transfer_archive" || s == "transfer_commit"), "{stages:?}");
+    assert_eq!(tree(&target.vault), before);
+    assert_eq!(store.records().len(), 1);
+    // 文案只给档案名称，不泄露账号 UUID 或 HMAC。
+    assert!(!error.contains("portable-A") && !error.contains(store.records()[0].account_key.as_deref().unwrap()));
+}
+
+#[test]
+fn early_probe_rejects_duplicate_account_while_unpacking_without_creating_vault_files() {
+    let (target, store, bytes) = imported_once(None);
+    let before = tree(&target.vault);
+    let probe = Probe::open(&target.vault).unwrap();
+    let file = target.root.join("again.bagapack");
+    private::write(&file, &bytes).unwrap();
+    let error = unpack(selected_file(&file).unwrap(), PASSWORD, &target.root, Some(&probe), &Reporter::channel(None)).err().unwrap();
+    assert_eq!(error, super::super::database::duplicate_account("Portable A"));
+    assert!(!staged(&target.root));
+    drop(probe);
+    assert_eq!(tree(&target.vault), before);
+    assert_eq!(store.records().len(), 1);
+    // 不存在的保险库不会因探针被创建；探针缺席时解包照常完成，后续预检再决定。
+    let fresh = Fixture::new();
+    let missing = fresh.root.join("no-vault-yet");
+    assert!(Probe::open(&missing).is_none());
+    assert!(fs::symlink_metadata(&missing).is_err());
+}
+
+#[test]
+fn exported_packs_put_the_account_member_first_so_the_probe_fires_before_bulk_data() {
+    let (origin, source, row) = saved();
+    let bytes = exported(&source, &row, &origin.root, None);
+    let salt: [u8; 32] = bytes[12..44].try_into().unwrap();
+    let key = password_key(PASSWORD, &salt).unwrap();
+    let names: Vec<String> = {
+        let decoded = compression::decode(codec::Open::new(io::Cursor::new(bytes[44..].to_vec()), key.as_ref()).unwrap()).unwrap();
+        let mut archive = tar::Archive::new(decoded);
+        let names = archive.entries().unwrap().take(2).map(|e| e.unwrap().path().unwrap().to_string_lossy().into_owned()).collect();
+        names
+    };
+    let metadata = metadata(&source, &row);
+    let account = account_source(&metadata.manifest).unwrap();
+    assert_ne!(account, 0, "fixture must sort .claude.json after .claude/* to prove reordering");
+    assert_eq!(names, ["transfer.json".to_string(), format!("data/{account}")]);
+    // 账号成员之后紧跟一个非法成员：提前查重先于它触发，证明拒绝发生在解包中途。
+    let mut value = serde_json::to_value(metadata).unwrap();
+    value["manifest"]["sources"] = serde_json::json!([value["manifest"]["sources"][account].clone()]);
+    value["manifest"]["fingerprints"] = serde_json::json!([value["manifest"]["fingerprints"][account].clone()]);
+    let claude = fs::read(origin.home.join(".claude.json")).unwrap();
+    let pack = custom_pack(&value, &[("data/0", tar::EntryType::Regular, &claude), ("../outside", tar::EntryType::Regular, b"x")], &[]);
+    let target = Fixture::new();
+    let store = Store::open(&target.vault, &target.home).unwrap();
+    let imported = read_pack(&bytes, PASSWORD, &target.root).unwrap();
+    store.import_pack(imported, None, &Reporter::channel(None)).unwrap();
+    let probe = Probe::open(&target.vault).unwrap();
+    let file = target.root.join("crafted.bagapack");
+    private::write(&file, &pack).unwrap();
+    let error = unpack(selected_file(&file).unwrap(), PASSWORD, &target.root, Some(&probe), &Reporter::channel(None)).err().unwrap();
+    assert_eq!(error, super::super::database::duplicate_account("Portable A"));
+    // 同一恶意包在没有冲突的保险库里仍按原规则拒绝：探针不放行任何东西。
+    let empty = Fixture::new();
+    let _ = Store::open(&empty.vault, &empty.home).unwrap();
+    let probe = Probe::open(&empty.vault).unwrap();
+    let file = empty.root.join("crafted.bagapack");
+    private::write(&file, &pack).unwrap();
+    assert_eq!(unpack(selected_file(&file).unwrap(), PASSWORD, &empty.root, Some(&probe), &Reporter::channel(None)).err().unwrap(), invalid());
+    // 正常包配合探针在无冲突时完整导入。
+    let imported = unpack({ let f = empty.root.join("ok.bagapack"); private::write(&f, &bytes).unwrap(); selected_file(&f).unwrap() }, PASSWORD, &empty.root, Some(&probe), &Reporter::channel(None)).unwrap();
+    drop(probe);
+    let store = Store::open(&empty.vault, &empty.home).unwrap();
+    assert_eq!(store.import_pack(imported, None, &Reporter::channel(None)).unwrap().name, "Portable A");
+}
+
+#[test]
+fn browser_seed_conflict_fails_before_unpacking_data_and_before_resealing() {
+    let (target, store, _) = imported_once(Some(seeded(424242)));
+    // 另一账号携带同一指纹种子。
+    let origin = Fixture::new();
+    origin.login("portable-B", "organization", "synthetic-token-b");
+    let mut source = Store::open(&origin.vault, &origin.home).unwrap();
+    source.save_current("Portable B", &Policy::default(), &Reporter::channel(None)).unwrap();
+    let row = source.records()[0].clone();
+    let bytes = exported(&source, &row, &origin.root, Some(seeded(424242)));
+    let before = tree(&target.vault);
+    let expected = super::super::database::duplicate_seed(Some("Portable A"));
+    let probe = Probe::open(&target.vault).unwrap();
+    let file = target.root.join("seed.bagapack");
+    private::write(&file, &bytes).unwrap();
+    let reporter = Reporter::channel(None);
+    assert_eq!(unpack(selected_file(&file).unwrap(), PASSWORD, &target.root, Some(&probe), &reporter).err().unwrap(), expected);
+    // 种子在 transfer.json 之后立即拒绝，尚未报告任何已认证数据成员。
+    assert!(reporter.events().iter().all(|e| e.current() == 0));
+    assert!(!staged(&target.root));
+    drop(probe);
+    let imported = read_pack(&bytes, PASSWORD, &target.root).unwrap();
+    let reporter = Reporter::channel(None);
+    let slot = crate::identities::new_id().unwrap();
+    assert_eq!(store.import_pack(imported, Some((slot.as_str(), 424242)), &reporter).err().unwrap(), expected);
+    assert!(!stages(&reporter).iter().any(|s| s == "transfer_archive"));
+    assert_eq!(tree(&target.vault), before);
+    assert_eq!(store.records().len(), 1);
+}
+
+#[test]
+fn transaction_still_rejects_a_duplicate_inserted_after_precheck_and_leaves_no_files() {
+    let (origin, source, row) = saved();
+    let bytes = exported(&source, &row, &origin.root, None);
+    let target = Fixture::new();
+    let store = Store::open(&target.vault, &target.home).unwrap();
+    let imported = read_pack(&bytes, PASSWORD, &target.root).unwrap();
+    let checked = store.import_precheck(&imported, None, &Reporter::channel(None)).unwrap();
+    let account = checked.account.clone().unwrap();
+    // 模拟预检之后、提交之前另一路径写入了同账号档案。
+    store.db.connection.execute(
+        "INSERT INTO identities(id,name,archive,saved_at,bytes,policy,empty,account_key) VALUES(?1,'Raced',?2,1,0,?3,0,?4)",
+        rusqlite::params![crate::identities::new_id().unwrap(), format!("{}.baga", crate::identities::new_id().unwrap()), serde_json::to_string(&Policy::default()).unwrap(), account],
+    ).unwrap();
+    let before = tree(&target.vault);
+    let reporter = Reporter::channel(None);
+    let error = store.import_checked(imported, checked, None, &reporter).err().unwrap();
+    assert_eq!(error, super::super::database::duplicate_account("Raced"));
+    assert!(stages(&reporter).iter().any(|s| s == "transfer_commit"));
+    assert_eq!(tree(&target.vault), before);
+    assert_eq!(store.records().len(), 1);
+}
+
+#[test]
+fn export_rejects_bad_password_existing_target_and_missing_record_before_decrypting() {
+    let (fixture, source, row) = saved();
+    let path = fixture.root.join("early.bagapack");
+    for (password, id) in [("short", row.id.as_str()), (PASSWORD, "00000000000000000000000000000000")] {
+        let reporter = Reporter::channel(None);
+        assert!(source.export_pack(&path, password, id, None, &reporter).is_err());
+        assert!(reporter.events().is_empty(), "rejected before transfer_validate");
+        assert!(fs::symlink_metadata(&path).is_err());
+    }
+    private::write(&path, b"keep-existing").unwrap();
+    let reporter = Reporter::channel(None);
+    assert_eq!(source.export_pack(&path, PASSWORD, &row.id, None, &reporter).err().unwrap(), "导出目标已存在；请选择新文件名。");
+    assert!(reporter.events().is_empty());
+    assert_eq!(fs::read(&path).unwrap(), b"keep-existing");
 }

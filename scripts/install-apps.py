@@ -48,8 +48,8 @@ def refresh_dock():
     for index, tile in enumerate(tiles):
         details = tile.get('tile-data', {})
         path = Path(unquote(urlparse(details.get('file-data', {}).get('_CFURLString', '')).path))
-        for name, bundle_id, old_name in APPS:
-            if details.get('bundle-identifier') == bundle_id or path in [Path('/Applications') / old_name, Path('/Applications') / name]:
+        for name, bundle_id, old_names in APPS:
+            if details.get('bundle-identifier') == bundle_id or path in [Path('/Applications') / candidate for candidate in (name, *old_names)]:
                 tiles[index] = {'tile-type': 'file-tile', 'tile-data': {'file-data': {'_CFURLString': (Path('/Applications') / name).as_uri() + '/', '_CFURLStringType': 15}}}
                 changed = True
     if changed:

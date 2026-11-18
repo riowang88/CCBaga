@@ -23,7 +23,7 @@ mockIPC((command,args)=>{
  if(command==='plugin:event|unlisten')return;
  if(command==='browser_read')return structuredClone(browser);
  if(command==='browser_check'){commands.push({command,args});browser.machine_exit={ip:'198.51.100.24',country:'US',city:'Fixture City',timezone:'America/New_York',isp:'Fixture ISP'};return structuredClone(browser);}
- if(command==='browser_launch'||command==='browser_open_report'){commands.push({command,args:null});if(command==='browser_launch'){browser.running=true;return structuredClone(browser);}return;}
+ if(command==='browser_launch'||command==='browser_open_report'){commands.push({command,args:command==='browser_launch'?{webrtc:(args as any)?.webrtc??null}:null});if(command==='browser_launch'){browser.running=true;return structuredClone(browser);}return;}
  if(command!=='network_diagnose_domains')throw Error(`Unexpected fixture command: ${command}`);
  return new Promise((resolve,reject)=>{release=()=>{
   if(mode==='error')return reject('fixture connection interrupted');

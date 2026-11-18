@@ -20,10 +20,10 @@ export async function testNetworkDiagnostics(browser:Browser,base:string) {
   assert.equal(await page.getByRole('button',{name:/^(安装 Skill|复制提示词|获取 VPS|获取家宽)$/}).count(),0);
   assert.equal(await page.getByRole('heading',{name:/^(Skill|DMIT|Webshare)$/}).count(),0);
   assert.equal(await page.getByRole('tab').count(),0);
-  // ----- WebRTC 未实现：如实未检测，不显示通过 -----
+  // ----- B 未运行：WebRTC 不显示通过 -----
   const webrtc=page.locator('.network-webrtc');
-  assert.equal(await webrtc.getAttribute('data-webrtc'),'unchecked');
-  assert.match(await webrtc.innerText(),/未检测.*不代表通过/s);
+  assert.equal(await webrtc.getAttribute('data-webrtc'),'stopped');
+  assert.match(await webrtc.innerText(),/不代表通过/);
   assert.equal(await webrtc.locator('.rb-ok').count(),0);
   // ----- B 未运行：完整报告链接禁用，DNS 说明需要 B -----
   const report=page.getByRole('button',{name:'在 B 中打开完整报告 →',exact:true});
@@ -70,7 +70,7 @@ export async function testNetworkDiagnostics(browser:Browser,base:string) {
   await page.locator('.network-dns[data-dns="idle"]').waitFor();
   assert.equal(await report.isEnabled(),true);
   await report.click();
-  assert.deepEqual((await commands()).slice(-2).map(row=>row.command),['browser_launch','browser_open_report']);
+  assert.deepEqual((await commands()).slice(-2),[{command:'browser_launch',args:{webrtc:false}},{command:'browser_open_report',args:null}]);
   await fixture(`window.networkFixture.browser.dns_last={observation:{id:'a'.repeat(48),resolvers:[{ip:'1.1.1.1',country_code:'US',country:'United States',city:'',isp:'Fixture DNS',geo_error:null},{ip:'2001:db8::1',country_code:'',country:'',city:'',isp:'',geo_error:'DNS 服务返回 HTTP 503'}],observed_at:1780000000000},error:'',at:1780000000000};window.networkFixture.refresh();`);
   await page.locator('.network-dns[data-dns="observed"]').waitFor();
   assert.equal(await dns.locator('tbody tr').count(),2);
@@ -84,14 +84,30 @@ export async function testNetworkDiagnostics(browser:Browser,base:string) {
   await page.locator('.network-dns[data-dns="failed"]').waitFor();
   assert.match(await dns.innerText(),/DNS 检测未完成.*HTTP 403/s);
   await dns.getByRole('button',{name:'在 B 中检测 →',exact:true}).waitFor();
+  // ----- WebRTC 最近一轮四态：只有一致显示通过色；未知/已禁用为警示；不一致显示 UDP 出口 -----
+  assert.equal(await webrtc.getAttribute('data-webrtc'),'idle');
+  const webrtcReport=(webrtc:unknown)=>`window.networkFixture.browser.report={language:'en-US',languages:['en-US'],timezone:'America/New_York',platform:'MacIntel',cores:8,user_agent:'fixture',platform_version:'fixture',browser_version:'fixture',geolocation:'denied',exit:{ip:'203.0.113.1',country:'US',city:'',timezone:'America/New_York',isp:''},error:'',webrtc:${JSON.stringify(webrtc)}};window.networkFixture.refresh();`;
+  await fixture(webrtcReport({status:'match',udp_ips:['203.0.113.1'],error:''}));
+  await page.locator('.network-webrtc[data-webrtc="match"]').waitFor();
+  assert.equal(await webrtc.locator('.rb-ok').count(),1);
+  await fixture(webrtcReport({status:'mismatch',udp_ips:['198.51.100.7'],error:''}));
+  await page.locator('.network-webrtc[data-webrtc="mismatch"]').waitFor();
+  assert.match(await webrtc.innerText(),/不一致（可能泄露）.*198\.51\.100\.7/s);
+  for(const [status,label] of [['unknown','未知'],['disabled','已禁用']]){
+   await fixture(webrtcReport({status,udp_ips:[],error:status==='unknown'?'未取到 STUN 候选（超时、UDP 被拦或浏览器策略限制）。':'WebRTC 已被浏览器策略禁用。'}));
+   await page.locator(`.network-webrtc[data-webrtc="${status}"]`).waitFor();
+   assert.match(await webrtc.innerText(),new RegExp(label));assert.equal(await webrtc.locator('.rb-ok').count(),0);
+  }
+  await webrtc.getByRole('button',{name:'在 B 中检测 →',exact:true}).click();
+  assert.deepEqual((await commands()).at(-1),{command:'browser_launch',args:{webrtc:true}});
   // ----- 英文界面 -----
   await page.evaluate(()=>(window as any).networkFixture.language('en'));
   await page.getByRole('heading',{name:'Claude availability',exact:true}).waitFor();
   assert.match(await panel.locator('.domain-outcome').innerText(),/Check failed/);
   await page.getByRole('button',{name:'Run all checks again',exact:true}).waitFor();
   await page.getByRole('button',{name:'Open full report in B →',exact:true}).waitFor();
-  assert.match(await webrtc.innerText(),/Not checked/);
+  assert.match(await webrtc.innerText(),/Unknown|Disabled|Consistent|Inconsistent|Check/);
   assert.deepEqual(errors,[]);
-  return 9;
+  return 10;
  } finally {await context.close();}
 }

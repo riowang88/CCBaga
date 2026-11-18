@@ -31,7 +31,7 @@ const temporary=await mkdtemp(join(tmpdir(),'ccbaga-ui-'));
 for(const name of ['config','cache'])await mkdir(join(temporary,name));
 Object.assign(env,{HOME:temporary,XDG_CONFIG_HOME:join(temporary,'config'),XDG_CACHE_HOME:join(temporary,'cache')});
 let browser;
-try{browser=await chromium.launch({executablePath:process.env.CCBAGA_TEST_ENGINE||resolve('browser-runtime',engine),headless:true,env});}
+try{browser=await chromium.launch({executablePath:process.env.CCBAGA_TEST_ENGINE||resolve('browser-runtime',engine),headless:true,env,args:['--force-webrtc-ip-handling-policy=disable_non_proxied_udp']});}
 catch(error){await server.close();await rm(temporary,{recursive:true,force:true});throw error;}
 let checks=0;
 try{

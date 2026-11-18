@@ -1,17 +1,18 @@
 /**
  * [INPUT]: 随机令牌回环服务上下文、浏览器原生 navigator/Intl/Permissions 与实际 HTTPS 出口与服务备援目录与宿主界面语言。
- * [OUTPUT]: 奶油/珊瑚视觉（browser-start.css）；逐项说明设置位置与生效方式，显示系统区域来源、检测依据与B 触发/A 取数的 DNS 真实结果；单项未知黄色待测与已知冲突红叉； 顶部本地身份工牌与绑定/不匹配/未知状态、全宽紧凑实测起始页，同步宿主中英文界面，显示本机通讯状态与回报时间，观测上报宿主；逐项原因和实际/目标对比，检测中黄色波纹横幅、失败红色横幅与原因、完整通过绿色大对勾，语义色只用于横幅/信号/逐项标记。
+ * [OUTPUT]: 奶油/珊瑚视觉（browser-start.css）；与 HTTP 出口同轮的 WebRTC/UDP 四态（一致/不一致/未知/已禁用，重测取消上一轮）随回报上送；逐项说明设置位置与生效方式，显示系统区域来源、检测依据与B 触发/A 取数的 DNS 真实结果；单项未知黄色待测与已知冲突红叉； 顶部本地身份工牌与绑定/不匹配/未知状态、全宽紧凑实测起始页，同步宿主中英文界面，显示本机通讯状态与回报时间，观测上报宿主；逐项原因和实际/目标对比，检测中黄色波纹横幅、失败红色横幅与原因、完整通过绿色大对勾，语义色只用于横幅/信号/逐项标记。
  * [POS]: 独立 Chromium 入口，复用工具箱控件；成功状态只由真实观测决定，不接入 Tauri 权限，不伪造地理位置。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 import { Button, MotionRoot, TooltipProvider } from 'cromma-ui';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {setLocale,useI18n} from "./i18n";
 import { createRoot } from 'react-dom/client';
 import { type BrowserContext, type Report, type Exit } from './browser-model';
 import { probeBrowserExit } from './browser-network';
 import {verifyBrowser} from './browser-verification';
 import {BrowserDns} from './browser-dns-panel';
+import {classifyWebRtc,collectCandidates,udpExitIps,type WebRtcResult} from './browser-webrtc';
 import browserLogo from '../assets/browser-logo.jpg';
 import './index.css';
 import './style.css';
@@ -36,11 +37,17 @@ function Start() {
     const {t,locale}=useI18n();
     const [context, setContext] = useState<BrowserContext | null>(null), [report, setReport] = useState<Report | null>(null), [busy, setBusy] = useState(true), [error, setError] = useState(''), [linked, setLinked] = useState(false), [reportedAt, setReportedAt] = useState(0);
     const [dnsRevision,setDnsRevision]=useState(0);
-    async function measure() {
+    const [webrtc,setWebrtc]=useState<WebRtcResult|null>(null), [webrtcBusy,setWebrtcBusy]=useState(false);
+    const webrtcRound=useRef<AbortController|null>(null);
+    async function measure(withWebrtc = false) {
         setBusy(true);
         setError('');
         setReport(null);
         setReportedAt(0);
+        setWebrtc(null);
+        // ----- 重测取消上一轮 WebRTC 采集；只有本轮控制器的结果才写入 -----
+        webrtcRound.current?.abort(new DOMException('superseded','AbortError'));
+        const round=new AbortController();webrtcRound.current=round;
         try {
             const context = await api<BrowserContext>('context');
             setContext(context);setLocale(context.ui_language);
@@ -57,31 +64,38 @@ function Start() {
             const high = await ua?.getHighEntropyValues(['platformVersion', 'uaFullVersion']).catch(() => null);
             const permission = await navigator.permissions.query({ name: 'geolocation' }).then(x => x.state).catch(() => 'unknown');
             let exit: Exit | null = null, networkError = '';
+            // ----- 只在用户显式发起时才连接公共 STUN：页内重新实测，或 A 的「在 B 中检测」附带 #webrtc -----
+            setWebrtcBusy(withWebrtc);
+            const candidates = !withWebrtc ? Promise.resolve(null) : collectCandidates(round.signal).catch(e => { if (round.signal.aborted) throw e; return {disabled:false,lines:[] as string[],error:e instanceof Error?e.message:String(e)}; });
             try {
                 exit = await probeBrowserExit(context.exit_services);
             }
             catch (e) {
                 networkError = e instanceof Error ? e.message : String(e);
             }
-            const observed: Report = { language: navigator.language, languages: [...navigator.languages], timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, platform: navigator.platform, cores: navigator.hardwareConcurrency, user_agent: navigator.userAgent, platform_version: high?.platformVersion || '', browser_version: high?.uaFullVersion || navigator.userAgent.match(/(?:Chrome|Chromium)\/([\d.]+)/)?.[1] || '', geolocation: permission, exit, error: networkError };
+            const gathered = await candidates;
+            const webrtcResult = gathered ? classifyWebRtc({disabled:gathered.disabled,udpIps:udpExitIps(gathered.lines),httpIp:exit?.ip??null,error:gathered.error}) : null;
+            if (webrtcRound.current === round) { setWebrtc(webrtcResult); setWebrtcBusy(false); }
+            const observed: Report = { language: navigator.language, languages: [...navigator.languages], timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, platform: navigator.platform, cores: navigator.hardwareConcurrency, user_agent: navigator.userAgent, platform_version: high?.platformVersion || '', browser_version: high?.uaFullVersion || navigator.userAgent.match(/(?:Chrome|Chromium)\/([\d.]+)/)?.[1] || '', geolocation: permission, exit, error: networkError, webrtc: webrtcResult };
             await api('report', observed);
             setReport(observed);
             setReportedAt(Date.now());
             setLinked(true);
         }
         catch (e) {
+            if (round.signal.aborted && webrtcRound.current !== round) return;
             setLinked(false);
             setError(String(e));
         }
         finally {
-            setBusy(false);
+            if (webrtcRound.current === round) { setBusy(false); setWebrtcBusy(false); }
         }
     }
-    useEffect(() => { void measure(); let live = true; const timer = setInterval(() => { void api<BrowserContext>('context').then(next => { if (live) {
+    useEffect(() => { void measure(location.hash === '#webrtc'); let live = true; const timer = setInterval(() => { void api<BrowserContext>('context').then(next => { if (live) {
         setContext(next);setLocale(next.ui_language);
         setLinked(true);
     } }).catch(() => { if (live)
-        setLinked(false); }); }, 10000); return () => { live = false; clearInterval(timer); }; }, []);
+        setLinked(false); }); }, 10000); return () => { live = false; clearInterval(timer); webrtcRound.current?.abort(); }; }, []);
     const result=verifyBrowser(context,report,linked,error,busy);
     const {phase,checks,problems}=result;
     const title=phase==='checking'?'检测中':phase==='passed'?'检测通过':'检测未通过';
@@ -101,7 +115,7 @@ function Start() {
       <section className="verification-banner" aria-labelledby="verification-title" aria-busy={busy}>
        <div className="verification-signal" aria-hidden="true"><i/><i/><svg viewBox="0 0 96 96"><circle cx="48" cy="48" r="44" fill="currentColor"/>{phase==='passed'?<path d="m27 49 14 14 28-31"/>:phase==='failed'?<path d="m34 34 28 28m0-28L34 62"/>:<><path d="M48 27v23"/><circle cx="48" cy="65" r="3" fill="white" stroke="none"/></>}</svg></div>
        <div className="verification-title" aria-live="polite"><span>{t('浏览器环境')}</span><h1 id="verification-title">{t(title)}</h1>{!busy&&<span>{t('已通过 {v0} / {v1} 项',{v0:checks.filter(check=>check.ok).length,v1:checks.length})}</span>}</div>
-       <Button variant="ink" loading={busy} disabled={busy} onClick={()=>void measure()}>{t('重新实测')}</Button>
+       <Button variant="ink" loading={busy} disabled={busy} onClick={()=>void measure(true)}>{t('重新实测')}</Button>
       </section>
       <div className="landing-section-band" aria-hidden="true"/>
       {context&&<section className="verification-network" aria-label={t('检测依据')}><div><span>{t('当前模式')}</span><strong>{t(context.config.follow_machine?'跟随本机':'手动配置')}</strong></div><div><span>{t('目标地区')}</span><strong>{context.region?`${context.region.label} (${context.region.country})`:t('尚未识别')}</strong></div></section>}
@@ -109,6 +123,13 @@ function Start() {
       {checks.length>0&&<section className="verification-results" aria-label={t('逐项检测结果')}>{checks.map(check=><article className={`verification-check ${check.ok==null?'pending':check.ok?'ok':'failed'}`} key={check.label}><header><h2>{t(check.label)}</h2><span aria-label={t(check.ok==null?'尚未核验':check.ok?'检测通过':'检测未通过')}>{check.ok==null?t('尚未核验'):check.ok?'✓':'×'}</span></header><strong>{t(check.actual)}</strong><p>{t('目标：{v0}',{v0:t(check.expected)})}</p>{check.label==='本机区域'&&<p className="verification-source">{t(context?.machine.platform==='macos'?'来源：macOS 系统设置 → 通用 → 语言与地区 → 地区。':'来源：操作系统的区域设置。')}{context?.machine.locale_country&&` ${t('区域代码：{v0}',{v0:context.machine.locale_country})}`}{' '}{t('这是系统区域格式，不是 IP 所在地。')}{check.ok==null&&` ${t(!context?.region?'目标地区未识别，暂不判断是否一致。':'系统区域未读到，暂不判断是否一致。')}`}</p>}<details className="verification-setting-help"><summary>{t('如何设置')}</summary><p>{t(settingHelp[check.label])}</p></details></article>)}</section>}
       {phase==='checking'&&<div className="verification-loading" role="status">{t('正在读取浏览器与网络…')}</div>}
       {report?.exit&&<section className="verification-network"><div><span>{t('出口 IP')}</span><strong>{report.exit.ip}</strong></div><div><span>{t('国家 / 城市')}</span><strong>{report.exit.country} / {report.exit.city||'—'}</strong></div></section>}
+      <section className="verification-webrtc" aria-labelledby="verification-webrtc-title" data-webrtc={webrtcBusy?'checking':webrtc?.status||'idle'}>
+       <header><h2 id="verification-webrtc-title">{t('WebRTC / UDP 出口')}</h2><span role="status" className={webrtc?.status==='match'?'ok':webrtc?.status==='mismatch'?'failed':'pending'}>{t(webrtcBusy?'正在检测 WebRTC…':webrtc?.status==='match'?'一致（未发现 UDP 出口差异）':webrtc?.status==='mismatch'?'不一致（可能泄露）':webrtc?.status==='disabled'?'已禁用':webrtc?'未知':'尚未检测 WebRTC')}</span></header>
+       {!!webrtc?.udp_ips.length&&<p className="verification-webrtc-ips">{t('UDP 出口：{v0}',{v0:webrtc.udp_ips.join(' / ')})}{report?.exit&&` · ${t('HTTP 出口：{v0}',{v0:report.exit.ip})}`}</p>}
+       {webrtc?.error&&<p>{t(webrtc.error)}</p>}
+       {!webrtc&&!webrtcBusy&&<p>{t('自动打开实测页时不连接 STUN；点击「重新实测」或在 A 的网络环境页点「在 B 中检测」后才检测。')}</p>}
+       <p>{t('通过固定公共 STUN（Google / Cloudflare）收集 UDP 候选并与本轮 HTTP 出口比对；不使用 TURN、不发送凭据。B 启动时已限制未代理 UDP，未取到候选通常是限制生效，但不能据此证明没有泄露。WebRTC 结果单独列示，不计入上方基础核验。')}</p>
+      </section>
       <BrowserDns revision={dnsRevision} connected={linked} config={context?.config}/>
       <footer className="verification-footer"><span className={linked?'connected':'disconnected'}>{t(linked?'已连接 CCBaga-A':'主应用未连接')}</span><time>{reportedAt?t('结果回传成功 {v0}',{v0:new Date(reportedAt).toLocaleTimeString(locale==='zh'?'zh-CN':'en-US')}):t('等待检测回传')}</time></footer>
      </main>

@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 原生只读检测命令：browser_read/browser_check（本机出口与环境一致性）、network_diagnose_domains（四域名探针）、browser_launch（让 B 重新实测与 DNS）、browser_open_report（固定报告页）；browser-report 事件与 YAML 文案。
- * [OUTPUT]: 网络环境检测页：本机出口 IP/所在地/运营商、深色 Claude 可用性四域名卡（含延迟）、环境一致性网格、DNS 最近一轮结果与「在 B 中检测」、WebRTC/UDP 如实「未检测」、「在 B 中打开完整报告」三级链接。
+ * [OUTPUT]: 网络环境检测页：本机出口 IP/所在地/运营商、深色 Claude 可用性四域名卡（含延迟）、环境一致性网格、DNS 最近一轮结果与「在 B 中检测」、WebRTC/UDP 最近一轮四态（一致/不一致/未知/已禁用）与「在 B 中检测」、「在 B 中打开完整报告」三级链接。
  * [POS]: 纯检测页；不修改系统、浏览器或代理设置，不自算 IP 信任评分/代理标记/住宅属性；DNS 由 B 触发，A 只读同会话最近一轮结果。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -79,11 +79,11 @@ export function VpsPanel() {
         void runExit();void runDiagnostics();
     }
 
-    async function inBrowser(command:'browser_launch'|'browser_open_report') {
+    async function inBrowser(command:'browser_launch'|'browser_open_report',webrtc=false) {
         if(action)return;
         setAction(command);setError('');
         try {
-            if(command==='browser_launch'){const next=await invoke<BrowserState>(command,{onProgress:new Channel()});if(live.current)setState(next);}
+            if(command==='browser_launch'){const next=await invoke<BrowserState>(command,{onProgress:new Channel(),webrtc});if(live.current)setState(next);}
             else await invoke(command);
         } catch(e) { if(live.current)setError(String(e)); }
         finally { if(live.current)setAction(''); }
@@ -94,6 +94,8 @@ export function VpsPanel() {
     const dns=state?.running?state.dns_last:null;
     const resolvers=dns?.observation?.resolvers;
     const dnsState=!state?.running?'stopped':!dns?'idle':dns.error?'failed':resolvers?.length?'observed':'empty';
+    const webrtc=state?.running?state.report?.webrtc:null;
+    const webrtcState=!state?.running?'stopped':webrtc?.status||'idle';
     const dnsCountries=[...new Set((resolvers||[]).map(row=>row.country_code).filter(Boolean))];
 
     return <section className="rb-page network-page" data-page="network">
@@ -158,9 +160,18 @@ export function VpsPanel() {
                 {!!resolvers?.length&&<table className="network-dns-table"><thead><tr><th>{t('DNS 解析器 IP')}</th><th>{t('国家 / 城市')}</th><th>{t('运营商')}</th></tr></thead><tbody>{resolvers.map(row=><tr key={row.ip}><td className="rb-mono">{row.ip}</td><td>{row.geo_error?<span title={t(row.geo_error)}>{t('归属地未取得')}</span>:[row.country_code,row.country,row.city].filter(Boolean).join(' · ')}</td><td>{row.isp||t('未知')}</td></tr>)}</tbody></table>}
                 <p className="rb-muted network-small">{t('解析器地区与出口不同不自动等于泄露；结果不构成安全保证。')}</p>
             </section>
-            <section className="rb-card line network-webrtc" aria-labelledby="network-webrtc-title" data-webrtc="unchecked">
-                <h2 id="network-webrtc-title" className="rb-label">{t('WebRTC / UDP 泄露')}</h2>
-                <p role="status"><span className="rb-warn">{t('未检测')}</span><span className="rb-muted"> · {t('本版本尚未提供 WebRTC/UDP 检测；未检测不代表通过。')}</span></p>
+            <section className="rb-card line network-webrtc" aria-labelledby="network-webrtc-title" data-webrtc={webrtcState}>
+                <div className="network-card-head"><h2 id="network-webrtc-title" className="rb-label">{t('WebRTC / UDP 泄露')}</h2>
+                    <button type="button" className="rb-link" disabled={!!action||!state?.engine_ready} onClick={()=>void inBrowser('browser_launch',true)}>{action==='browser_launch'?t('正在打开实测页'):state?.running?t('在 B 中检测'):t('打开 B 并检测')} →</button></div>
+                <p role="status">{webrtcState==='stopped'?<span className="rb-muted">{t('B 浏览器未运行；WebRTC 由 B 经公共 STUN 检测，A 只读取最近一轮结果。')}</span>
+                    :webrtcState==='idle'?<span className="rb-muted">{t('尚未检测 WebRTC')}</span>
+                    :webrtcState==='match'?<span className="rb-ok">{t('一致（未发现 UDP 出口差异）')}</span>
+                    :webrtcState==='mismatch'?<span className="rb-err">{t('不一致（可能泄露）')}</span>
+                    :webrtcState==='disabled'?<span className="rb-warn">{t('已禁用')}</span>
+                    :<span className="rb-warn">{t('未知')}</span>}
+                    {!!webrtc?.udp_ips.length&&<span className="rb-muted rb-mono"> · {t('UDP 出口：{v0}',{v0:webrtc.udp_ips.join(' / ')})}</span>}</p>
+                {webrtc?.error&&<p className="rb-muted network-small">{t(webrtc.error)}</p>}
+                <p className="rb-muted network-small">{t('未知与已禁用不代表通过；B 已限制未代理 UDP，未取到候选不能证明没有泄露。')}</p>
             </section>
         </div>
         <p className="rb-muted network-small network-foot">{t('IP 信任评分、VPN/代理标记与住宅/机房属性不在此显示，也不自行推算；需要时在 B 中打开完整报告查看。')}</p>

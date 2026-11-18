@@ -9,7 +9,7 @@ mod launch;
 mod network;
 mod profile;
 mod workspaces;
-use launch::launch_locked;
+use launch::{launch_locked, launch_page};
 pub(crate) use workspaces::delete_saved;
 pub(crate) use workspaces::{identity_action, identity_profiles};
 pub(crate) use profile::running as profile_running;
@@ -536,11 +536,12 @@ pub async fn browser_save(app: tauri::AppHandle, config: Config) -> Result<Snaps
 pub async fn browser_launch(
     app: tauri::AppHandle,
     on_progress: Channel<Progress>,
+    webrtc: Option<bool>,
 ) -> Result<Snapshot, String> {
     run(move || {
         let state = app.state::<Browser>();
         let _guard = state.gate.lock().unwrap();
-        launch_locked(&app, &Reporter::channel(Some(on_progress)))
+        launch_page(&app, &Reporter::channel(Some(on_progress)), webrtc.unwrap_or(false))
     })
     .await
 }

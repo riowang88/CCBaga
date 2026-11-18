@@ -1,4 +1,4 @@
-// [INPUT]: 显式代理地址、ipwho.is/ipapi.co HTTPS 出口信息与真实浏览器上报。
+// [INPUT]: 显式代理地址、ipwho.is/ipapi.co HTTPS 出口信息与真实浏览器上报（含有界 WebRTC/UDP 比对结果）。
 // [OUTPUT]: 独立目标国家与配置语言核验、共用检测服务目录、出口解析与按同一路由切换服务的检测；无上报或失败保持未核验。
 // [POS]: 环境核验边界；只把出口观测当证据，配置值不能冒充实际结果。
 // [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -109,6 +109,25 @@ pub struct Report {
     pub geolocation: String,
     pub exit: Option<Exit>,
     pub error: String,
+    /// B 页面经固定公共 STUN 采集的 UDP 出口与同轮 HTTP 出口的比对；旧页面不上报时为空。
+    #[serde(default)]
+    pub webrtc: Option<WebRtc>,
+}
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WebRtc {
+    pub status: String,
+    pub udp_ips: Vec<String>,
+    pub error: String,
+}
+impl WebRtc {
+    fn valid(&self) -> bool {
+        ["match", "mismatch", "unknown", "disabled"].contains(&self.status.as_str())
+            && self.udp_ips.len() <= 8
+            && self.udp_ips.iter().all(|x| x.parse::<std::net::IpAddr>().is_ok())
+            && self.error.len() < 300
+            && (self.status != "mismatch" || !self.udp_ips.is_empty())
+    }
 }
 impl Report {
     pub fn valid(&self) -> bool {
@@ -134,6 +153,7 @@ impl Report {
                             .all(|x| x.len() < 300)
                 })
                 .unwrap_or(true)
+            && self.webrtc.as_ref().is_none_or(WebRtc::valid)
     }
 }
 #[derive(Serialize)]
@@ -280,10 +300,31 @@ pub fn checks(
                 "Canvas 与布局矩形使用稳定种子；不作为机器完全一致。".into()
             },
         ),
-        check(
-            "DNS / WebRTC 泄漏",
-            None,
-            "已设置代理 DNS、限制未代理 UDP、关闭 QUIC；尚未完成独立泄漏测试。".into(),
-        ),
+        // ----- 仅一致为通过、不一致为冲突；未知/禁用/未上报保持待核验，不冒充通过 -----
+        {
+            let webrtc = report.and_then(|r| r.webrtc.as_ref());
+            let http = report
+                .and_then(|r| r.exit.as_ref())
+                .map(|x| x.ip.as_str())
+                .unwrap_or("待测");
+            check(
+                "WebRTC / UDP 出口",
+                webrtc.and_then(|w| match w.status.as_str() {
+                    "match" => Some(true),
+                    "mismatch" => Some(false),
+                    _ => None,
+                }),
+                match webrtc.map(|w| w.status.as_str()) {
+                    Some("match") => format!("UDP 出口与 HTTP 出口一致：{http}"),
+                    Some("mismatch") => format!(
+                        "UDP 出口：{}；HTTP 出口：{http}",
+                        webrtc.map(|w| w.udp_ips.join(" / ")).unwrap_or_default()
+                    ),
+                    Some("disabled") => "WebRTC 已被浏览器策略禁用，状态未知。".into(),
+                    Some(_) => "未取到 STUN 候选（超时、UDP 被拦或浏览器策略限制），状态未知。".into(),
+                    None => "需要在 B 中检测 WebRTC / UDP 出口。".into(),
+                },
+            )
+        },
     ]
 }

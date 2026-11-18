@@ -1,6 +1,6 @@
 /*
  * [INPUT]: browser-start.tsx / browser-dns-panel.tsx 的既有类名与 data-* 状态；rb.css 变量缺失时用同值回退（本入口不加载主应用壳）。
- * [OUTPUT]: 伴生检测页奶油/珊瑚视觉：奶油底、衬线标题、12px 圆角细线卡、深色身份工牌；检测中黄/失败红/通过绿三态语义色，保留 verification-ripple 波纹与减弱动态。
+ * [OUTPUT]: 伴生检测页奶油/珊瑚视觉（含 WebRTC 独立卡）：奶油底、衬线标题、12px 圆角细线卡、深色身份工牌；检测中黄/失败红/通过绿三态语义色，保留 verification-ripple 波纹与减弱动态。
  * [POS]: 仅由 browser-start.tsx 在 index.css/style.css 之后引入，完整定义本页布局，不依赖主应用斜纹/点阵壳；不改变任何判定逻辑。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -95,6 +95,17 @@
 .verification-dns td:first-child{font-family:var(--vp-mono);overflow-wrap:anywhere}
 .verification-dns td{user-select:text}
 .verification-dns-help h3{margin-top:12px;font-size:12px;font-weight:600}
+
+/* ----- WebRTC / UDP 出口（单独列示，不计入基础核验） ----- */
+.verification-webrtc{padding:16px 20px;border:1px solid var(--vp-line);border-radius:12px;background:var(--vp-canvas)}
+.verification-webrtc header{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 16px}
+.verification-webrtc h2{font:500 20px var(--vp-serif);letter-spacing:-.01em}
+.verification-webrtc header span{font-size:12px;font-weight:500}
+.verification-webrtc header .ok{color:#2f7d47}
+.verification-webrtc header .failed{color:var(--rb-err,#c64545)}
+.verification-webrtc header .pending{color:#8a6500}
+.verification-webrtc p{font-size:12px;line-height:1.6;color:var(--vp-muted);margin:8px 0 0}
+.verification-webrtc .verification-webrtc-ips{font-family:var(--vp-mono);color:var(--vp-ink);user-select:text;overflow-wrap:anywhere}
 
 /* ----- 底部连接状态 ----- */
 .verification-footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;padding:4px;font-size:12px;color:var(--vp-muted)}

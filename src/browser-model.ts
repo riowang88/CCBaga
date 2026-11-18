@@ -6,10 +6,11 @@
  */
 import type {DnsConfig} from './browser-doh';
 import type {DnsObservation} from './browser-dns';
+import type {WebRtcResult} from './browser-webrtc';
 export type BrowserConfig={seed:number;proxy:string;follow_machine:boolean;language:string;timezone:string;native_graphics:boolean;dns?:DnsConfig};
 export type Machine={platform:string;version:string;cores:number;timezone:string;languages:string[];locale:string;locale_country:string;location_enabled:boolean|null;timezones:string[]};
 export type Exit={ip:string;country:string;city:string;timezone:string;isp:string};
-export type Report={language:string;languages:string[];timezone:string;platform:string;cores:number;user_agent:string;platform_version:string;browser_version:string;geolocation:string;exit:Exit|null;error:string};
+export type Report={language:string;languages:string[];timezone:string;platform:string;cores:number;user_agent:string;platform_version:string;browser_version:string;geolocation:string;exit:Exit|null;error:string;webrtc?:WebRtcResult|null};
 export type BrowserIdentity={linked:boolean;status:'linked'|'draft'|'empty'|'unlinked'|'mismatch'|'unknown';name:string|null;email:string|null;organization:string|null};
 export type BrowserContext={identity?:BrowserIdentity;ui_language:'zh'|'en';exit_services:string[];region:{id:string;label:string;country:string;language:string;locale:string;timezone:string}|null;config:BrowserConfig;machine:Machine;engine_version:string};
 export type BrowserState=BrowserContext&{engine_ready:boolean;running:boolean;profile:string;identity_linked?:boolean;cache:{path:string;bytes:number;login:boolean}[];cache_error:string;report:Report|null;report_received_at:number|null;machine_exit:Exit|null;dns_last?:DnsLast|null;checks:{title:string;status:'ok'|'mismatch'|'pending';detail:string}[]};

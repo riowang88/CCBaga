@@ -1,0 +1,74 @@
+/*
+ * [INPUT]: rb.css 设计令牌（--rb-*，此处带回退值，合并前也可读）与身份页子组件的类名。
+ * [OUTPUT]: 身份页专属布局与配色：页头、横幅、工牌三态配色（空=canvas 虚线、当前=深色带「当前」标记、已存=奶油）、卡内主操作+「···」菜单、策略切换片、更多工具分段与分端登录行。
+ * [POS]: 由 identities.tsx 引入；style.css 中旧身份规则保留到收尾清理，这里用 .rb-identity 作用域与新类名覆盖，不删旧规则。
+ * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+ */
+.identity-page.rb-identity { display:flex; flex-direction:column; gap:14px; padding:32px 28px; box-sizing:border-box; background:var(--rb-canvas,#faf9f5); color:var(--rb-ink,#141413); }
+.identity-page.rb-identity > * { flex-shrink:0; }
+
+/* ----- 页头 ----- */
+.rb-id-head { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+.rb-id-head > h1 { flex:1; margin:0; min-width:0; }
+.rb-id-head label { font-size:14px; }
+.rb-id-head .rb-link { display:inline-flex; align-items:center; gap:6px; }
+
+/* ----- 横幅：错误、未完成恢复、浏览器重开警告 ----- */
+.rb-id-banner { display:flex; align-items:center; justify-content:space-between; gap:16px; margin:0; padding:12px 16px; border-radius:12px; border:1px solid var(--rb-hairline,#e6dfd8); background:var(--rb-card,#efe9de); font-size:13px; }
+.rb-id-banner.warn { border-color:color-mix(in srgb,var(--rb-warn,#b7791f) 40%,transparent); background:color-mix(in srgb,var(--rb-warn,#b7791f) 10%,var(--rb-canvas,#faf9f5)); }
+.rb-id-banner.rb-err { border-color:color-mix(in srgb,var(--rb-err,#b53333) 35%,transparent); background:color-mix(in srgb,var(--rb-err,#b53333) 7%,var(--rb-canvas,#faf9f5)); }
+.rb-id-banner strong { font-weight:500; }
+
+/* ----- 工牌轨道与三态配色（几何沿用 style.css 的 222×352 证件比例） ----- */
+.rb-identity .rb-id-library { display:flex; flex-direction:column; gap:0; }
+.rb-identity .identity-card-rail { padding:10px 0 24px; scroll-padding-inline:0; }
+.rb-identity .identity-card { border-radius:12px; background:var(--rb-cream-strong,#efe9de); border-color:var(--rb-hairline,#e6dfd8); box-shadow:0 1px 3px rgba(20,20,19,.08); }
+.rb-identity .identity-card:hover { box-shadow:0 10px 24px -12px rgba(20,20,19,.28); }
+.rb-identity .identity-card.empty { background:var(--rb-canvas,#faf9f5); border:1px dashed var(--rb-hairline-strong,#cfc5b4); }
+.rb-identity .identity-card.empty.selected { border-style:solid; border-color:var(--rb-ink,#141413); }
+.rb-identity .identity-card.current { color:var(--rb-on-dark-soft,#faf9f5); background:var(--rb-dark,#181715); border-color:var(--rb-dark,#181715); }
+.rb-identity .identity-card.current .identity-avatar { color:var(--rb-ink,#141413); }
+.rb-identity .saved-account .identity-email { color:var(--rb-ink,#141413); }
+.rb-id-title { display:flex; align-items:center; gap:8px; min-width:0; }
+.rb-id-title > h3 { flex:1; min-width:0; }
+.rb-id-current-pill { flex:0 0 auto; font-size:12px; font-weight:500; padding:2px 10px; border-radius:9999px; background:var(--rb-dark-elevated,#252320); color:var(--rb-ok-on-dark,#7fd093); }
+
+/* ----- 卡内操作：主操作占满，「···」为圆形次要按钮 ----- */
+.rb-id-actions { display:flex; gap:8px; margin-top:auto; padding-top:8px; }
+.rb-id-actions > button:first-child { flex:1; min-width:0; }
+.rb-id-menu-trigger { flex:0 0 auto; width:36px; padding:0; border-radius:50%; letter-spacing:-.05em; }
+.rb-identity .identity-card.current .rb-btn:not(.primary) { background:var(--rb-dark-elevated,#252320); border-color:var(--rb-dark-elevated,#252320); color:var(--rb-on-dark-soft,#faf9f5); }
+.rb-id-menu { z-index:60; min-width:150px; padding:4px; border-radius:10px; border:1px solid var(--rb-hairline,#e6dfd8); background:var(--rb-canvas,#faf9f5); box-shadow:0 10px 30px -10px rgba(20,20,19,.3); font:500 13px var(--rb-sans,inherit); }
+.rb-id-menu-item { padding:8px 12px; border-radius:6px; color:var(--rb-ink,#141413); cursor:default; outline:none; user-select:none; }
+.rb-id-menu-item[data-highlighted] { background:var(--rb-card,#efe9de); }
+.rb-id-menu-item.danger { color:var(--rb-err,#b53333); }
+
+/* ----- 保留策略条 ----- */
+.rb-id-policy-head { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+.rb-id-policy-head > h2 { margin:0; font-size:16px; font-weight:500; }
+.rb-id-policy-head > p { margin:0; font-size:13px; }
+.rb-id-chips { display:flex; gap:8px; flex-wrap:wrap; }
+.rb-id-chips .rb-chip { display:inline-flex; align-items:center; gap:8px; }
+.rb-id-chip-dot { width:8px; height:8px; border-radius:50%; background:var(--rb-hairline-strong,#cfc5b4); }
+.rb-id-chips .rb-chip[aria-pressed=true] { background:var(--rb-dark,#181715); border-color:var(--rb-dark,#181715); color:var(--rb-on-dark-soft,#faf9f5); }
+.rb-id-chips .rb-chip[aria-pressed=true] .rb-id-chip-dot { background:var(--rb-ok,#5db872); }
+
+/* ----- 更多工具分段：子面板沿用旧结构，去掉旧斜纹隔带与左右内边距 ----- */
+.rb-id-tools { padding-top:12px; }
+.rb-id-tabs { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:6px; }
+.rb-id-tabs [role=tab][aria-selected=true] { background:var(--rb-card,#efe9de); color:var(--rb-ink,#141413); }
+.rb-id-tab-panel[hidden] { display:none; }
+.rb-identity .rb-id-tab-panel .identity-cli,
+.rb-identity .rb-id-tab-panel .claude-residue { border-top:0; border-image:none; }
+.rb-identity .rb-id-tab-panel .identity-section-head { padding:10px 0; }
+.rb-identity .rb-id-tab-panel .identity-operation { margin-inline:0; }
+.rb-id-sharing { padding:10px 0; }
+
+/* ----- 分端登录行 ----- */
+.rb-id-clients > p { margin:6px 0; font-size:13px; }
+.rb-id-client { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.rb-id-client-name { width:130px; font-weight:500; }
+.rb-id-client-meta { flex:1; min-width:180px; display:grid; gap:2px; font-size:13px; }
+.rb-id-client-source { font-family:var(--rb-mono,ui-monospace,monospace); font-size:11px; }
+
+@media(max-width:850px) { .identity-page.rb-identity { padding:24px 16px; } }

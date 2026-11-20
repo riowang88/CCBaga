@@ -1,5 +1,5 @@
 # RioBaga - RioBaga-A（宿主，橙底清理员 A）与 RioBaga-B（指纹 Chromium，橙底浏览器 B）
-安装为 /Applications/RioBaga-A.app 与 /Applications/RioBaga-B.app（旧名 CCBaga-A.app/CCBaga-B.app 由 install-apps.py 安装时迁移移除）。改名只涉及显示名与 macOS 应用包文件名；Bundle ID（ai.local.requirement-french / ai.local.requirement-french.browser）、Cargo 包名、app_data_dir 与保险库 key.bin、种子派生串、CCBaga-DNS.json、归档魔数/扩展名、更新仓库 riowang88/CCBaga 一律不变——app_data_dir 由 identifier 推导，改了旧保险库将无法解密。Linux/Windows 的安装路径、可执行名、注册表键与 .desktop Exec 沿用 CCBaga-A/B（tauri.linux/windows.conf.json 显式固定 productName=CCBaga-A 以保持 Tauri 推导路径，仅窗口标题与桌面入口显示名为 RioBaga）。
+安装为 /Applications/RioBaga-A.app 与 /Applications/RioBaga-B.app（旧名 CCBaga-A.app/CCBaga-B.app 由 install-apps.py 安装时迁移移除）。改名只涉及显示名与 macOS 应用包文件名；Bundle ID（ai.local.requirement-french / ai.local.requirement-french.browser）、Cargo 包名、app_data_dir 与保险库 key.bin、种子派生串、CCBaga-DNS.json、归档魔数/扩展名、更新仓库（已改名 riowang88/RioBaga，旧地址由 GitHub 跳转，已安装旧版沿用旧地址检查更新）一律不变——app_data_dir 由 identifier 推导，改了旧保险库将无法解密。Linux/Windows 的安装路径、可执行名、注册表键与 .desktop Exec 沿用 CCBaga-A/B（tauri.linux/windows.conf.json 显式固定 productName=CCBaga-A 以保持 Tauri 推导路径，仅窗口标题与桌面入口显示名为 RioBaga）。
 Tauri 2.12.1 + Rust + macOS AppKit/UniformTypeIdentifiers/Accessibility/Security/CoreLocation + SHA-256 + React 19.3.0 + TypeScript 5.9.3 + Cromma UI 本地副本 + Radix UI 1.6.7 + Tailwind CSS 4.3.3 + Motion 14.0.0 + Vite 7.3.6 + YAML 2.9.1（仅构建）
 
 <directory>
@@ -9,7 +9,6 @@ src-tauri/ - 白名单身份暂存/切换、Claude Code CLI 安装管理、独�
 browser-runtime/ - 固定摘要的独立 Fingerprint Chromium 引擎与保留 Framework 链接的打包归档；见其 CLAUDE.md
 tests/ - 独立身份与 Claude 出口 GUI 虚构 IPC 入口，供发布前真实浏览器交互模拟；不进入生产构建；见其 CLAUDE.md
 scripts/ - 图标、签名、引擎打包、应用安装与Claude Code CLI 管理脚本；见其 CLAUDE.md
-skills/ - Agent Skills 标准目录与 npm/npx 通用安装，MIT/兼容声明和全部脚本独立交付；AI 收集用户资料、运行本机预检与经确认的远端部署；应用界面不再提供 Skill 入口或安装提示词，目录仍随仓库发布；见其 CLAUDE.md
 packaging/ - 社区 Linux 构建配方；见其 CLAUDE.md
 assets/ - 两张压缩品牌图与极客像素安装盘背景，分别供图标/README 和 DMG 布局使用；见其 CLAUDE.md
 docs/ - 英文仓库封面、操作速查、身份存储/迁移/性能边界与 Linux/Windows 开发说明；见其 CLAUDE.md
@@ -40,9 +39,9 @@ NOTICE.md - 第三方引擎、组件与图标的授权边界
 文件残留：身份页提供用户触发的默认 Claude 路径检查，列出完整元数据、文件路径和窄 JSON 字段；默认仅选择完整缓存，登录/历史/旧备份需另选。明确警告并勾选确认后结束 Claude，按原生快照编号校验和清理，成功/失败均复查；不访问钥匙串，不修改个人设置、Skills、保险库、浏览器资料或通用终端/代理配置。未完成身份恢复时阻止清理，扫描失败不保留可执行旧预览；非空或未知锁目录仅警告保留，不生成删除快照，扫描后内容改变则拒绝执行。
 实时呈现：身份转换、空身份、直接删除与残留清理共用卡片正下方的事件驱动阶段动画，后端完成哪一步才标记哪一步；只显示当前阶段真实 n/N，不将归档写入完成当作整个切换完成，未知总量不显示百分比。回滚、部分失败和浏览器重开警告保留真实后果；减弱动态偏好下停止脉冲。
 浏览器与系统：缓存操作保留登录/书签/密码；显式全清理按当前身份user-data-dir完整删除登录/密码库及密钥元数据、书签、历史、扩展、偏好和缓存，单独警告勾选确认且不备份；其他身份、保险库和系统钥匙串不在范围；回环请求最多32并发且发送前复核令牌；换指纹先退出 B，再随机种子和目标地区语言/时区，显式代理留空跟随 TUN。真实设备版本/CPU、出口服务备援、回环令牌/回报时间仍沿用原边界；浏览器页只留配置与数据清理（出口与核验网格已移到网络页，美国机器对齐 browser_align 已删除）；伴生检测页（browser-start.css）用奶油底/衬线标题/12px 圆角卡：检测中黄底波纹、失败红底与逐项原因、完整通过绿底大对勾，不伪造 IP/坐标或未测结果。系统修改显式授权并读回；未知定位保持未知。
-网络：网络环境页是纯只读检测页，用户点击才运行：本机出口 IP/所在地/运营商、「Claude 出口」四域名只读连通性探针（待测/检测中/成功/失败及逐域原因）、环境一致性、DNS 泄漏（读取同会话 B 最近一轮结果）、WebRTC/UDP 泄漏（读取 B 回报；仅用户显式点「在 B 中检测」或在 B 页内重测时，B 的页面才向固定公共 STUN（Google 主、Cloudflare 备，无 TURN/凭据）发起 UDP 外连，自动打开不连；一致/不一致/未知/已禁用四态，未知与未检测不等于通过，不并入原 12 项核验）；页面不显示也不自算 IP 信任评分，不改任何设置。网络页不再有 Skill 安装入口、AI 图标分段或安装/运行提示词（DMIT/Webshare 推广与购买帮助同样已移除），skills/ 目录仍在仓库，由用户自行安装。下载源只在 HTTP 200 且最多 64 字节的公开三段数字版本正文验证后通过，不能由根目录或畸形响应推断可下载。探针不携带认证、不跟随重定向，连接对端不冒充出口或分流验证。SSH/三文件/家宽资料和确认部署归独立 Skill；私密资料留在 Git/Skill 外，后续严格主机指纹验证，订阅私密交付后引导 TUN 开/系统代理关。供应商设置唯一来源 skills/ccbaga-network/providers.json，完整原始地址由回归锁定。
+网络：网络环境页是纯只读检测页，用户点击才运行：本机出口 IP/所在地/运营商、「Claude 出口」四域名只读连通性探针（待测/检测中/成功/失败及逐域原因）、环境一致性、DNS 泄漏（读取同会话 B 最近一轮结果）、WebRTC/UDP 泄漏（读取 B 回报；仅用户显式点「在 B 中检测」或在 B 页内重测时，B 的页面才向固定公共 STUN（Google 主、Cloudflare 备，无 TURN/凭据）发起 UDP 外连，自动打开不连；一致/不一致/未知/已禁用四态，未知与未检测不等于通过，不并入原 12 项核验）；页面不显示也不自算 IP 信任评分，不改任何设置。网络页没有 Skill 安装入口、AI 图标分段、提示词或供应商推广；Network Skill 与 skills/ 目录已从仓库删除。下载源只在 HTTP 200 且最多 64 字节的公开三段数字版本正文验证后通过，不能由根目录或畸形响应推断可下载。探针不携带认证、不跟随重定向，连接对端不冒充出口或分流验证。应用不收集 SSH 密钥、不连接或部署服务器。
 CLI 管理：Claude 身份页提供一键卸载/重装，确认后结束全部已识别 Claude 进程；原生、Homebrew 与登录终端/nvm 全局 npm 按官方流程卸载程序，配置、会话、技能、项目与钥匙串保留。拒绝删除自定义启动器或外部链接；重装沿用已识别包管理器，无安装时用官方原生安装器；原生重装以唯一目录暂存原程序，捕获安装/核验失败时恢复（Windows 验哈希），回滚受阻保留文件并如实报告；强制终止不承诺自动恢复。版本核验成功且收到完整回报才报告完成。超时结束本次子进程组，错误保留部分修改的事实。
-发布权限：本仓库版本仅由仓库所有者 riowang88 在 riowang88/CCBaga 发布，CI 同时核对仓库、触发者与重跑者；PR/main 检查不接触签名凭据。README 不承载发布、公证操作文章。
+发布权限：本仓库版本仅由仓库所有者 riowang88 在 riowang88/RioBaga 发布，CI 同时核对仓库、触发者与重跑者；PR/main 检查不接触签名凭据。README 不承载发布、公证操作文章。
 发布契约：开发构建默认临时签名；release-macos.py 支持显式 CC_MACOS_SIGNING_MODE=adhoc/notarized，脚本默认 notarized，本仓库 CI 明确选择 adhoc；不因缺凭据静默降级。adhoc 使用临时签名且不宣称 Apple 信任，notarized 使用外部 Developer ID 和 Apple API key，依次公证装订浏览器、宿主与 DMG。单个 DMG 同时交付两个应用；每次品牌化都明确设置浏览器 Bundle ID（不能依赖本机旧引擎）；安装盘验收核对双应用名称/标识/入口。哈希锁定的 dmgbuild 只用于发布，写入像素背景与固定拖拽布局，不依赖 Finder GUI。notarized 模式必须取得 Accepted、装订票据并通过 Gatekeeper；adhoc 保留严格代码签名完整性、安装盘内容和更新验签检查，下载说明明确首次打开可能被系统拦截。不自动移除用户下载的隔离属性。最终 A 由官方 CLI 生成带版本签名的 .app.tar.gz 与公开 latest.json；仅公钥进入应用，原生 updater 强制验证版本，安装后重启，B 继续使用完整 DMG。CI 只缓存 Rust 依赖，签名私钥不传给构建子进程。密钥和发布产物不入 Git。
 交付流程：视觉验收由项目所有者完成；获得发布授权后，同步推送 main 与 release 的同一已验收提交，release 触发递增版本和 tag；公开产物验收成功后核对两分支一致，再回复并关闭相关 issue，避免提交中的关闭关键字提前结束问题。版本说明描述当前产品与安装方式。所有平台构建、载荷、签名更新清单和公开下载验收成功后完成交付；历史 Release 与 tag 默认全部保留，方便回退和对比，失败时保留当前可用版本。源码安装与引擎替换：可捕获的取消包含在回滚范围内，目录实际移动后发生异常也按磁盘状态恢复；双重失败保留并报告恢复目录。Mac/Linux 安装前、三平台正式载荷与构建 CI 共用页面实际资源引用检查，不用任意 JS 存在替代完整性。此契约不宣称断电/强制结束的崩溃原子性或并发安装安全。本机开发使用 bun run dev:install：debug/custom-protocol 内嵌 UI、临时签名、双应用事务重装到 /Applications 并启动/激活；开发模式拒绝外部安装盘，只允许临时签名包。GitHub Releases 交付双应用 DMG；Apple 签名公证为显式可选模式，下载页据真实模式说明限制，安装包完整性验收保持。
 安全契约：src-tauri/SECURITY.md 描述数据流、外部连接与已确认上游依赖风险；进程参数只在原生层识别，Machine.system_proxy 禁止序列化；宿主无用户信息上传服务；验证未覆盖的第三方、桌面或远程行为不得宣称通过。
@@ -50,7 +49,7 @@ Linux x86_64 适配：见 docs/linux.md；平台配置拆分为 tauri.macos.conf
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 
 电脑环境页的国家地区目录固定为截图的 13 项，顺序不扩展；同页「同时关闭定位」「同时更换 B 浏览器指纹」为显式勾选，按真实结果逐步记录。Windows 完整时区映射只服务实际系统读回与核验。
-Windows x64：平台桥使用当前用户 SID、文件所有权、reparse-point 检查和 \\?\ verbatim 长路径转换；进程核验精确入口、创建时间和 live handle。凭据管理器不读取或自动删除。当前用户 International cmdlets 保留其他语言并核验实际生效；时区 tzutil 写入后读回，不用默认值伪装状态。默认浏览器只注册自身 HKCU 能力并引导系统确认，独立读取 HTTP/HTTPS。CLI 由内嵌 PowerShell 按原生/npm/bun/WinGet 来源管理，Job Object 限定子进程树；个人资产保留。单 NSIS 同时安装 A/B；Windows 自动更新使用同一安装器且先关闭 B。网络仍只用独立 Skill；Windows 私密文件采用用户 SID 独占 NTFS ACL，原生 OpenSSH/curl，无 WSL 或 VPS UI。main 的所有者手动安装样本预检不得签名或发布；正式发布需全部平台验收，Windows 更新私钥仅在测试后的独立签名步骤注入。
+Windows x64：平台桥使用当前用户 SID、文件所有权、reparse-point 检查和 \\?\ verbatim 长路径转换；进程核验精确入口、创建时间和 live handle。凭据管理器不读取或自动删除。当前用户 International cmdlets 保留其他语言并核验实际生效；时区 tzutil 写入后读回，不用默认值伪装状态。默认浏览器只注册自身 HKCU 能力并引导系统确认，独立读取 HTTP/HTTPS。CLI 由内嵌 PowerShell 按原生/npm/bun/WinGet 来源管理，Job Object 限定子进程树；个人资产保留。单 NSIS 同时安装 A/B；Windows 自动更新使用同一安装器且先关闭 B。无 WSL 或 VPS UI。main 的所有者手动安装样本预检不得签名或发布；正式发布需全部平台验收，Windows 更新私钥仅在测试后的独立签名步骤注入。
 
 浏览器身份联动：未设置用户默认开启，保留显式关闭；初始沿用既有资料，在显式切换或联动确认时建立绑定，原地备份不改变活动绑定，后续每个身份绑定独占 user-data-dir（内部 Default）与配置；本软件身份 ID 经 SHA-256 派生非零 32 位种子、登记冲突并持久复用，主动换指纹只修改当前资料。SQLite v3 在切换/恢复同事务提交选择指针；正常退出 B 后才切身份，失败回滚，恢复未完成时禁止启动；Mac 入口无参数时不再回退其他资料。空身份每次分配全新资料，现有资料默认保留，重新启用时可显式选择采用原资料。浏览器数据不进入身份归档、不在切换时复制，不自动注入网页登录令牌；不能保证网站与 CLI/桌面账号相同，不改变出口 IP，不承诺匿名或第三方无外连。删除暂存身份时可独立确认删除关联浏览器资料，使用中的资料拒绝删除。视觉验收后方可发布。
 
@@ -72,7 +71,7 @@ Windows x64：平台桥使用当前用户 SID、文件所有权、reparse-point 
 
 保存完整性修复：所选历史等本地资料不因缺少登录元数据而被同档案重选回灌；联动重开产生不同资料后另存本地档案，重复保存更新新档案，保留旧档案及浏览器绑定。原有空工作区恢复、保留策略与账号隔离不变。
 
-本仓库更新渠道：公开 riowang88/CCBaga Releases 的 latest.json 与独立更新公钥；强制签名版本、篡改拒绝、所有者发布/重跑和跨平台验收保持。版本基数 0.2.50，CI 按运行号递增；首次使用新渠道需要安装包含新地址与公钥的构建，既有安装版不会因源码修改自动迁移。更新私钥只放仓库外与 GitHub Secrets，仅 notarized 模式要求 Apple 公证凭据；本次用户授权 GitHub Releases 安装包采用 adhoc 模式。
+本仓库更新渠道：公开 riowang88/RioBaga Releases 的 latest.json 与独立更新公钥；强制签名版本、篡改拒绝、所有者发布/重跑和跨平台验收保持。版本基数 0.2.50，CI 按运行号递增；首次使用新渠道需要安装包含新地址与公钥的构建，既有安装版不会因源码修改自动迁移。更新私钥只放仓库外与 GitHub Secrets，仅 notarized 模式要求 Apple 公证凭据；本次用户授权 GitHub Releases 安装包采用 adhoc 模式。
 
 首版人工维护窗口（2026-10-28 用户裁决）：对将快照或替换的客户端资料由用户保持静止；进程查询/生命周期/helper/资料占用检查和已检测冲突锁存、持久恢复仍保留，不承诺拦截检查间完成的外部启动/写入/退出，不引入系统级服务。原地备份仅保存 B 绑定时仍可保持 B 运行。身份页分端资料与本地摘要不等于登录有效，旧摘要字段缺失及未读取的 Keychain 明确未知；CLI 受控登录仅限已验证的 macOS 默认原生 2.1.307，显式确认后向当前 B 资料交付官方链接，取消可能晚于凭据写入；不自动归档。单端更新明确目标，保持另一端旧归档及 B 绑定，CLI 本地账号/组织冲突拒绝，App 仅记用户核对；该来源不随跨设备迁移导出。真实候选回调、默认 Keychain 保存恢复、App 登录控制及 CLI/App 选择重启尚待完成，不宣称 D1/D2 整体验收通过。
 

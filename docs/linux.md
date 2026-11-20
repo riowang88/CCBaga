@@ -10,7 +10,7 @@ RioBaga-A builds on Linux x86_64. The pinned Fingerprint Chromium 148.0.7778.215
 
 ## Installation
 
-Download the Linux x86_64 package for your distribution from [GitHub Releases](https://github.com/liseami/CCBaga/releases/latest): DEB for Ubuntu/Debian, RPM for compatible Fedora systems, AppImage for compatible desktops, or `.pkg.tar.zst` for Arch/pacman. A and its companion B engine are included in each package.
+Download the Linux x86_64 package for your distribution from [GitHub Releases](https://github.com/riowang88/RioBaga/releases/latest): DEB for Ubuntu/Debian, RPM for compatible Fedora systems, AppImage for compatible desktops, or `.pkg.tar.zst` for Arch/pacman. A and its companion B engine are included in each package.
 
 DEB, RPM and AppImage packages are built on Ubuntu 22.04 (glibc 2.35). Every packaged ELF is checked for newer glibc requirements before publication, including the host and bundled browser libraries. A compatible desktop with GTK 3 and WebKitGTK 4.1 is required; AppImage does not replace the system's glibc. Arch packages are built separately on Arch and target current Arch systems. Linux updates use the package manager or a new downloaded package; in-app updates support macOS and Windows.
 
@@ -67,13 +67,12 @@ bun run build
 bun test
 cargo test --locked --manifest-path src-tauri/Cargo.toml
 python3 scripts/test-linux.py
-python3 skills/ccbaga-network/scripts/test_network.py
 bun run tauri build --features custom-protocol
 ```
 
 The fetcher checks the pinned publisher SHA-256, ELF architecture and actual browser version before preparing `browser-runtime/LinuxBrowser`. It refuses to overwrite an existing prepared engine. Linux builds use the existing PNG icon and platform-native tools. DEB, RPM and AppImage keep the vendor browser in `/usr/libexec/CCBaga-B`, separate from host libraries so AppImage tooling cannot rewrite its binaries. Source and Arch installations retain their existing resource layout.
 
-Local Tauri builds produce DEB and AppImage under `src-tauri/target/release/bundle`. RPM downloads use native RPM tooling with the same application file tree. Install the package matching your distribution, or make the AppImage executable and run it. The pinned browser and its notices travel with the package. Source builds are for development. Official versions are provided only by liseami; Linux updates use a new installation package, not the macOS in-app update feed.
+Local Tauri builds produce DEB and AppImage under `src-tauri/target/release/bundle`. RPM downloads use native RPM tooling with the same application file tree. Install the package matching your distribution, or make the AppImage executable and run it. The pinned browser and its notices travel with the package. Source builds are for development. Official versions are provided only by the repository owner, riowang88; Linux updates use a new installation package, not the macOS in-app update feed.
 
 For a local source installation without a package manager:
 
@@ -96,7 +95,7 @@ This installs application files under `~/.local/share/ccbaga-install`, creates A
 | CLI install management | Existing native and npm flows, including nvm. Requires zsh; Homebrew cask detection runs only on macOS. |
 | Browser | Pinned Linux fingerprint engine, isolated profiles, cache-only cleanup and explicitly confirmed full profile reset, rotation and real observations. Full reset removes all browser data for the current identity. Linux platform is checked; Chromium does not expose the kernel release through UA client hints, so that field is not compared with `uname`. |
 | Network route | Use TUN or the explicit browser proxy. Native exit probes can use proxy environment variables; GNOME/KDE desktop proxy settings and PAC are not independently discovered. Proxy credentials stay in native code. |
-| Network | Fixed provider/Skill links open through xdg-open; the selected coding agent handles the separate Skill, files and authorized deployment. |
+| Network | Read-only checks only; the app does not collect SSH keys or deploy to servers. |
 | Time zone | Reads zoneinfo; `timedatectl set-timezone` uses systemd/polkit authorization and verifies the result. Desktop automatic time-zone policies remain separate. Non-systemd systems return an actionable error. |
 | Language/region | Reads login-session language (`LC_MESSAGES`) and regional time formats (`LC_TIME`), respecting `LC_ALL`. Open GNOME/KDE settings, change language/formats, then sign out and back in. Existing matching session settings are verified. A differing language/region returns a manual-action error before the region action changes the time zone. |
 | Location | GNOME's location preference can be read, disabled and reread. Other desktops return unknown, never disabled. Full machine alignment stops before modifying settings on desktops with unknown location state. Portal/other location services are not independently verified; do not treat this preference as a global privacy guarantee. |

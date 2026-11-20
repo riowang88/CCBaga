@@ -5,13 +5,11 @@
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 -->
 
-> **Local maintenance repository:** This repository tracks the installed `0.2.49+local.identity.6` fixes. See [maintenance baseline](LOCAL-DEVELOPMENT.md). New builds use this repository’s update endpoint and signing key; the first release requires signing and notarization credentials. Existing installed builds retain their embedded upstream channel until replaced.
-
 <div align="center">
   <img src="docs/brand-logos.svg" width="320" height="149" alt="RioBaga-A and RioBaga-B logos, side by side" />
   <h1>RioBaga</h1>
   <p><strong>English</strong> · <a href="README.zh-CN.md">简体中文</a></p>
-  <p><strong>A native macOS, Linux and Windows toolkit for a cleaner workspace and an environment you can verify.</strong></p>
+  <p><strong>Manage your own Claude identities and verify the environment they run in — A manages, B is an isolated fingerprint browser.</strong></p>
   <p>Claude identities · Browser fingerprints · System settings · Network checks</p>
   <p>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-e8a181?style=flat-square" alt="MIT license" /></a>
@@ -36,9 +34,7 @@
 
 **Intended use:** RioBaga is intended solely for people residing or traveling abroad to manage their own Claude identities. Use that violates Anthropic's official terms of service is prohibited.
 
-RioBaga brings local maintenance and environment setup into one focused desktop workflow. Inspect Claude data before removing it, rotate your companion browser's fingerprint and restart it, set system settings for a selected region, and compare real browser readings with the machine and network exit.
-
-Two applications work together: **RioBaga-A** owns native operations; **RioBaga-B** runs an isolated Fingerprint Chromium profile. Browser measurements return to the host through a local session. Changing a setting and verifying its effect are separate steps.
+RioBaga is a desktop toolkit for people residing or traveling abroad. Two applications ship together: **RioBaga-A** manages Claude identities and your computer's regional settings, and **RioBaga-B** is an isolated fingerprint Chromium browser with its own profile. Browser measurements return to A through a local session, so changing a setting and verifying its effect stay separate steps.
 
 ## Features
 
@@ -65,20 +61,26 @@ The bilingual **Usage guide** covers common actions and data boundaries. See the
 
 **Platforms:** macOS 12 or later on Apple Silicon; Linux x86_64 with GTK 3 and WebKitGTK 4.1; Windows 10/11 x86_64. Intel macOS and Linux ARM64 are not supported.
 
-Linux x86_64 packages include DEB, RPM and AppImage built on Ubuntu 22.04 (glibc 2.35), plus a separate package for current Arch/pacman systems. All include the companion browser. See [Linux setup](docs/linux.md) for installation and platform limits. Official versions are published exclusively by the project owner, **liseami**.
+Download from [GitHub Releases](https://github.com/riowang88/RioBaga/releases/latest). Every installer contains **both A and B**; there is no separate browser download.
 
-Windows x86_64 uses one NSIS setup installer containing both A and B. The installer is not Authenticode signed and may show SmartScreen; managed security policy can block it. See [Windows setup](docs/windows.md) for installation, toolchains and platform behaviors.
+| Platform | Installer |
+| --- | --- |
+| macOS (Apple Silicon) | `RioBaga-<version>-macos-arm64.dmg` |
+| Windows x86_64 | `RioBaga-<version>-windows-x86_64-setup.exe` |
+| Linux x86_64 | `RioBaga-<version>-linux-x86_64.deb` · `.rpm` · `.AppImage` · `.pkg.tar.zst` (Arch/pacman) |
+
+- **macOS:** the app is ad-hoc signed and **not notarized by Apple**. The first launch may be blocked by Gatekeeper; after verifying the source, review the app in System Settings → Privacy & Security. Organization policy may prohibit opening it.
+- **Windows:** the installer has no Authenticode certificate, so SmartScreen may show a warning; managed security policy can block it. See [Windows setup](docs/windows.md).
+- **Linux:** DEB, RPM and AppImage are built on Ubuntu 22.04 (glibc 2.35); the Arch package targets current Arch/pacman systems. See [Linux setup](docs/linux.md).
 
 ### macOS
 
-Download the installer from this repository’s [GitHub Releases](https://github.com/riowang88/CCBaga/releases/latest). The distribution package is named `RioBaga-<version>-macos-arm64.dmg`. It contains both applications:
+The DMG contains both applications:
 
 | Application | Installed bundle | Role |
 | --- | --- | --- |
 | RioBaga-A | `RioBaga-A.app` | Identity management, system settings and environment verification |
 | RioBaga-B | `RioBaga-B.app` | Companion browser with a dedicated profile |
-
-Download **one DMG**; it contains both applications. There is no separate browser download. The installer uses the same pixel-art style as this README.
 
 1. Open the disk image and drag **both applications** into Applications.
 2. Launch RioBaga-A. It starts the companion browser automatically.
@@ -120,17 +122,9 @@ Open **Network** for read-only checks of the actual environment: exit IP, Claude
 
 The success page appears only when the measured checks match, the report reaches the cleaner and no measurement error remains. The WebRTC/UDP check contacts fixed public STUN servers (Google, then Cloudflare; no TURN, no credentials) only when you start it; DNS and WebRTC/UDP results are single observations, and unknown or untested is not a pass. A green result describes the measured checks, not a guarantee of anonymity or account acceptance.
 
-### Network Skill (optional, separate)
-
-The app has no Skill installer or prompt. The [Network Skill](skills/ccbaga-network/README.md#installation) follows the Agent Skills specification and installs separately from the apps. It supports the npm `skills` CLI: `npx skills add liseami/CCBaga --skill ccbaga-network --global`; the AI selects the target tool, uses copy mode on Windows, and disables installer tracking. Ask your own coding agent to run it. Give the AI your VPS address, the three matching PEM/PPK/PUB files or downloaded key bundle, and your residential SOCKS5 connection details. It handles file paths, private configuration, commands and checks; you do not need to open a terminal or edit JSON. Missing resources are purchased by you with the AI's guidance. Remote setup runs only after approval of the actual server changes.
-
-The Skill supports authorized Debian 12/13 servers using root key login on port 22. It checks the SSH identity and fixed SOCKS5 exit, configures Xray/Reality and delivers a private local import file after server self-checks pass. Client setup uses **TUN ON**, **System Proxy OFF** and an empty explicit browser proxy; actual TUN/browser verification remains a separate step. The subscription URL uses HTTP and contains credentials; prefer the file retrieved over SSH.
-
-Network setup is optional; local cleanup does not require a VPS or a proxy subscription. **The app does not collect SSH keys or proxy credentials and does not deploy to servers.**
-
 ## Architecture
 
-![Pixel architecture map: native core, companion browser and a separate AI Network Skill](docs/architecture.svg)
+![Pixel architecture map: UI, native core, platform APIs and the companion browser](docs/architecture.svg)
 
 The UI owns inputs and presentation. Rust owns validation, task locks, process identity checks and execution. Small Objective-C bridges call macOS APIs; Rust Linux and Windows boundaries use native process identity checks and platform controls. The browser test page has no Tauri command access; it exchanges context and measurements through a random-token loopback session.
 
@@ -140,7 +134,6 @@ The UI owns inputs and presentation. Rust owns validation, task locks, process i
 | Interface | React 19 · TypeScript · Cromma UI | Forms, previews and execution results |
 | Platform bridges | AppKit · Security · CoreLocation · Linux / Windows Rust | Platform permissions and system integration |
 | Companion browser | Fingerprint Chromium | Dedicated profile and real browser measurements |
-| Separate Network Skill | Python standard library · OpenSSH · Bash · Xray | AI-managed private configuration, approved remote setup and server/client verification |
 | Localization | YAML · Vite | Build-time English/Chinese catalogs |
 
 <details>
@@ -153,7 +146,6 @@ src-tauri/src/      Rust commands and transaction boundaries
 src-tauri/native/   Small macOS API bridges
 browser-runtime/    Engine metadata, launcher, entitlements and licenses
 scripts/            Icons, local builds and installation helpers
-skills/             Installable AI Network Skill and its execution scripts
 packaging/arch/     Native Arch Linux PKGBUILD and desktop entry
 docs/               README artwork and platform development guides
 vendor/cromma-ui/   Vendored interface components
@@ -210,22 +202,19 @@ bun test
 MACOSX_DEPLOYMENT_TARGET=12.0 \
   cargo test --manifest-path src-tauri/Cargo.toml
 python3 scripts/test-sign-browser.py
-python3 skills/ccbaga-network/scripts/test_network.py
-bash -n skills/ccbaga-network/scripts/setup-vps.sh
 ```
 
-Pull requests run the existing frontend, native Rust, offline Skill and npm skill-installation checks on Ubuntu, macOS and Windows, plus the relevant platform regression tests. The workflow uses a read-only token, no signing secrets and no artifact uploads; it does not publish releases or download the browser engine. Complete engine and installer validation remains part of the separate delivery checks.
+Pull requests run the existing frontend, native Rust and release-script checks on Ubuntu, macOS and Windows, plus the relevant platform regression tests. The workflow uses a read-only token, no signing secrets and no artifact uploads; it does not publish releases or download the browser engine. Complete engine and installer validation remains part of the separate delivery checks.
 
 The identity UI simulation uses 40 fictitious accounts, mocked Tauri IPC and an isolated headless context with external requests blocked. It covers card navigation, retention choices, switching, irreversible-delete alerts, failure recovery and both languages. Run `bun run test:identities` with Node.js 22.23.2 or later after preparing the pinned browser engine. The browser receives a temporary HOME/XDG configuration. Native archive tests use temporary SQLite databases and files; the macOS credential bridge is also checked against a separate disposable Keychain.
 
-Automated tests exercise disposable fixtures and local test servers. They do not deploy a real VPS, delete your Claude account data or perform administrator-authorized system changes. Real SSH connectivity, client-side TUN routing and permission-dependent operations require validation in the target environment.
+Automated tests exercise disposable fixtures and local test servers. They do not delete your Claude account data or perform administrator-authorized system changes. Client-side TUN routing and permission-dependent operations require validation in the target environment.
 
 ## Data & permissions
 
 - **Identities are local.** Login state is archived before switching. You choose which personal data stays in the workspace and which is stored with the identity. Actual project source and cloud-side account records are outside this scope.
-- **Secrets stay out of UI logs.** The apps have no SSH key picker or server deployment command. After explicit confirmation, the native identity vault reads only the recognized default Claude credentials needed for restoration; credential contents never enter the GUI, command-line arguments or network. The separate Skill uses private local files and temporary private PEM copies (0600 on POSIX, verified user-only NTFS ACLs on Windows); data supplied to your coding agent is subject to that agent provider’s handling.
+- **Secrets stay out of UI logs.** The apps have no SSH key picker or server deployment command, and never collect proxy credentials. After explicit confirmation, the native identity vault reads only the recognized default Claude credentials needed for restoration; credential contents never enter the GUI, command-line arguments or network.
 - **Network checks make real requests.** Exit detection uses `ipwho.is` with `ipapi.co` as a fallback on the same route. IP location is a service estimate.
-- **Remote changes are explicit.** The separate Skill contacts only the VPS you provide after server-change approval. Required credentials remain in private local/server configuration, outside Git and public logs.
 - **Permissions are feature-specific.** Timezone changes require macOS administrator authorization. Keychain access follows system prompts. Location controls may require Accessibility permission or a manual action in System Settings.
 
 Custom `CLAUDE_CONFIG_DIR` locations are not automatically included in the default identity scope. The app reports this limitation rather than silently claiming they were switched.
@@ -236,7 +225,7 @@ Start with [CONTRIBUTING.md](CONTRIBUTING.md). Small, focused changes with clear
 
 ## License & credits
 
-CCBaga's original project code is released under the **[MIT License](LICENSE)**. Third-party code and binaries retain their own terms; see [NOTICE.md](NOTICE.md).
+RioBaga is derived from [liseami/CCBaga](https://github.com/liseami/CCBaga); the original project code is released under the MIT license. RioBaga is released under the **[MIT License](LICENSE)**. Third-party code and binaries retain their own terms; see [NOTICE.md](NOTICE.md).
 
 Built with [Tauri](https://tauri.app/), [React](https://react.dev/) and [Fingerprint Chromium](https://github.com/adryfish/fingerprint-chromium), with a native macOS implementation of Claude maintenance workflows. Cleanup discovery was informed by the [claude-cleanup skill](https://github.com/suyuan2022/suyuan-skill/tree/main/claude-cleanup).
 

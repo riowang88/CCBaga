@@ -82,14 +82,8 @@ jobs:
         run: bun run build
       - name: Browser UI resource references
         run: python scripts/browser_ui.py dist
-      - name: Skill npm installation
-        run: bun scripts/test-skill-install.ts
-      - name: Network Skill offline tests
-        run: python skills/ccbaga-network/scripts/test_network.py
       - name: Release assembly offline tests
         run: python scripts/test-assemble-release.py
-      - name: Script syntax
-        run: bash -n skills/ccbaga-network/scripts/setup-vps.sh
       - name: Native CLI zsh syntax
         if: runner.os != 'Windows'
         run: zsh -n scripts/claude-cli.sh

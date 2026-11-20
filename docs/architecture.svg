@@ -1,14 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="624" viewBox="0 0 1120 624" role="img" aria-labelledby="title desc">
-<!-- [INPUT]: Rust、平台 API、浏览器回环与用户在 AI 中运行独立 Skill 的真实依赖方向。 -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="464" viewBox="0 0 1120 464" role="img" aria-labelledby="title desc">
+<!-- [INPUT]: Rust、平台 API、浏览器回环的真实依赖方向。 -->
 <!-- [OUTPUT]: README 极客像素风架构图，硬边方格和阶梯边角表达不同执行边界。 -->
 <!-- [POS]: 可导出的自包含工程图；所有连线对应现有接口，不是应用截图。 -->
 <!-- [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md -->
-<title id="title">RioBaga architecture</title><desc id="desc">React talks to the native Rust core, which invokes platform APIs and exchanges token-scoped browser reports. The UI offers a separate Skill installation prompt; the user runs it in a local AI coding agent for approved SSH deployment to a VPS and residential SOCKS5 exit.</desc>
+<title id="title">RioBaga architecture</title><desc id="desc">React talks to the native Rust core, which invokes platform APIs and exchanges token-scoped browser reports.</desc>
 <defs><pattern id="grid" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="2" height="2" fill="#222a2c"/></pattern></defs>
-<rect width="1120" height="624" fill="#101518"/><rect width="1120" height="624" fill="url(#grid)"/>
+<rect width="1120" height="464" fill="#101518"/><rect width="1120" height="464" fill="url(#grid)"/>
 <g fill="#fff4df" font-family="ui-monospace,SFMono-Regular,Consolas,monospace"><text x="40" y="44" font-size="18" font-weight="bold">$ cat architecture.map</text></g>
-<g fill="none" stroke="#d76a3e" stroke-width="4" shape-rendering="crispEdges"><path d="M300 144H420M692 144H812M560 208V272M692 336H812M948 280V240H608V208M172 208V424M300 496H420M692 496H812"/></g>
-<g fill="#d76a3e" shape-rendering="crispEdges"><path d="M420 136V152L432 144ZM812 136V152L824 144ZM552 272H568L560 284ZM812 328V344L824 336ZM600 208H616L608 196ZM164 424H180L172 436ZM420 488V504L432 496ZM812 488V504L824 496Z"/></g>
+<g fill="none" stroke="#d76a3e" stroke-width="4" shape-rendering="crispEdges"><path d="M300 144H420M692 144H812M560 208V272M692 336H812M948 280V240H608V208"/></g>
+<g fill="#d76a3e" shape-rendering="crispEdges"><path d="M420 136V152L432 144ZM812 136V152L824 144ZM552 272H568L560 284ZM812 328V344L824 336ZM600 208H616L608 196Z"/></g>
 
 <path d="M48 84H296V92H304V196H296V204H48V196H40V92H48Z" fill="#1c2428" stroke="#dd8959" stroke-width="2" shape-rendering="crispEdges"/>
 <path d="M56 100h8v8h-8zm16 0h8v8h-8zm16 0h8v8h-8z" fill="#dd8959" shape-rendering="crispEdges"/>
@@ -40,21 +40,4 @@
 <text x="832" y="358" fill="#b4c0b8" font-size="12">Random-token loopback</text>
 <text x="832" y="376" fill="#b4c0b8" font-size="12">Context + measured reports</text>
 </g>
-<path d="M48 436H296V444H304V548H296V556H48V548H40V444H48Z" fill="#1c2428" stroke="#779fc6" stroke-width="2" shape-rendering="crispEdges"/>
-<path d="M56 452h8v8h-8zm16 0h8v8h-8zm16 0h8v8h-8z" fill="#779fc6" shape-rendering="crispEdges"/>
-<g font-family="ui-monospace,SFMono-Regular,Consolas,monospace"><text x="56" y="492" fill="#fff4df" font-size="18" font-weight="bold">AI NETWORK SKILL</text>
-<text x="56" y="518" fill="#b4c0b8" font-size="12">User files / agent commands</text>
-<text x="56" y="536" fill="#b4c0b8" font-size="12">Separate install / approval</text>
-</g>
-<path d="M436 436H684V444H692V548H684V556H436V548H428V444H436Z" fill="#1c2428" stroke="#779fc6" stroke-width="2" shape-rendering="crispEdges"/>
-<path d="M444 452h8v8h-8zm16 0h8v8h-8zm16 0h8v8h-8z" fill="#779fc6" shape-rendering="crispEdges"/>
-<g font-family="ui-monospace,SFMono-Regular,Consolas,monospace"><text x="444" y="492" fill="#fff4df" font-size="18" font-weight="bold">USER VPS</text>
-<text x="444" y="518" fill="#b4c0b8" font-size="12">root:22 SSH / Xray Reality</text>
-<text x="444" y="536" fill="#b4c0b8" font-size="12">Three matching key files</text>
-</g>
-<path d="M824 436H1072V444H1080V548H1072V556H824V548H816V444H824Z" fill="#1c2428" stroke="#779fc6" stroke-width="2" shape-rendering="crispEdges"/>
-<path d="M832 452h8v8h-8zm16 0h8v8h-8zm16 0h8v8h-8z" fill="#779fc6" shape-rendering="crispEdges"/>
-<g font-family="ui-monospace,SFMono-Regular,Consolas,monospace"><text x="832" y="492" fill="#fff4df" font-size="18" font-weight="bold">RESIDENTIAL EXIT</text>
-<text x="832" y="518" fill="#b4c0b8" font-size="12">Fixed authenticated SOCKS5</text>
-<text x="832" y="536" fill="#b4c0b8" font-size="12">Subscription / client TUN</text></g>
-<g font-family="ui-monospace,SFMono-Regular,Consolas,monospace" font-size="11" fill="#8b9a92"><text x="40" y="595">LOCAL OPERATIONS</text><text x="428" y="595">MEASURED BROWSER DATA</text><text x="816" y="595">EXPLICIT REMOTE SETUP</text></g></svg>
+<g font-family="ui-monospace,SFMono-Regular,Consolas,monospace" font-size="11" fill="#8b9a92"><text x="40" y="436">LOCAL OPERATIONS</text><text x="428" y="436">MEASURED BROWSER DATA</text></g></svg>

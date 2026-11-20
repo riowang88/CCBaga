@@ -20,7 +20,7 @@ env:
   CC_MACOS_SIGNING_MODE: adhoc
 jobs:
   version:
-    if: github.repository == 'riowang88/CCBaga' && (github.ref == 'refs/heads/release' || (github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.installer_run != '')) && github.actor == 'riowang88' && github.triggering_actor == 'riowang88'
+    if: github.repository == 'riowang88/RioBaga' && (github.ref == 'refs/heads/release' || (github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.installer_run != '')) && github.actor == 'riowang88' && github.triggering_actor == 'riowang88'
     runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -47,7 +47,7 @@ jobs:
           PY
   build:
     needs: version
-    if: github.repository == 'riowang88/CCBaga' && github.ref == 'refs/heads/release' && github.actor == 'riowang88' && github.triggering_actor == 'riowang88'
+    if: github.repository == 'riowang88/RioBaga' && github.ref == 'refs/heads/release' && github.actor == 'riowang88' && github.triggering_actor == 'riowang88'
     runs-on: macos-15
     timeout-minutes: 120
     outputs:
@@ -90,13 +90,10 @@ jobs:
           codesign --force --sign - "$identity_test"
           "$identity_test"
           rm -f "$identity_test"
-          bun scripts/test-skill-install.ts
           python3 scripts/test-sign-browser.py
           python3 scripts/test-browser-launcher.py
           python3 scripts/test-release-env.py
           python3 scripts/test-install-apps.py
-          python3 skills/ccbaga-network/scripts/test_network.py
-          bash -n skills/ccbaga-network/scripts/setup-vps.sh
           CC_SIGN_IDENTITY=- sh scripts/package-browser.sh
           cargo test --locked --manifest-path src-tauri/Cargo.toml --features custom-protocol
       - name: Build release with selected macOS signing mode
@@ -278,7 +275,7 @@ jobs:
           workspaces: src-tauri -> target
           shared-key: windows-msvc
           cache-on-failure: true
-      - name: Run Windows native, CLI, frontend and Skill checks
+      - name: Run Windows native, CLI and frontend checks
         if: inputs.installer_run == ''
         env:
           CC_RELEASE_VERSION: ${{ needs.version.outputs.version }}

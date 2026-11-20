@@ -37,7 +37,7 @@ def main():
     if set(manifest['platforms'])!=set(expected):raise SystemExit('Unexpected updater target')
     for platform,filename in expected.items():
         entry=manifest['platforms'][platform]
-        url=f'https://github.com/riowang88/CCBaga/releases/download/v{version}/{filename}'
+        url=f'https://github.com/riowang88/RioBaga/releases/download/v{version}/{filename}'
         if entry['url']!=url or entry['signature']!=(OUT/(filename+'.sig')).read_text(encoding='utf-8').strip():raise SystemExit('Updater URL/signature mismatch')
     manifest['notes']='macOS updates RioBaga-A; Windows updates both applications. Save unfinished browser work before updating.'
     (OUT/'latest.json').write_text(json.dumps(manifest,indent=2)+'\n',encoding='utf-8')
@@ -50,8 +50,8 @@ def main():
     (ROOT/'release-files.txt').write_text(''.join('releases/'+name+'\n' for name in public),encoding='utf-8')
     labels=['macOS Apple Silicon · A + B','Windows x64 · A + B','Linux DEB','Linux RPM','Linux AppImage','Arch/pacman']
     notes=['RioBaga combines recoverable local Claude identities, CLI management, real environment checks and an isolated companion browser.\n','\n| Platform | Installer |\n| --- | --- |\n']
-    for label,filename in zip(labels,installers):notes.append(f'| {label} | [Download](https://github.com/riowang88/CCBaga/releases/download/v{version}/{filename}) |\n')
-    notes+=['\nEach installer contains both applications. On macOS drag both apps into Applications. On Windows run the setup installer; SmartScreen may show a warning because the installer has no Authenticode certificate. Organization policy can restrict installation.\n','\nSidebar updates verify signed downloads: macOS updates A, Windows updates A and B. Linux uses its package manager. The archive and latest.json are used by automatic updates; ordinary installation only needs the platform installer. SHA256SUMS covers public downloads.\n','\n[Usage](https://github.com/riowang88/CCBaga#readme) · [Network Skill](https://github.com/riowang88/CCBaga/tree/main/skills/ccbaga-network)\n']
+    for label,filename in zip(labels,installers):notes.append(f'| {label} | [Download](https://github.com/riowang88/RioBaga/releases/download/v{version}/{filename}) |\n')
+    notes+=['\nEach installer contains both applications. On macOS drag both apps into Applications. On Windows run the setup installer; SmartScreen may show a warning because the installer has no Authenticode certificate. Organization policy can restrict installation.\n','\nSidebar updates verify signed downloads: macOS updates A, Windows updates A and B. Linux uses its package manager. The archive and latest.json are used by automatic updates; ordinary installation only needs the platform installer. SHA256SUMS covers public downloads.\n','\n[Usage](https://github.com/riowang88/RioBaga#readme)\n']
     if manifest.get('macos_signing') == 'adhoc':
         notes.append('\nmacOS: this build uses ad-hoc signing and is not notarized by Apple. First launch may be blocked. After verifying the source, review the app in System Settings > Privacy & Security. Organization policy may prohibit opening it. This does not disable or replace updater signature verification.\n')
     (ROOT/'release-notes.md').write_text(''.join(notes),encoding='utf-8')

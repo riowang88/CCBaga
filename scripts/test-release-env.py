@@ -68,7 +68,7 @@ with tempfile.TemporaryDirectory(prefix='ccbaga-release-mode-') as temporary:
     (root / 'browser-runtime').mkdir()
     (root / 'browser-runtime/Browser.zip').write_text('disposable engine archive')
     (root / 'src-tauri').mkdir()
-    (root / 'src-tauri/tauri.conf.json').write_text(json.dumps({'plugins': {'updater': {'endpoints': ['https://github.com/riowang88/CCBaga/releases/latest/download/latest.json']}}}))
+    (root / 'src-tauri/tauri.conf.json').write_text(json.dumps({'plugins': {'updater': {'endpoints': ['https://github.com/riowang88/RioBaga/releases/latest/download/latest.json']}}}))
     commands = []
     def fake_run(*args, env=None):
         commands.append(tuple(map(str, args)))

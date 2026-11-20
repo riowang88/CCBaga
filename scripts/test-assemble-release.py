@@ -38,7 +38,7 @@ class ReleaseAssemblyTests(unittest.TestCase):
             signature = 'disposable-signature-' + platform
             (self.out / (name + '.sig')).write_text(signature + '\n')
             (self.out / manifest).write_text(json.dumps({'version': self.version, 'platforms': {
-                platform: {'url': f'https://github.com/riowang88/CCBaga/releases/download/v{self.version}/{name}',
+                platform: {'url': f'https://github.com/riowang88/RioBaga/releases/download/v{self.version}/{name}',
                            'signature': signature}}}))
         self.lists = {'SHA256SUMS': [self.dmg, self.archive, self.archive + '.sig', 'latest.json'],
                       'Linux-SHA256SUMS': self.linux,
@@ -72,7 +72,7 @@ class ReleaseAssemblyTests(unittest.TestCase):
                 original = path.read_bytes()
                 manifest = json.loads(original)
                 manifest['platforms'][platform]['url'] = manifest['platforms'][platform]['url'].replace(
-                    'github.com/riowang88/CCBaga/', 'github.com/liseami/CCBaga/')
+                    'github.com/riowang88/RioBaga/', 'github.com/liseami/CCBaga/')
                 path.write_text(json.dumps(manifest))
                 self.write_lists()
                 try:

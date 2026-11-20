@@ -10,7 +10,6 @@ test-sign-browser.py: 临时伪引擎树验证叶子到容器的签名顺序、�
 windows-region.ps1: 当前用户 International 首选语言/显示语言偏好与区域格式设置；PowerShell 5.1 泛型列表保留其他语言/输入法、复核持久化，当前会话未生效时明确报告需重新登录。
 claude-cli.ps1: 包管理器仅按 PATH 外部程序发现，避免精确命令触发模块扫描；Windows 唯一目录暂存/逐文件哈希回滚与失败保留恢复文件；Windows 官方 CLI 程序管理与真实完成协议；原生重装先下载、严格 UTF-8 解码字节响应并解析官方安装器，再卸载旧程序；下载/内容异常保留旧程序，安装失败使用固定脱敏文案，保留配置和项目，不执行 VPS 配置。
 package-browser.ps1: Windows 固定引擎前置核验，不打包用户资料或私钥。
-test-skill-install.ts: Agent Skills metadata/完整公开文件与 npm skills 1.7.2 的四项真实安装；临时 HOME 和缓存，关闭统计，验证共享目录、完整文件与无 symlink。
 test-system-ui.ts: testLayoutBudget（1040×820 下电脑/网络/浏览器页不纵向滚动，1040×820 与 760×640 下五页不横向溢出）；电脑环境页回归：真实外壳下页面内距/无横向溢出、13 项地区、「同时更换 B 浏览器指纹」标签与说明、B 运行时 set_region→browser_read→browser_rotate→browser_launch 顺序、英文；由 test-identities-ui.ts 调用。
 test-network-diagnostics.ts: 共用隔离引擎验证真实网络页（含 1200×800 外壳内距、无横向溢出、深色卡无浅色汇总块与白边表格）无 Skill/提示词、Claude 可用性四态与延迟、逐域 403 原因、命令异常/空返回拒绝、本机出口、一致性网格、DNS 最近一轮三态与在 B 中检测、WebRTC 未检测不冒充通过、完整报告仅 B 运行时可用和双语；不访问真实网络。
 test-webrtc-stub.ts: 伴生页测试用 init script 替换 RTCPeerConnection（可切换一致/不一致/无候选/禁用并记录 iceServers），防止真实 STUN UDP 外连；test-identities-ui.ts 的测试引擎另加 disable_non_proxied_udp 作兜底。
@@ -39,9 +38,10 @@ test-linux.py: 临时载荷验证 glibc/浏览器资源/链接/运行保护、�
 assemble-release.py: 逐平台校验当前版本必需产物的完整摘要覆盖后合并更新平台清单，以明确白名单交付九个公开文件；内部签名、公证和引擎地图只留 CI，下载表独立展示安装器，说明可恢复身份管理。
 test-assemble-release.py: 临时完整产物验证九文件白名单；逐平台遗漏安装器摘要并替换字节时必须在改写更新清单和交付列表前拒绝，不发布或下载。
 sign-windows-update.py: 已验收安装器的独立版本绑定更新签名和官方更新器核验；更新私钥不进入构建或测试。
-release-windows.py: Windows x64 MSVC 无凭据构建，check/build/verify 阶段在 CI 分开呈现，原生/40 身份 UI 模拟/CLI/Skill/npm 安装回归与真实 NSIS 安装、启动、升级、卸载验证，交付单安装器与内部引擎哈希清单。
-verify-windows-installer.py: 仅在空白 CI runner 对刚创建的样本复用 Skill 私有 ACL 层，按子项到父目录顺序明确当前用户所有者与独占 ACL，避免继承 ACE 迁移中断及管理员默认所有者误触生产保护；UTF-8 控制台诊断保留中文启动错误；复用 browser_ui 核对已安装页面的实际资源引用；使用原生 Known Folder 和一致的父子进程环境定位空白 CI 数据；拒绝预存 Claude/应用目录再创建可丢弃用户资产样本，通过已持有句柄的宿主树/本次唯一安装目录回收 CI 程序，不给 GUI 沙箱套额外 Job，PowerShell 5.1 优先自身模块以保证 CIM 进程查询，查询错误即时报告、统一 Windows 8.3 别名/扩展路径/分隔符，只记录匹配布尔值；严格核对安装后引擎/图标/UI、实际浏览器 JS 回报的平台/CPU/版本与 A/B 回环、升级和卸载资产保留；验收后的 PermissionError 仅在本次固定 Chromium Cache 子树允许交由一次性 runner 销毁，其他路径/错误仍失败。
-release-linux.py: 无凭据的 Ubuntu 22.04 x86_64 三格式构建，先跑身份 UI/Skill 回归；Tauri 交付 DEB/AppImage，rpmbuild 从同一文件树生成 RPM，厂商引擎不剥离且隔离在 libexec；真实解包核对宿主、UI、B 入口、引擎字节及全部 ELF 的 glibc 2.35 上限，生成校验清单。
+release-windows.py: Windows x64 MSVC 无凭据构建，check/build/verify 阶段在 CI 分开呈现，原生/40 身份 UI 模拟/CLI 回归与真实 NSIS 安装、启动、升级、卸载验证，交付单安装器与内部引擎哈希清单。
+windows_private_acl.py: 仅供 verify-windows-installer.py 在空白 CI 样本上设置并核验当前用户独占 NTFS ACL（原 Network Skill 的 Windows 私有文件层，Job Object 部分已删除）。
+verify-windows-installer.py: 仅在空白 CI runner 对刚创建的样本复用 windows_private_acl.py 私有 ACL 层，按子项到父目录顺序明确当前用户所有者与独占 ACL，避免继承 ACE 迁移中断及管理员默认所有者误触生产保护；UTF-8 控制台诊断保留中文启动错误；复用 browser_ui 核对已安装页面的实际资源引用；使用原生 Known Folder 和一致的父子进程环境定位空白 CI 数据；拒绝预存 Claude/应用目录再创建可丢弃用户资产样本，通过已持有句柄的宿主树/本次唯一安装目录回收 CI 程序，不给 GUI 沙箱套额外 Job，PowerShell 5.1 优先自身模块以保证 CIM 进程查询，查询错误即时报告、统一 Windows 8.3 别名/扩展路径/分隔符，只记录匹配布尔值；严格核对安装后引擎/图标/UI、实际浏览器 JS 回报的平台/CPU/版本与 A/B 回环、升级和卸载资产保留；验收后的 PermissionError 仅在本次固定 Chromium Cache 子树允许交由一次性 runner 销毁，其他路径/错误仍失败。
+release-linux.py: 无凭据的 Ubuntu 22.04 x86_64 三格式构建，先跑身份 UI 回归；Tauri 交付 DEB/AppImage，rpmbuild 从同一文件树生成 RPM，厂商引擎不剥离且隔离在 libexec；真实解包核对宿主、UI、B 入口、引擎字节及全部 ELF 的 glibc 2.35 上限，生成校验清单。
 test-rpm.py: 临时 DEB 文件树经真实 rpmbuild 转换，回归 RPM 版本/架构、桌面入口与引擎字节，不执行样本程序。
 verify-linux-package.py: 共用页面引用与只读载荷验收，Ubuntu/Arch 均拒绝缺失 UI、入口或引擎改写；独立 verify_glibc 对标准发行包实际 ELF 符号需求执行 2.35 上限，Arch 不套旧系统基线。
 build-arch.sh: 固定摘要容器准备 Node.js 等构建/测试依赖，以非 root makepkg、原生回归与解包验收，公开源码与 Cargo 缓存挂载；不接触 macOS 凭据。
@@ -66,7 +66,7 @@ test-browser-doh.ts：语言时区与 DNS 模式改为分段控件；隔离内�
 
 test-identity-regressions.ts 追加 browser-only 保存入口、命名提交、当前卡与空模板高亮回归；test-local-identity-sessions.mjs 同时执行无账号元数据与纯浏览器身份的真实 HttpOnly 会话往返，临时 HOME/XDG、合成 Cookie、本机 HTTP 样本，不读真实资料。
 
-本仓库更新产物：release-macos.py 从 tauri.conf.json 的更新地址派生下载仓库；sign-windows-update.py 与 assemble-release.py 固定 riowang88/CCBaga，装配回归覆盖新地址接受与旧地址拒绝。摘要、更新签名和跨平台交付检查保留，Apple 公证仅在显式 notarized 模式要求。
+本仓库更新产物：release-macos.py 从 tauri.conf.json 的更新地址派生下载仓库；sign-windows-update.py 与 assemble-release.py 固定 riowang88/RioBaga，装配回归覆盖新地址接受与旧地址拒绝。摘要、更新签名和跨平台交付检查保留，Apple 公证仅在显式 notarized 模式要求。
 
 test-identity-regressions.ts: 隔离虚构 IPC 验证保留策略、本地槽位、运行标签、仅浏览器保存与分端资料、旧档案未知、维护窗口、双语及查看引导不触发登录/保存；可用 CCBAGA_TEST_ENGINE 指定已知引擎。
 

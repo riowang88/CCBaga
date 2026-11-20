@@ -43,7 +43,7 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/riowang88/CCBaga/releases/latest/download/latest.json"
+        "https://github.com/riowang88/RioBaga/releases/latest/download/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM1QzhERjM2QzQ1Q0IwNjIKUldSaXNGekVOdC9JTlRtMUdzaFZxdXZ2R25UdGdWVjJJYkcxZjZxRk5SaDBuRW5CZS92SjA1ZVAK",
       "requireSignedVersion": true

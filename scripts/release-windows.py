@@ -30,8 +30,6 @@ def main():
         run('bun','test');run('bun','run','build')
         checks=[
             ['bun','run','test:identities'],
-            ['bun','scripts/test-skill-install.ts'],
-            [sys.executable,'skills/ccbaga-network/scripts/test_network.py'],
             ['cargo','test','--locked','--manifest-path','src-tauri/Cargo.toml','--features','custom-protocol'],
             [sys.executable,'scripts/test-windows.py'],
         ]

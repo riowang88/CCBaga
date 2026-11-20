@@ -58,8 +58,8 @@ def main():
         settings=home/'.claude/settings.json';settings.write_text('{"keep":true}',encoding='utf-8')
         profile=data/'browser/profile/Default/personal-data';profile.parent.mkdir(parents=True);profile.write_bytes(b'keep-profile')
         # ----- 只修正刚创建的 CI 样本；管理员 token 的默认所有者不能冒充用户 SID -----
-        sys.path.insert(0,str(ROOT/'skills/ccbaga-network/scripts'))
-        import windows as private_files
+        sys.path.insert(0,str(ROOT/'scripts'))
+        import windows_private_acl as private_files
         for sample in (data,claude):
             # 先保护子项，避免父目录移除继承 ACE 时暂时失去子项访问权。
             for path in sorted([sample,*sample.rglob('*')],key=lambda p:len(p.parts),reverse=True):

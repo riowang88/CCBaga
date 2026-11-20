@@ -46,7 +46,7 @@ Version: {version}
 Release: 1
 Summary: RioBaga native maintenance and companion browser
 License: MIT
-URL: https://github.com/liseami/CCBaga
+URL: https://github.com/riowang88/RioBaga
 BuildArch: x86_64
 AutoReqProv: no
 {requires}
@@ -79,10 +79,7 @@ def main():
         raise SystemExit('Linux x86_64 and a numeric release version are required')
     if any(key.startswith('APPLE_') or key.startswith('TAURI_SIGNING_PRIVATE_KEY') for key in os.environ):
         raise SystemExit('Linux builds must not receive Apple or updater credentials')
-    run('python3', ROOT / 'skills/ccbaga-network/scripts/test_network.py')
-    run('bash', '-n', ROOT / 'skills/ccbaga-network/scripts/setup-vps.sh')
     run('bun', 'test')
-    run('bun', ROOT / 'scripts/test-skill-install.ts')
     run('bun', 'run', 'build')
     run('bun', 'run', 'test:identities')
     run('cargo', 'test', '--locked', '--manifest-path', 'src-tauri/Cargo.toml', '--features', 'custom-protocol')

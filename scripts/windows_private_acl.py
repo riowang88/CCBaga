@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-# [INPUT]: Windows 当前进程令牌、NTFS 安全描述符与本 Skill 创建的子进程。
-# [OUTPUT]: 仅当前用户可访问的私密文件 ACL、所有权核验及超时任务树回收。
-# [POS]: Windows 标准库适配；不读取账户凭据、不枚举其他用户、不修改系统安全策略。
+# [INPUT]: Windows 当前进程令牌与 NTFS 安全描述符。
+# [OUTPUT]: 仅当前用户可访问的私密文件 ACL 设置与所有权核验。
+# [POS]: 仅供 verify-windows-installer.py 在空白 CI runner 上整理刚创建的样本目录；不读取账户凭据、不枚举其他用户、不修改系统安全策略。
 # [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 import ctypes as c
 from ctypes import wintypes as w
@@ -30,7 +30,7 @@ equal_sid = bind(a, 'EqualSid', w.BOOL, P, P)
 get_ace = bind(a, 'GetAce', w.BOOL, P, D, c.POINTER(P))
 
 def fail():
-    raise OSError('Windows private ACL or task isolation failed; no credentials printed')
+    raise OSError('Windows private ACL failed; no credentials printed')
 
 def user_sid():
     token = w.HANDLE(); size = D()
@@ -79,26 +79,3 @@ def assert_private(path):
     finally:
         if sd: free(sd)
         free(expected)
-
-class BasicLimit(c.Structure):
-    _fields_ = [('process_time', c.c_int64), ('job_time', c.c_int64), ('flags', D), ('min_ws', c.c_size_t), ('max_ws', c.c_size_t), ('processes', D), ('affinity', c.c_size_t), ('priority', D), ('scheduling', D)]
-class IO(c.Structure):
-    _fields_ = [(name, c.c_uint64) for name in ('reads','writes','other','read_bytes','write_bytes','other_bytes')]
-class Limits(c.Structure):
-    _fields_ = [('basic', BasicLimit), ('io', IO), ('process_memory', c.c_size_t), ('job_memory', c.c_size_t), ('peak_process', c.c_size_t), ('peak_job', c.c_size_t)]
-
-create_job = bind(k, 'CreateJobObjectW', w.HANDLE, P, w.LPCWSTR)
-set_job = bind(k, 'SetInformationJobObject', w.BOOL, w.HANDLE, c.c_int, P, D)
-assign = bind(k, 'AssignProcessToJobObject', w.BOOL, w.HANDLE, w.HANDLE)
-terminate = bind(k, 'TerminateJobObject', w.BOOL, w.HANDLE, w.UINT)
-
-class Job:
-    def __init__(self, child):
-        self.handle = create_job(None, None)
-        limit = Limits(); limit.basic.flags = 0x2000
-        if not self.handle or not set_job(self.handle, 9, c.byref(limit), c.sizeof(limit)) or not assign(self.handle, w.HANDLE(int(child._handle))):
-            self.close(); child.kill(); child.wait(); fail()
-    def stop(self):
-        if not terminate(self.handle, 1): fail()
-    def close(self):
-        if self.handle: close(self.handle); self.handle = None

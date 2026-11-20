@@ -1,5 +1,5 @@
 <!--
-[INPUT]: Linux/Windows 原生边界、共用清理/浏览器/CLI 实现、独立网络 Skill、回归测试与上游安全公告。
+[INPUT]: Linux/Windows 原生边界、共用清理/浏览器/CLI 实现、回归测试与上游安全公告。
 [OUTPUT]: 数据读写、外部连接、操作授权、验证范围与已确认依赖风险的当前安全契约。
 [POS]: 原生模块的安全地图；与 src/CLAUDE.md 的事务边界共同维护。
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -23,11 +23,10 @@
 | `src/browser-webrtc.ts`（在 B 浏览器内运行） | 仅当用户显式发起时（B 页内「重新实测」，或 A 网络页 WebRTC 卡「在 B 中检测」使本次实测页带 `#webrtc`；A 启动自动带起 B、身份切换重开和普通打开实测页都不触发），用 RTCPeerConnection 向固定 `stun:stun.l.google.com:19302` 与备用 `stun:stun.cloudflare.com:3478` 发 STUN 绑定请求，取 UDP srflx 候选与同轮 HTTP 出口比对 | 服务器为编译常量，页面/用户/宿主都不能传入地址；不使用 TURN，不发送账号、令牌、Cookie、凭据或本地文件；5 秒超时，重测取消上一轮。STUN 服务会看到 B 的 UDP 出口 IP 与端口。结果（四态与至多 8 个 IP）经现有回环 report 回传，Rust 端白名单校验。STUN 走 UDP，不受 CSP connect-src 约束，回环 CSP 未修改；B 启动参数保留 `disable_non_proxied_udp`，未取到候选只记为未知。UI 回归用 init script 替身，测试引擎另加同一参数，不发真实 STUN。 |
 | `src/browser/network.rs` / 前端出口探测 | 向 `ipwho.is`、`ipapi.co` 请求出口信息 | 外部服务会看到请求出口 IP；不发送本地文件、账号、密钥或浏览记录。服务失败使用同一路由备用服务，不伪造成功。 |
 | `src/browser/mod.rs` `browser_open_report` | 用户在网络页点击后，在当前已运行的 B 资料中打开固定 `https://ip.net.coffee/claude` | 地址为编译常量，WebView 不能传入 URL；B 未运行时拒绝且不启动新资料、不改配置/指纹/默认浏览器。该页面由第三方提供，会看到 B 的出口与浏览器环境；A 不读取、不保存其评分或标记。 |
-| `src/network_links.rs` | 固定 VPS/家宽公开入口（界面已无入口，Skill 入口已删除）与用户触发的 claude.ai/api.anthropic.com/platform.claude.com/downloads.claude.ai（官方安装器公开版本号路径）四个固定 HTTPS 探针 | 仅白名单地址与供应商配置编译内嵌；应用不选择密钥、不收集家宽资料、不注册 SSH/部署命令。探针不发送账号/Cookie/令牌/本地文件，不继承代理认证、不跟随重定向。下载版本探针只接受 HTTP 200，流式读取最多 64 字节并校验三段数字版本；空白、畸形、超限和截断正文均失败，正文不进入 UI。仅显示状态/延迟/连接对端，其他域名的 Cloudflare 浏览器质询只表示已到达站点边缘；不证明安装器完整可下载、账号可用、出口、DNS 或分流规则正确。 |
+| `src/network_links.rs` | 用户触发的 claude.ai/api.anthropic.com/platform.claude.com/downloads.claude.ai（官方安装器公开版本号路径）四个固定 HTTPS 探针 | 仅白名单地址编译内嵌；应用不选择密钥、不收集家宽资料、不注册 SSH/部署命令。探针不发送账号/Cookie/令牌/本地文件，不继承代理认证、不跟随重定向。下载版本探针只接受 HTTP 200，流式读取最多 64 字节并校验三段数字版本；空白、畸形、超限和截断正文均失败，正文不进入 UI。仅显示状态/延迟/连接对端，其他域名的 Cloudflare 浏览器质询只表示已到达站点边缘；不证明安装器完整可下载、账号可用、出口、DNS 或分流规则正确。 |
 | `src/identities/usage.rs` / `sidecar.rs` | 用户点击「刷新」时：当前账号以实时 Claude Code access token 向固定 `https://api.anthropic.com/api/oauth/usage` 发起 GET；已存账号在令牌 5 分钟内到期时先以 refresh token 向固定 `https://platform.claude.com/v1/oauth/token` POST 续期，再读用量 | 令牌只在原生内存，不进入 UI、日志、argv 或 SQLite；当前账号不续期、本地到期即不发送；已存账号续期时持有全局身份事务锁，轮换结果先以保险库主密钥 AES-GCM 加密、原子写入绑定归档代次的 `<id>-<代次>.cred` 再使用，写入失败报告可能需重新登录；侧车只含 claudeAiOauth，新代次、删除身份时回收，损坏时回退归档令牌。不跟随重定向、12 秒超时、响应最多 64 KiB；只缓存百分比/重置时间/套餐/读取时间。同一账号被其他工具同时续期会使对方令牌失效。结果不证明网页或 Desktop 登录有效。 |
 | `src/progress.rs` | 操作阶段的开始/结果、数量、固定错误文案与会话共享跳过计数 | 写入本机 `app_data_dir/diagnostics`（POSIX 0600），两个文件轮换、总量约 512 KiB 封顶；主目录写成 `~`、邮箱打码、单行截断，不含令牌、聊天正文或文件内容，错误文案可能含进程名/PID 与主目录下的相对路径。没有上传通道：仅用户点击“复制诊断日志”时把末尾至多 200 KiB 放入剪贴板，由用户自行发送。 |
 | `src/identities/desktop_token.rs` | 同一次用户点击中，macOS 原生读取默认 Desktop `config.json` 的 `oauth:tokenCacheV2` 与 `Claude Safe Storage` 口令（实时钥匙串或已认证归档），按 Electron safeStorage（PBKDF2-HMAC-SHA1/CommonCrypto AES-128-CBC）解密，取与 CLI 账号一致、未到期的访问令牌，只用于上述固定用量 GET | 只读：不续期、不写回、不修改 Desktop 资料；令牌与口令只在原生内存。已存身份的 Desktop 令牌与“是否有 CLI 令牌”标记以同一主密钥加密为 `<id>-<代次>.usage`，与 `.cred` 一同按代次/删除回收，避免每次刷新解密整包归档。 |
-| `skills/ccbaga-network/scripts/network.py` | 用户主动提供的附件、VPS 地址与家宽连接资料 | AI 经标准输入提交配置，验证后保存 Git/Skill 外的 0600 文件；拒绝覆盖和链接路径。配对后临时 PEM 0600，事务结束移除；仅所选 VPS 经 SSH 接收家宽配置，秘密不进入 argv/公开日志。用户交给 AI 的资料可能由其服务提供商处理，不能声称完全不进入模型。 |
 | `scripts/claude-cli.sh` | 用户选择的 CLI 卸载/重装 | 明确确认后只修改已识别 CLI 程序；保留配置、会话、技能和项目。重装使用官方安装地址或既有包管理器，并核验实际版本。原生程序在唯一目录暂存，捕获失败恢复（Windows 比对哈希），回滚受阻保留备份；没有任意安装器环境变量入口，强制终止不承诺自动回滚。 |
 | `scripts/install-linux.py` | 用户选择的本地构建产物 | 拒绝外部启动器、链接安装父目录和仍运行的 A/B；替换失败回滚，不迁移或读取用户资料。 |
 
@@ -35,11 +34,10 @@
 
 - Linux 源码安装器检查整个本安装应用目录下的进程，A 或 B 运行时均拒绝替换其资源；回归验证安装目录保持不变。
 - Linux 定位未知保持 `null`，不能显示已关闭或触发绿色通过；浏览器页写死美国的机器对齐（`browser_align`）已删除，系统地区修改只走电脑环境页。
-- 本仓库发布任务只允许 `riowang88/CCBaga` 的所有者触发和重跑；PR 和 fork 不触及签名凭据。开发文档不授予官方发布身份。
+- 本仓库发布任务只允许 `riowang88/RioBaga` 的所有者触发和重跑；PR 和 fork 不触及签名凭据。开发文档不授予官方发布身份。
 
 ## 发布与入口边界
 
-- `skills/ccbaga-network/providers.json` 由固定导航编译内嵌，也供独立 Skill 消费，WebView 传供应商编号，不传可任意改写的 URL；现有回归锁住两条原始完整目标地址。
 - Linux/Arch 构建任务没有 Apple 或更新私钥；macOS 临时钥匙串只授权 codesign。构建、DMG 工具和更新签名子进程不继承 Apple 凭据，公证工具只接收明确的认证参数。
 - RPM 使用标准 rpmbuild 从已构建的非 AppImage /usr 文件树生成，禁用安装钩子和引擎剥离；Linux 内置更新仍禁用，RPM 当前沿用非 AppImage 宿主的 DEB 类型提示；后续启用 Linux 更新必须先补齐 RPM 类型标注。DEB/RPM/AppImage 将浏览器隔离在 libexec，避免 linuxdeploy 将可选 Qt 库当作宿主必需依赖或改写厂商 ELF；解包后仍严格比对引擎字节。所有平台产物验收完成后才创建正式版本。公开产物清单不包含密钥、钥匙串或完整私有配置。
 
@@ -47,11 +45,11 @@
 
 本机 `dev:install` 不读取 Apple/更新私钥，强制临时签名与 debug/custom-protocol。开发浏览器临时签名清除 runtime，避免无 Team ID 的 Framework 被正式库验证拒绝；正式签名仍启用 runtime 与可信时间戳。安装前实际执行 Chromium --version 验证加载。开发安装只能选择仓库的 debug 宿主和本机引擎；拒绝与外部 DMG 路径组合，并核验两个包确为临时签名。正式安装仍要求严格签名和 Gatekeeper。此开发边界不移除下载包隔离、不禁用系统安全机制；用户数据仍沿用同一事务保护。
 
-Windows Skill 私密文件采用用户 SID 独占且保护的 NTFS ACL，写入秘密之前核验；拒绝 junction 和 symlink 父目录。原生 OpenSSH/curl、不依赖 WSL；Job Object 只管理本次子进程树。Windows CLI 卸载和 NSIS 更新不删除用户配置/技能/资料；安装回归只在空白 CI runner 执行。Windows 构建不接触 Apple 凭据或更新私钥，版本签名仅在验收后的独立步骤注入。
+Windows CLI 卸载和 NSIS 更新不删除用户配置/技能/资料；安装回归只在空白 CI runner 执行。Windows 构建不接触 Apple 凭据或更新私钥，版本签名仅在验收后的独立步骤注入。
 
 ## 验证边界
 
-前端、原生、安装边界与独立 Skill 使用可重复的离线回归；公开更新向量另需实际清单与签名归档。Skill 回归使用临时生成密钥和伪配置，不使用用户凭据，不连接 VPS。配置非交互验证、拒绝 Git/Skill 写入与覆盖、秘密标准输入传输、完整目标链接、配对/权限/清理与失败/超时均有可运行回归。各平台构建运行 Skill 与原生验收，Linux 安装包按真实引擎字节检查后才交付。真实 VPS、家宽账号、TUN、桌面权限和第三方浏览器行为须在目标环境验证；未执行的操作不记为通过。视觉验收由项目所有者完成。
+前端、原生与安装边界使用可重复的离线回归；公开更新向量另需实际清单与签名归档。各平台构建运行原生验收，Linux 安装包按真实引擎字节检查后才交付。TUN、桌面权限和第三方浏览器行为须在目标环境验证；未执行的操作不记为通过。视觉验收由项目所有者完成。
 
 目录统计完整遍历白名单目标的元数据，不读取正文、不进入链接目标；不以目录规模或计时截断正常扫描。任何元数据或目录读取失败均显示路径和系统原因，并拒绝生成该目标的删除快照。清理前仍重复比较完整树指纹，变化即拒绝。
 
